@@ -1,0 +1,19 @@
+[package]
+name = "fluxdown_engine_protocol"
+version = "0.1.0"
+edition.workspace = true
+
+[dependencies]
+fluxdown_engine = { version = "0.1.0", path = "../engine", default-features = false }
+fluxdown_protocol = { version = "0.1.0", path = "../protocol" }
+
+[features]
+default = []
+plugins = ["fluxdown_engine/plugins"]
+components = ["fluxdown_engine/components"]
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+serde_json = "1"

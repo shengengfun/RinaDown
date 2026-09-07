@@ -1,0 +1,8 @@
+{
+  "name": "fluxdown-repo-tooling",
+  "description": "Repo-level tooling: @commitlint rules consumed by opencommit (OCO_PROMPT_MODULE=@commitlint) to keep commits parseable by git-cliff",
+  "private": true,
+  "devDependencies": {
+    "@commitlint/load": "^18"
+  }
+}

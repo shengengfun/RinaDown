@@ -1,0 +1,18 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { FloatingNavbar } from "../components/ui/floating-navbar";
+import NotFoundContent from "../components/NotFoundContent";
+import Footer from "../components/Footer";
+---
+
+<Layout title="404 - FluxDown" description="Page not found.">
+  <FloatingNavbar client:load />
+  <main class="pt-24 relative">
+    <!-- Background ambiance -->
+    <div class="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+      <div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-brand-blue/[0.04] blur-[140px] rounded-full"></div>
+    </div>
+    <NotFoundContent client:load />
+  </main>
+  <Footer client:load />
+</Layout>

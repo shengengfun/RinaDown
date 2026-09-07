@@ -1,0 +1,10 @@
+# 仅供 docker/server.Dockerfile（上下文 = 仓库根）使用：
+# 白名单模式，只放行 server 镜像构建所需内容，其余全部排除。
+*
+!Cargo.toml
+!Cargo.lock
+!native
+!web
+!docker
+web/node_modules
+web/dist

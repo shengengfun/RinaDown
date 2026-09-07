@@ -1,0 +1,80 @@
+---
+/**
+ * 文档页脚导航(零水合静态组件):
+ * 编辑此页 / 本页历史与贡献者 / 帮我们翻译(仅回退页)+ 上一页/下一页。
+ */
+import type { DocsNavItem } from "../../lib/docs-nav";
+
+interface Props {
+  prev: DocsNavItem | null;
+  next: DocsNavItem | null;
+  editUrl: string;
+  historyUrl: string;
+  translateUrl?: string;
+  lang: "en" | "zh";
+}
+
+const { prev, next, editUrl, historyUrl, translateUrl, lang } = Astro.props;
+const zh = lang === "zh";
+const t = {
+  edit: zh ? "编辑此页" : "Edit this page",
+  history: zh ? "本页历史与贡献者" : "Page history & contributors",
+  translate: zh ? "帮我们翻译此页" : "Help translate this page",
+  prev: zh ? "上一页" : "Previous",
+  next: zh ? "下一页" : "Next",
+};
+const metaLink =
+  "inline-flex items-center gap-1.5 text-xs text-dark-text-muted transition-colors hover:text-brand-sky";
+---
+
+<div class="mt-12 space-y-6 border-t border-dark-border pt-6">
+  <div class="flex flex-wrap gap-x-6 gap-y-2">
+    <a href={editUrl} target="_blank" rel="noopener noreferrer" class={metaLink}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path></svg>
+      {t.edit}
+    </a>
+    <a href={historyUrl} target="_blank" rel="noopener noreferrer" class={metaLink}>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg>
+      {t.history}
+    </a>
+    {
+      translateUrl && (
+        <a href={translateUrl} target="_blank" rel="noopener noreferrer" class={metaLink}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6" /><path d="m4 14 6-6 2-3" /><path d="M2 5h12" /><path d="M7 2h1" /><path d="m22 22-5-10-5 10" /><path d="M14 18h6" /></svg>
+          {t.translate}
+        </a>
+      )
+    }
+  </div>
+
+  {
+    (prev || next) && (
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {prev ? (
+          <a
+            href={prev.href}
+            class="group rounded-lg border border-dark-border p-4 transition-colors hover:border-brand-sky/40"
+          >
+            <div class="text-xs text-dark-text-muted">← {t.prev}</div>
+            <div class="mt-1 text-sm font-medium text-dark-text group-hover:text-brand-sky">
+              {prev.title}
+            </div>
+          </a>
+        ) : (
+          <div />
+        )}
+        {next && (
+          <a
+            href={next.href}
+            class="group rounded-lg border border-dark-border p-4 text-right transition-colors hover:border-brand-sky/40"
+          >
+            <div class="text-xs text-dark-text-muted">{t.next} →</div>
+            <div class="mt-1 text-sm font-medium text-dark-text group-hover:text-brand-sky">
+              {next.title}
+            </div>
+          </a>
+        )}
+      </div>
+    )
+  }
+</div>

@@ -1,0 +1,187 @@
+# 生成面向用户的双语 release notes（5 个 release job 共用）
+#
+# 流水线：git-cliff 出「原始素材」→ 采集 commit 正文 + 变更文件统计作为上下文
+#        → Claude 改写为面向用户的双语发布说明 → 校验标记，失败回退 cliff 原文。
+#
+# 与旧实现的差别：旧 prompt 要求「条目一一对应」，AI 只能当翻译机，产出仍是
+# commit 流水账。这里把 cliff 输出降级为素材之一，允许合并/删减/重述条目。
+#
+# 输出格式必须保持官网 ChangelogSection.tsx 的解析契约：
+#   <!-- fluxdown:lang:zh --> / <!-- fluxdown:lang:en --> 两个区块，
+#   区块内只用 "## 标题" / "### 分组" / "- 条目" 三级结构。
+name: Generate release notes
+description: git-cliff 采集素材 + Claude 改写为面向用户的中英双语发布说明
+
+inputs:
+  component:
+    description: 组件名（写进 prompt，帮助 AI 判断该讲什么，如 "桌面客户端" / "浏览器扩展"）
+    required: true
+  fallback-title:
+    description: 区间内无符合规范 commit 时的兜底 body
+    required: true
+  paths:
+    description: 路径过滤（空格分隔的 glob，如 'native/cli/** native/api/**'）；留空 = 全仓
+    required: false
+    default: ""
+  claude-token:
+    description: CLAUDE_CODE_OAUTH_TOKEN
+    required: true
+
+outputs:
+  file:
+    description: 生成的 release notes 文件路径
+    value: RELEASE_NOTES.md
+
+runs:
+  using: composite
+  steps:
+    # ── 素材 1：git-cliff 的 Conventional Commits 聚合 ──
+    - name: Collect git-cliff summary
+      shell: bash
+      run: |
+        set -f  # 本步先关 glob，避免 ** 在这里被展开
+        ARGS="--latest --strip header"
+        for p in ${{ inputs.paths }}; do
+          # 引号是「字面量」：git-cliff-action 会把 args 裸插进自己的 shell 命令行
+          # （run.sh --config=... ${{ inputs.args }}），不带引号的 ** 会在那边被展开成本地路径。
+          ARGS="$ARGS --include-path \"$p\""
+        done
+        echo "CLIFF_ARGS=$ARGS" >> "$GITHUB_ENV"
+
+    - uses: orhun/git-cliff-action@v4
+      with:
+        args: ${{ env.CLIFF_ARGS }}
+      env:
+        OUTPUT: RELEASE_NOTES.md
+        GITHUB_REPO: ${{ github.repository }}
+
+    # ── 素材 2：commit 正文 + 变更文件统计 ──
+    # 只有 subject 的话 AI 缺料，只能把 commit 换个说法；正文和变更面才能支撑
+    # 「这个版本用户实际感知到什么」的判断。
+    - name: Collect commit context
+      shell: bash
+      run: |
+        TAG="${GITHUB_REF#refs/tags/}"
+        PREV=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "${TAG}^" 2>/dev/null || true)
+        RANGE="${PREV:+${PREV}..}${TAG}"
+        echo "Context range: ${RANGE}"
+
+        set -f  # 同上：** 交给 git pathspec 解释，不能被 shell 先展开
+        PATHSPEC=(${{ inputs.paths }})
+        # 不用 `... | head -c`：composite 的 shell: bash 带 -eo pipefail，
+        # 素材超限时 head 提前关闭管道会让 git 收到 SIGPIPE，整步判失败。
+        # 先落盘再原地截断，规避管道。
+        {
+          echo "# Commits (${RANGE})"
+          echo
+          git log --no-merges --date=short \
+            --format='## %s%n%b%n' "$RANGE" -- "${PATHSPEC[@]}"
+          echo
+          echo "# Changed files"
+          echo
+          git diff --stat "$RANGE" -- "${PATHSPEC[@]}"
+        } > COMMIT_CONTEXT.md
+        truncate -s '<120000' COMMIT_CONTEXT.md
+
+        echo "── Commit context ($(wc -c < COMMIT_CONTEXT.md) bytes, 前 80 行) ──"
+        head -n 80 COMMIT_CONTEXT.md
+
+    # 兜底：区间内没有符合规范的 commit 时不进 AI，直接用固定标题
+    - name: Finalize baseline notes
+      id: finalize
+      shell: bash
+      run: |
+        HAS_NOTES=true
+        if [ ! -s RELEASE_NOTES.md ]; then
+          echo "${{ inputs.fallback-title }}" > RELEASE_NOTES.md
+          HAS_NOTES=false
+        fi
+        cp RELEASE_NOTES.md RELEASE_NOTES.orig.md
+        echo "has_notes=$HAS_NOTES" >> "$GITHUB_OUTPUT"
+        echo "── git-cliff raw ──"
+        cat RELEASE_NOTES.md
+
+    # ── AI 改写 ──
+    # 直接调 Claude Code CLI 而非 claude-code-action：后者事件白名单不含 push，
+    # tag 推送触发会立刻报 "Unsupported event type: push"。
+    # 注意：composite step 不支持 continue-on-error（元数据 schema 里没这个键，
+    # 写了会在 workflow 解析期直接报错），所以容错靠脚本内的 `|| ...` 兜住。
+    - name: Rewrite release notes with Claude
+      if: steps.finalize.outputs.has_notes == 'true'
+      shell: bash
+      env:
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ inputs.claude-token }}
+        COMPONENT: ${{ inputs.component }}
+      run: |
+        if ! npm install -g @anthropic-ai/claude-code; then
+          echo "::warning::claude-code CLI install failed — keeping git-cliff output"
+          exit 0
+        fi
+
+        PROMPT=$(cat <<'EOF'
+        你是 FluxDown（多协议下载器）的发布说明作者。本次发布的组件是：__COMPONENT__
+
+        输入素材（都在当前目录，只读）：
+        - RELEASE_NOTES.md：git-cliff 按 Conventional Commits 聚合的原始条目（流水账，仅作线索）
+        - COMMIT_CONTEXT.md：本区间的 commit 正文与变更文件统计
+        必要时可用 Read 打开仓库里被改动的源码/文档确认改动实质。
+
+        任务：撰写一份**面向最终用户**的发布说明，覆盖写回 RELEASE_NOTES.md。
+
+        写作要求：
+        - 讲「用户能感知到什么」，不是「改了哪个函数/文件」。每条从使用者视角描述行为变化、修好的问题、新增的能力
+        - 合并同一功能的多个 commit 为一条；纯内部重构、CI、依赖升级、格式化、测试改动一律不写（除非带来可感知的性能/体积/稳定性变化，那就写结果而非过程）
+        - 不出现 commit hash、分支名、commit 类型前缀（feat:/fix:）、*(scope)* 标记
+        - 只写素材支持的事实，绝不臆造功能；拿不准的宁可略去
+        - 条目数量以信息密度为准，宁少勿凑数；重要的排前面
+        - 若本版本有破坏性变更或需要用户手动操作（改配置、重新登录、数据迁移），必须单列 "### ⚠️ 注意事项" 分组置顶说明
+
+        输出文件格式（严格遵守；无代码块围栏、无任何额外说明文字）：
+
+        <!-- fluxdown:lang:zh -->
+        ## <版本标题> - <YYYY-MM-DD>
+
+        ### 🚀 新功能
+        - ...
+
+        ### 🐛 问题修复
+        - ...
+
+        <!-- fluxdown:lang:en -->
+        ## <version title> - <YYYY-MM-DD>
+
+        ### 🚀 Features
+        - ...
+
+        ### 🐛 Bug Fixes
+        - ...
+
+        格式硬约束（官网 changelog 页按此解析，违反会渲染错乱）：
+        - 两个语言区块内容一一对应，只有语言不同
+        - 区块内只允许 "## " 标题、"### " 分组、"- " 条目三种行首；不用嵌套列表、表格、引用块
+        - 分组按需选用（新功能 / 问题修复 / 性能优化 / 注意事项 等），没有内容的分组不要出现
+        - 版本号与日期取自 RELEASE_NOTES.md 原有的 "## [x.y.z] - 日期" 行
+        - 专有名词与代码标识（HLS、DASH、aria2、BitTorrent、Rinf、Content-Disposition、`--flag` 等）中英文区块均原样保留
+        - 只修改 RELEASE_NOTES.md，不改动任何其他文件
+        EOF
+        )
+        PROMPT="${PROMPT//__COMPONENT__/$COMPONENT}"
+
+        claude -p "$PROMPT" --allowedTools "Read,Write,Edit,Glob,Grep" \
+          || echo "::warning::Claude rewrite failed — next step falls back to git-cliff output"
+
+    # 校验：缺少双语标记说明 AI 跑偏或失败，回退 cliff 原文
+    - name: Validate notes
+      if: steps.finalize.outputs.has_notes == 'true'
+      shell: bash
+      run: |
+        if grep -q '<!-- fluxdown:lang:zh -->' RELEASE_NOTES.md \
+          && grep -q '<!-- fluxdown:lang:en -->' RELEASE_NOTES.md; then
+          echo "AI-authored bilingual notes OK"
+        else
+          echo "::warning::Rewritten notes missing language markers — falling back to git-cliff output"
+          cp RELEASE_NOTES.orig.md RELEASE_NOTES.md
+        fi
+        rm -f RELEASE_NOTES.orig.md COMMIT_CONTEXT.md
+        echo "── Final release notes ──"
+        cat RELEASE_NOTES.md

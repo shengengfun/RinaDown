@@ -1,0 +1,51 @@
+name: Website CI
+
+# 仅当 PR 涉及文档子系统相关路径时触发：构建校验（content collection schema + 全量路由）
+# + 安全 lint（拒绝危险 scheme 链接与外链图片）。不做 website/** 全站门禁，
+# 维护者确认后可扩大触发范围（见文档系统设计方案 D9）。
+on:
+  pull_request:
+    paths:
+      - "website/src/content/**"
+      - "website/src/pages/docs/**"
+      - "website/src/components/docs/**"
+      - "website/src/content.config.ts"
+      - "website/astro.config.mjs"
+      - "website/src/lib/docs-*.ts"
+
+concurrency:
+  group: website-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & Lint Docs
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: website
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # 本地用 bun/pnpm，不维护 package-lock.json，故用 install 而非 ci（同 Dockerfile 约定）
+      - name: Install dependencies
+        run: npm install
+
+      - name: "文档安全 lint（拒绝 javascript:/data: 链接与外链图片）"
+        run: npm run docs:lint
+
+      - name: Build（校验 content collection schema 与全量路由）
+        run: npm run build
+
+      # 译文 sourceHash 缺失/过期仅供提醒，不阻塞合入（见方案 D5/D9）；
+      # docs-hash.mjs --check-all 永远以 0 退出，continue-on-error 仅作为双重保险。
+      - name: sourceHash 检查报告（仅提醒，不影响本 job 结果）
+        if: always()
+        continue-on-error: true
+        run: node scripts/docs-hash.mjs --check-all >> "$GITHUB_STEP_SUMMARY"

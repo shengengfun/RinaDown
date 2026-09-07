@@ -1,0 +1,194 @@
+{
+  "identity": "fluxdown@ytdlp",
+  "name": "yt-dlp 通用视频解析",
+  "version": "3.0.0",
+  "description": "经 FluxDown yt-dlp 组件把视频页解析为可下载直链，交回引擎多段并发下载 + 断点续传。为避免误接管任意链接，仅对一批社区默认、低版权风险的主流平台生效：YouTube / Bilibili（B站）/ Niconico / Twitch / Vimeo / Dailymotion / SoundCloud / AcFun（A站）。画质在下载时经画质选择弹框由用户挑选（含各分辨率与仅音频档，非在设置里固定）；可为需要登录的平台分别配置 Cookie（如 B站大会员画质、YouTube 会员/风控、Vimeo 私有视频）。⚠ YouTube 依赖 JS 运行时：需在系统 PATH 安装 Node.js（≥22）或 Deno（≥2.3），否则无法求解 n-sig 挑战（其他平台通常不需要）。签名直链自动按一次性 URL 处理并透传 http_headers 鉴权头。关闭「优先 MP4 容器」时下载完成后经 ffmpeg 转码为 H.264/AAC mp4。需在 App「组件」页安装 yt-dlp（及可选 ffmpeg）。",
+  "homepage": "https://fluxdown.zerx.dev",
+  "minAppVersion": "0.1.60",
+  "permissions": ["ytdlp", "ffmpeg"],
+  "resolvers": [
+    {
+      "match": {
+        "urls": [
+          "*://www.youtube.com/*",
+          "*://youtube.com/*",
+          "*://m.youtube.com/*",
+          "*://music.youtube.com/*",
+          "*://youtu.be/*",
+          "*://www.bilibili.com/*",
+          "*://bilibili.com/*",
+          "*://m.bilibili.com/*",
+          "*://b23.tv/*",
+          "*://www.douyin.com/*",
+          "*://douyin.com/*",
+          "*://v.douyin.com/*",
+          "*://www.iesdouyin.com/*",
+          "*://x.com/*",
+          "*://www.x.com/*",
+          "*://twitter.com/*",
+          "*://www.twitter.com/*",
+          "*://t.co/*",
+          "*://www.nicovideo.jp/*",
+          "*://nico.ms/*",
+          "*://live.nicovideo.jp/*",
+          "*://www.twitch.tv/*",
+          "*://twitch.tv/*",
+          "*://m.twitch.tv/*",
+          "*://clips.twitch.tv/*",
+          "*://vimeo.com/*",
+          "*://player.vimeo.com/*",
+          "*://www.dailymotion.com/*",
+          "*://dailymotion.com/*",
+          "*://dai.ly/*",
+          "*://soundcloud.com/*",
+          "*://m.soundcloud.com/*",
+          "*://www.acfun.cn/*",
+          "*://acfun.cn/*"
+        ]
+      },
+      "entry": "resolve.js",
+      "timeoutMs": 45000
+    }
+  ],
+  "hooks": {
+    "entry": "hooks.js",
+    "events": ["onDone"],
+    "match": {
+      "urls": [
+        "*://www.youtube.com/*",
+        "*://youtube.com/*",
+        "*://m.youtube.com/*",
+        "*://music.youtube.com/*",
+        "*://youtu.be/*",
+        "*://www.bilibili.com/*",
+        "*://bilibili.com/*",
+        "*://m.bilibili.com/*",
+        "*://b23.tv/*",
+        "*://www.douyin.com/*",
+        "*://douyin.com/*",
+        "*://v.douyin.com/*",
+        "*://www.iesdouyin.com/*",
+        "*://x.com/*",
+        "*://www.x.com/*",
+        "*://twitter.com/*",
+        "*://www.twitter.com/*",
+        "*://t.co/*",
+        "*://www.nicovideo.jp/*",
+        "*://nico.ms/*",
+        "*://live.nicovideo.jp/*",
+        "*://www.twitch.tv/*",
+        "*://twitch.tv/*",
+        "*://m.twitch.tv/*",
+        "*://clips.twitch.tv/*",
+        "*://vimeo.com/*",
+        "*://player.vimeo.com/*",
+        "*://www.dailymotion.com/*",
+        "*://dailymotion.com/*",
+        "*://dai.ly/*",
+        "*://soundcloud.com/*",
+        "*://m.soundcloud.com/*",
+        "*://www.acfun.cn/*",
+        "*://acfun.cn/*"
+      ]
+    }
+  },
+  "settings": [
+    {
+      "key": "preferMp4",
+      "title": "优先 MP4 容器",
+      "description": "开启时优先 H.264/AV1 MP4；关闭时允许 VP9 WebM（同画质体积更小）",
+      "type": "boolean",
+      "widget": "toggle",
+      "default": "true"
+    },
+    {
+      "key": "playlistItem",
+      "title": "播放列表条目",
+      "description": "当 URL 是播放列表/合集时选择下载第几条（yt-dlp --playlist-items 语法的单值，如 1、3、-1 表最后一条）。留空则对播放列表 URL 取第 1 条。单视频 URL 忽略此项。注意：一次下载仅对应一个任务，本插件不展开整个列表。",
+      "type": "string",
+      "widget": "text",
+      "default": ""
+    },
+    {
+      "key": "jsRuntime",
+      "title": "JS 运行时（YouTube 用）",
+      "description": "yt-dlp 求解 YouTube n-sig 挑战所需的 JavaScript 运行时，须已安装在系统 PATH 中（安全限制：不能填绝对路径）。仅 YouTube 需要，缺失则 YouTube 视频无法下载（其他平台不受影响）。node 需 ≥22，deno 需 ≥2.3。none = 不指定（仅靠缓存，多数 YouTube 视频会失败）。",
+      "type": "string",
+      "widget": "select",
+      "options": [
+        { "value": "node", "label": "Node.js（推荐）" },
+        { "value": "deno", "label": "Deno" },
+        { "value": "quickjs", "label": "QuickJS" },
+        { "value": "none", "label": "不指定" }
+      ],
+      "default": "node"
+    },
+    {
+      "key": "cookiesYoutube",
+      "title": "YouTube Cookie",
+      "description": "遇「Sign in to confirm you're not a bot」风控，或下载会员/年龄限制视频时填写。支持两种格式：① 浏览器 Cookie 头 k=v; k2=v2；② Netscape cookies.txt 文件内容。⚠ YouTube 登录会话 cookie（__Secure-3PSID 等）多为 HttpOnly，网页 Console 脚本读不到——请用下方助手脚本或「开发者工具→网络面板→复制请求的 cookie 头」，或用「Get cookies.txt」扩展导出。新建下载时任务级 Cookie 优先。留空则不使用。",
+      "type": "string",
+      "widget": "textarea",
+      "default": "",
+      "helperScript": "(() => { if (!location.hostname.endsWith('youtube.com')) { console.log('%c[FluxDown] 请先打开并登录 www.youtube.com，再在本页 Console 执行本脚本', 'color:#e11'); return; } const readable = document.cookie.split('; ').filter(Boolean); const names = readable.map(s => s.split('=')[0]); const CRITICAL = ['__Secure-3PSID', '__Secure-3PSIDTS', 'LOGIN_INFO']; const missing = CRITICAL.filter(n => !names.includes(n)); if (missing.length === 0 && readable.length >= 5) { const s = readable.join('; '); try { copy(s); console.log('%c[FluxDown] 已复制 ' + readable.length + ' 条完整 cookie 到剪贴板，粘贴到插件 YouTube Cookie 输入框即可', 'color:#0a0'); } catch (e) { console.log('[FluxDown] 自动复制失败，请手动复制下面一行：'); console.log(s); } return; } console.log('%c[FluxDown] document.cookie 只能读到 ' + readable.length + ' 条 cookie，缺少登录会话 cookie（' + missing.join(', ') + '），无法通过 YouTube 风控。', 'color:#e11;font-weight:bold'); console.log('%cHttpOnly cookie 受浏览器保护、任何 Console 脚本都读不到。请改用下面任一方法获取完整 cookie：', 'color:#333'); console.log('%c方法 A（推荐，无需插件）：', 'font-weight:bold'); console.log('  1. 按 F12 打开开发者工具，切到「网络 / Network」面板'); console.log('  2. 刷新本页（F5），在请求列表点任意一条 www.youtube.com 的请求'); console.log('  3. 在「标头 / Headers」→「请求标头 / Request Headers」中找到 cookie: 一行'); console.log('  4. 完整复制 cookie: 后面的全部内容，粘贴到插件 YouTube Cookie 输入框'); console.log('%c方法 B：用「Get cookies.txt」等浏览器扩展导出 youtube.com 的 cookies.txt，整段内容粘贴到输入框', 'color:#333'); })();",
+      "helperLabel": "复制 YouTube Cookie 脚本"
+    },
+    {
+      "key": "cookiesBilibili",
+      "title": "Bilibili（B站）Cookie",
+      "description": "B站不登录只能拿默认画质；登录 cookie 可解锁 1080P，大会员 cookie 可解锁 4K/大会员番剧与付费内容。支持浏览器 Cookie 头（k=v; k2=v2，关键项 SESSDATA / bili_jct / DedeUserID）或 Netscape cookies.txt。用下方助手脚本或「开发者工具→网络面板复制 cookie 头」获取。留空则默认画质。",
+      "type": "string",
+      "widget": "textarea",
+      "default": "",
+      "helperScript": "(() => { const h = location.hostname; if (!h.endsWith('bilibili.com')) { console.log('%c[FluxDown] 请先打开并登录 www.bilibili.com，再在本页 Console 执行本脚本', 'color:#e11'); return; } const readable = document.cookie.split('; ').filter(Boolean); const names = readable.map(s => s.split('=')[0]); if (!names.includes('SESSDATA')) { console.log('%c[FluxDown] 未读到 SESSDATA（HttpOnly，Console 读不到）。请用「开发者工具→网络 / Network 面板→刷新→点任意 bilibili.com 请求→请求标头 cookie:」完整复制后粘贴到插件 Bilibili Cookie 输入框', 'color:#e11;font-weight:bold'); return; } const s = readable.join('; '); try { copy(s); console.log('%c[FluxDown] 已复制 ' + readable.length + ' 条 cookie 到剪贴板，粘贴到插件 Bilibili Cookie 输入框即可', 'color:#0a0'); } catch (e) { console.log('[FluxDown] 自动复制失败，请手动复制下面一行：'); console.log(s); } })();",
+      "helperLabel": "复制 Bilibili Cookie 脚本"
+    },
+    {
+      "key": "cookiesNiconico",
+      "title": "Niconico Cookie",
+      "description": "下载会员限定 / 需登录的 niconico 视频时填写。支持浏览器 Cookie 头或 Netscape cookies.txt。请在登录 nicovideo.jp 后用「开发者工具→网络面板复制 cookie 头」获取。留空则仅可下载公开视频。",
+      "type": "string",
+      "widget": "textarea",
+      "default": ""
+    },
+    {
+      "key": "cookiesTwitch",
+      "title": "Twitch Cookie",
+      "description": "下载订阅者限定 VOD 或需登录的 Twitch 内容时填写。支持浏览器 Cookie 头或 Netscape cookies.txt。请在登录 twitch.tv 后用「开发者工具→网络面板复制 cookie 头」获取。留空则仅可下载公开内容。",
+      "type": "string",
+      "widget": "textarea",
+      "default": ""
+    },
+    {
+      "key": "cookiesVimeo",
+      "title": "Vimeo Cookie",
+      "description": "下载私有 / 密码保护 / 需登录的 Vimeo 视频时填写。支持浏览器 Cookie 头或 Netscape cookies.txt。请在登录 vimeo.com 后用「开发者工具→网络面板复制 cookie 头」获取。留空则仅可下载公开视频。",
+      "type": "string",
+      "widget": "textarea",
+      "default": ""
+    },
+    {
+      "key": "cookiesGeneric",
+      "title": "通用 Cookie（其他平台）",
+      "description": "供上面未单列的平台（Dailymotion / SoundCloud / AcFun 等）使用的兜底 Cookie，遇需登录内容时填写。支持浏览器 Cookie 头或 Netscape cookies.txt，cookie 域按下载 URL 主机名自动推导。新建下载时任务级 Cookie 优先。留空则不使用。",
+      "type": "string",
+      "widget": "textarea",
+      "default": ""
+    },
+    {
+      "key": "extraArgs",
+      "title": "附加 yt-dlp 参数（高级）",
+      "description": "追加到 yt-dlp 解析命令的额外参数，空格分隔（如 --geo-bypass --extractor-args \"generic:impersonate\"）。用于释放 yt-dlp 高级能力。⚠ 出于安全，FluxDown 会拒绝 --exec / --downloader / --config-location / --load-info-json / --cookies-from-browser 等危险开关；--ffmpeg-location 由 FluxDown 自动注入，请勿手填。含空格的单个参数值请用引号包裹。",
+      "type": "string",
+      "widget": "text",
+      "default": ""
+    },
+    {
+      "key": "verbose",
+      "title": "详细日志",
+      "type": "boolean",
+      "widget": "toggle",
+      "default": "false"
+    }
+  ]
+}

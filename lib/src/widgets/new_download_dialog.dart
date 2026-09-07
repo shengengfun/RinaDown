@@ -1,0 +1,2487 @@
+import 'dart:async';
+import 'dart:io';
+
+import '../services/file_picker_service.dart';
+import 'package:flutter/material.dart'
+    show
+        AdaptiveTextSelectionToolbar,
+        CircularProgressIndicator,
+        Colors,
+        DefaultMaterialLocalizations,
+        InputDecoration,
+        Material,
+        MaterialType,
+        OutlineInputBorder,
+        TextField,
+        TextSelectionTheme,
+        TextSelectionThemeData;
+import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart';
+import 'package:rinf/rinf.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
+import 'flux_sonner.dart';
+import '../bindings/bindings.dart';
+import '../i18n/locale_provider.dart';
+
+import '../models/download_controller.dart';
+import '../models/download_queue.dart';
+import '../models/task_proxy_choice.dart';
+import '../models/settings_provider.dart';
+import '../models/site_auth_store.dart';
+import '../services/recent_dirs.dart';
+import '../services/system_proxy_status.dart';
+import 'context_menu.dart';
+import 'split_action_button.dart';
+import 'task_proxy_selector.dart';
+import '../models/ua_presets.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_metrics.dart';
+import '../services/bt_file_selection_service.dart';
+import '../services/resolve_preview_client.dart';
+import '../services/cloud/cloud_auth_service.dart';
+import '../services/cloud/cloud_client.dart';
+import '../services/cloud/device_identity.dart';
+import '../services/link/link_models.dart';
+import '../services/link/local_pairing_service.dart';
+
+import 'bt_file_selection_shared.dart' show formatBtFileSize;
+import 'bt_file_selection_view.dart';
+import 'dir_picker_field.dart';
+import 'manifest_select_dialog.dart';
+import 'thread_selector.dart';
+
+void showNewDownloadDialog(
+  BuildContext context,
+  DownloadController controller,
+  SettingsProvider settingsProvider,
+) {
+  showShadDialog(
+    context: context,
+    barrierColor: AppColors.of(context).dialogBarrier,
+    animateIn: const [],
+    animateOut: const [],
+    builder: (context) => _NewDownloadDialogContent(
+      controller: controller,
+      settingsProvider: settingsProvider,
+    ),
+  );
+}
+
+class _NewDownloadDialogContent extends StatefulWidget {
+  final DownloadController controller;
+  final SettingsProvider settingsProvider;
+
+  const _NewDownloadDialogContent({
+    required this.controller,
+    required this.settingsProvider,
+  });
+
+  @override
+  State<_NewDownloadDialogContent> createState() =>
+      _NewDownloadDialogContentState();
+}
+
+class _NewDownloadDialogContentState extends State<_NewDownloadDialogContent> {
+  final _urlController = TextEditingController();
+  final _urlFocusNode = FocusNode();
+  final _saveDirController = TextEditingController();
+  final _renameController = TextEditingController();
+  final _proxyUrlController = TextEditingController();
+
+  /// 任务代理选择项（自定义 URL 仍走 [_proxyUrlController]）。
+  TaskProxyChoice _proxyChoice = TaskProxyChoice.followGlobal;
+  final _userAgentController = TextEditingController();
+
+  /// 任务 Cookie（#256）。Cookie 是独立入口，不并入 extra_headers。
+  final _cookieController = TextEditingController();
+
+  /// 哈希校验值（#247/#248）；与 [_selectedHashAlgo] 拼成 "algo=hexhash"。
+  final _checksumController = TextEditingController();
+
+  /// 选中的哈希算法（与后端 verify_checksum 支持的算法名一致）。
+  String _selectedHashAlgo = 'sha-256';
+
+  /// HTTP Basic 认证（仅单条 URL 非种子路径生效；留空 = 引擎自动套用
+  /// 已为该站点保存的凭据）。
+  final _httpAuthUserController = TextEditingController();
+  final _httpAuthPasswordController = TextEditingController();
+
+  /// 密码输入框明文显示切换。
+  bool _showHttpAuthPassword = false;
+
+  /// 是否把本次凭据按站点保存到本地（引擎侧明文存 config）。
+  bool _saveSiteAuth = false;
+
+  /// 当前认证两框内容是否来自站点凭据自动回填（是则 URL 切换时可被
+  /// 更新/清空；用户手动编辑后置 false 并锁死 [_httpAuthDirty]）。
+  bool _httpAuthAutofilled = false;
+
+  /// 用户手动编辑过认证输入 → 本次对话框内不再自动覆盖。
+  bool _httpAuthDirty = false;
+
+  /// 正在程序化写入认证两框（区分自动回填与用户手动输入的监听护栏）。
+  bool _applyingAuthAutofill = false;
+
+  /// 自定义请求头列表（#347），每项含一对 key/value 输入控制器。
+  final List<_HeaderRow> _headerRows = [];
+
+  String? selectedThreads;
+  String _selectedUaPreset = 'default';
+
+  /// 选中的队列 ID（空字符串 = 默认队列）
+  String _selectedQueueId = '';
+
+  /// 下载到（目标设备）：null/空 = 本机；非空 = 远程 deviceId 或本地配对
+  /// 设备指纹。渐进披露 — 仅当存在远程设备或本地配对设备时才在 UI 呈现
+  /// 选择行，两者都没有时该字段恒为 null，本机下载路径零改动。
+  String? _selectedDeviceId;
+
+  /// 用户是否手动修改过线程数（用于判断切换队列时是否需要自动更新）
+  bool _threadsUserModified = false;
+
+  /// 是否展开高级选项（含任务代理）
+  bool _showAdvanced = false;
+
+  /// 当前任务是否显式忽略 HTTPS 证书错误。安全默认值为 false。
+  bool _ignoreTlsErrors = false;
+
+  /// 防止双击重复提交
+  bool _isSubmitting = false;
+
+  /// 解析出的有效 URL 数量（实时计算）
+  int _urlCount = 0;
+
+  /// 是否所有链接都是 magnet
+  bool _allMagnet = false;
+
+  /// 已选择的 .torrent 文件路径列表（单次只支持一个，批量 torrent 通过多次添加实现）
+  final List<String> _torrentFilePaths = [];
+
+  /// 防止重复打开文件选择器
+  bool _isPicking = false;
+
+  /// 用户是否手动通过文件选择器修改过保存目录（是则不再自动覆盖）
+  bool _saveDirUserModified = false;
+
+  // ── torrent 文件预解析状态 ──────────────────────────────────────────────────
+
+  /// 当前正在解析的 probe_id → torrent 路径映射（一次只解析一个）
+  String? _probingPath;
+
+  /// 解析结果：路径 → TorrentMetaResult
+  final Map<String, TorrentMetaResult> _torrentMeta = {};
+
+  /// 解析进行中（显示 loading）
+  bool _isProbing = false;
+
+  /// 解析错误消息（非空时显示）
+  String _probeError = '';
+
+  /// 每个 torrent 文件的文件勾选状态：路径 → 已选 index 集合
+  final Map<String, Set<int>> _torrentSelections = {};
+
+  /// TorrentMetaResult 信号订阅
+  StreamSubscription<RustSignalPack<TorrentMetaResult>>? _metaSub;
+
+  // ── 磁力链接等待文件选择状态机 ─────────────────────────────────────────────
+  // 状态：null = 普通模式；'probing' = 已创建任务正在等待 DHT 解析；
+  //        'selecting' = 文件元数据已到达，展示文件选择视图；
+  //        'error' = 解析失败（任务已转 error，如元数据解析超时）
+  String? _btWaitPhase; // null | 'probing' | 'selecting' | 'error'
+
+  /// 收到 BtFilesInfo 后记录的真实 task_id（用于发送 SelectBtFiles）
+  String? _btPendingTaskId;
+
+  /// 提交的磁力链接 URL（probing 阶段 task_id 未知，用 URL 匹配错误信号）
+  String? _btSubmittedUrl;
+
+  /// 解析失败时 Rust 返回的错误消息（phase=error 时显示）
+  String _btErrorMessage = '';
+
+  /// TaskProgress 信号订阅 — 监听磁力任务在等待阶段转入 error 状态（#379）
+  StreamSubscription<RustSignalPack<TaskProgress>>? _btProgressSub;
+
+  /// 收到的 BT 文件条目（Phase=selecting 时非空）
+  List<BtFileEntry> _btFiles = [];
+
+  /// 用户在对话框内对 BT 文件的勾选状态
+  Set<int> _btSelectedIndices = {};
+
+  /// 用户在 probing 阶段（task_id 尚未知）点了取消，或对话框被关闭。
+  /// 下次收到 BtFilesInfo 时立刻发 [-1] 让 Rust 暂停任务。
+  bool _btCancelPending = false;
+
+  /// 提交磁力任务前的任务 id 快照 —— probing 阶段引擎只回 URL 相同的新任务，
+  /// 靠"不在快照里"把刚创建的那条与历史同磁力任务区分开。
+  Set<String> _btPreExistingTaskIds = const {};
+
+  // ── manifest 预解析状态（单条 http(s) 链接可能是多文件清单）───────────────
+  // 提交单条 http(s) 非磁力/种子/ed2k 链接时先探测是否为多文件清单（发送/
+  // 90s 超时/取消/迟到丢弃逻辑收敛在 ResolvePreviewClient，独立小窗与快速
+  // 下载回退对话框共用同一实现）。命中清单则弹 manifest_select_dialog；
+  // 无清单/error/超时/用户取消都回退到（或中止）原有单任务创建路径，
+  // 行为零差异。
+
+  /// 当前等待中的预解析；非 null 时动作按钮进入 loading 态。
+  ResolvePreviewHandle? _previewHandle;
+
+  /// 用户主动取消了本次预解析等待——让 `_startDownloadInner` 区分"取消"
+  /// （中止整个提交）与"无清单"（继续走原有创建路径）。
+  bool _previewCancelled = false;
+
+  /// 根据队列 ID 计算有效的线程数选项字符串。
+  ///
+  /// 优先级：自定义队列的 defaultSegments → 全局 defaultSegments → null（Auto）
+  String? _effectiveSegmentsOption(String queueId) {
+    if (queueId.isNotEmpty) {
+      final queue = widget.controller.queues
+          .where((q) => q.queueId == queueId)
+          .firstOrNull;
+      if (queue != null && queue.defaultSegments > 0) {
+        return queue.defaultSegments.toString();
+      }
+    }
+    final global = widget.settingsProvider.defaultSegments;
+    return global > 0 ? global.toString() : null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // 打开对话框即触发系统代理检测（在途去重）；结果经 listener 驱动
+    // 任务代理选择器的禁用态实时更新。
+    SystemProxyStatusService.instance
+      ..addListener(_onProxyStatusChanged)
+      ..refresh();
+    _saveDirController.text = widget.settingsProvider.effectiveDefaultSaveDir;
+    _urlController.addListener(_onUrlChanged);
+    _httpAuthUserController.addListener(_onHttpAuthEdited);
+    _httpAuthPasswordController.addListener(_onHttpAuthEdited);
+    _pasteUrlFromClipboard();
+    // 优先使用侧边栏队列筛选，否则使用设置中的默认队列；'' 已不是有效
+    // 归属（引擎会兜底重映射到主队列），选择器直接落到主队列。
+    final qf = widget.controller.queueFilter;
+    var initialQueue = (qf != null && qf.isNotEmpty)
+        ? qf
+        : widget.settingsProvider.defaultQueueId;
+    if (initialQueue.isEmpty) initialQueue = kMainQueueId;
+    _selectedQueueId = initialQueue;
+    // "下载到"记忆上次选择的目标设备；空 = 本机（渐进披露：无远程设备时
+    // 该值不会在 UI 中出现选择入口，_selectedDeviceId 也不影响提交路径）。
+    // 记忆值可能是云端 deviceId，也可能是局域网指纹（同一个偏好字段承载
+    // 两种命名空间），必须校验目标仍在其中一份名册里才能回填——否则典型
+    // 场景是用户解除了那台局域网设备的配对且未登录云账号：下方
+    // hasRemoteDevices/hasLocalDevices 都为 false，设备选择行整行不渲染，
+    // 但 _selectedDeviceId 仍指向一个失效指纹，提交时照样会走
+    // _dispatchEntriesToDevice 下发分支、本地名册查不到再回退云端下发，
+    // 变成每次新建下载都必然失败，且界面上没有入口能改回本机。找不到就
+    // 当作本机（null），不留死选择。
+    final lastTargetDevice = widget.settingsProvider.lastTargetDevice;
+    final knownRemote = CloudAuthService.instance.remoteDevices.any(
+      (d) => d.deviceId == lastTargetDevice,
+    );
+    final knownLocal = LocalPairingService.instance.localDevices.any(
+      (d) => d.fingerprint == lastTargetDevice,
+    );
+    _selectedDeviceId =
+        (lastTargetDevice.isNotEmpty && (knownRemote || knownLocal))
+        ? lastTargetDevice
+        : null;
+    // 优先沿用上次用户选择的线程数，其次根据队列/全局设置初始化
+    final lastThreads = widget.settingsProvider.lastDialogThreads;
+    selectedThreads = lastThreads.isNotEmpty
+        ? (lastThreads == 'auto' ? null : lastThreads)
+        : _effectiveSegmentsOption(_selectedQueueId);
+    // 订阅 torrent meta 解析结果（.torrent 文件预解析）
+    _metaSub = TorrentMetaResult.rustSignalStream.listen(_onTorrentMetaResult);
+    // 订阅任务进度 — 磁力等待阶段任务转 error 时跳出等待并展示错误（#379）
+    _btProgressSub = TaskProgress.rustSignalStream.listen(_onBtTaskProgress);
+  }
+
+  /// 磁力等待阶段（probing/selecting）监听任务错误信号。
+  ///
+  /// Rust 端磁力元数据解析超时（或其他失败）会把任务标为 status=4 并发
+  /// TaskProgress，但不会发 BtFilesInfo——若不处理，对话框会永远停留在
+  /// “正在解析磁力链接”。probing 阶段 task_id 未知，用任务 URL 与提交的
+  /// 磁力链接匹配；selecting 阶段直接按 task_id 匹配。
+  void _onBtTaskProgress(RustSignalPack<TaskProgress> pack) {
+    final msg = pack.message;
+    if (!mounted) return;
+    if (_btWaitPhase != 'probing' && _btWaitPhase != 'selecting') return;
+    if (msg.status != 4) return;
+
+    if (_btWaitPhase == 'selecting') {
+      if (msg.taskId != _btPendingTaskId) return;
+    } else {
+      // probing：通过 controller 中的任务记录用 URL 匹配
+      final task = widget.controller.tasks
+          .where((t) => t.id == msg.taskId)
+          .firstOrNull;
+      if (task == null || task.url != _btSubmittedUrl) return;
+    }
+
+    BtFileSelectionService.registerPendingHandler(null);
+    setState(() {
+      _btWaitPhase = 'error';
+      _btErrorMessage = msg.errorMessage;
+      _btPendingTaskId = null;
+    });
+  }
+
+  /// 由 [BtFileSelectionService] 回调：DHT 解析完成，文件元数据已就绪。
+  void _onBtFilesInfoReceived(BtFilesInfo msg) {
+    // 用户已取消（probing 阶段点取消、或对话框被关闭）：
+    // 立刻发 [-1] 让 Rust 将任务暂停，不展示文件选择视图。
+    if (_btCancelPending || !mounted || _btWaitPhase != 'probing') {
+      SelectBtFiles(
+        taskId: msg.taskId,
+        selectedIndices: const [-1],
+      ).sendSignalToRust();
+      return;
+    }
+    setState(() {
+      _btPendingTaskId = msg.taskId;
+      _btWaitPhase = 'selecting';
+      _btFiles = msg.files;
+      _btSelectedIndices = msg.files.map((f) => f.index.toInt()).toSet();
+    });
+  }
+
+  /// probing 阶段关闭/取消对话框：直接把刚创建的任务暂停。
+  ///
+  /// 磁力元数据可能长时间（引擎侧 300s 才超时）解析不出来，此时 Rust 永远
+  /// 不会发 BtFilesInfo，只靠 [_btCancelPending] 等信号到达再发 [-1] 会让
+  /// 任务一直卡在"准备中"。引擎的 pause 路径显式覆盖"元数据解析期间暂停"
+  /// （drop 掉 detached add_torrent 并落 paused），与 [-1] 的语义一致。
+  void _abortProbingTask() {
+    _btCancelPending = true;
+    final taskId = _resolveProbingTaskId();
+    if (taskId == null) {
+      // 任务记录还没从进度信号回流：保留 Service 回调，等 BtFilesInfo 到达
+      // 时由 _onBtFilesInfoReceived 发 [-1] 兜底。
+      return;
+    }
+    widget.controller.pauseTask(taskId);
+    BtFileSelectionService.registerPendingHandler(null);
+  }
+
+  /// 按提交的磁力 URL 反查本次创建的任务 id（排除提交前已存在的同 URL 任务）。
+  String? _resolveProbingTaskId() {
+    final url = _btSubmittedUrl;
+    if (url == null || url.isEmpty) return null;
+    for (final t in widget.controller.tasks.reversed) {
+      if (t.url == url && !_btPreExistingTaskIds.contains(t.id)) return t.id;
+    }
+    return null;
+  }
+
+  void _onTorrentMetaResult(RustSignalPack<TorrentMetaResult> pack) {
+    final msg = pack.message;
+    // probeId 就是文件路径（_probeTorrentFile 里以 path 作为 probeId）
+    final path = msg.probeId;
+    // 只处理本对话框发出的 probe（路径必须在当前列表中）
+    if (!_torrentFilePaths.contains(path)) return;
+    if (!mounted) return;
+    setState(() {
+      if (_probingPath == path) {
+        _isProbing = false;
+        _probingPath = null;
+      }
+      if (msg.error.isNotEmpty) {
+        _probeError = msg.error;
+      } else {
+        _probeError = '';
+        _torrentMeta[path] = msg;
+        // 默认全选
+        _torrentSelections[path] = msg.files
+            .map((f) => f.index.toInt())
+            .toSet();
+      }
+    });
+  }
+
+  void _onUrlChanged() {
+    final entries = _parseEntries(_urlController.text);
+    final count = entries.length;
+    final allMagnet =
+        entries.isNotEmpty &&
+        entries.every((e) => e.url.toLowerCase().startsWith('magnet:'));
+    if (count != _urlCount || allMagnet != _allMagnet) {
+      setState(() {
+        _urlCount = count;
+        _allMagnet = allMagnet;
+      });
+    }
+    // 站点凭据自动回填：URL 变化时按站点键查已保存凭据表
+    _maybeAutofillSiteAuth(
+      entries.length == 1 && !_hasTorrentFiles ? entries.first.url : null,
+    );
+    // 自动从 URL 提取文件名并匹配分类保存目录
+    if (entries.isNotEmpty &&
+        !entries.first.url.toLowerCase().startsWith('magnet:')) {
+      final fileName = _extractFilenameFromUrl(entries.first.url);
+      _tryAutoApplySaveDir(fileName);
+    }
+  }
+
+  /// 认证输入变化监听 — 程序化写入（自动回填/清空）经
+  /// [_applyingAuthAutofill] 护栏跳过；其余视为用户手动编辑，此后
+  /// 本对话框内不再自动覆盖两框内容。
+  void _onHttpAuthEdited() {
+    if (_applyingAuthAutofill) return;
+    _httpAuthDirty = true;
+    _httpAuthAutofilled = false;
+  }
+
+  /// 按当前（单条）URL 的站点键查凭据表并回填/更新/清空认证两框。
+  ///
+  /// [url] 为 null = 非单条 http(s) 路径（批量/种子等）：仅当两框仍是
+  /// 自动值时清空。用户手动编辑过（[_httpAuthDirty]）则一律不动；
+  /// 「为此网站保存」开关不被拨动。
+  void _maybeAutofillSiteAuth(String? url) {
+    if (_httpAuthDirty) return;
+    final key = url == null ? null : siteKeyFromUrl(url);
+    final cred = key == null
+        ? null
+        : parseSiteAuthStore(widget.settingsProvider.siteAuthCredentials)[key];
+    _applyingAuthAutofill = true;
+    try {
+      if (cred != null) {
+        // 仅当字段为空或此前就是自动回填值时才覆盖（防御浏览器捕获
+        // 等外部预填：非空且非自动 → 视为脏，不动）。
+        final canWrite =
+            _httpAuthAutofilled ||
+            (_httpAuthUserController.text.isEmpty &&
+                _httpAuthPasswordController.text.isEmpty);
+        if (!canWrite) return;
+        if (_httpAuthUserController.text != cred.user) {
+          _httpAuthUserController.text = cred.user;
+        }
+        if (_httpAuthPasswordController.text != cred.pass) {
+          _httpAuthPasswordController.text = cred.pass;
+        }
+        _httpAuthAutofilled = true;
+      } else if (_httpAuthAutofilled) {
+        // URL 切到无凭据站点且两框仍是自动值 → 清空
+        _httpAuthUserController.clear();
+        _httpAuthPasswordController.clear();
+        _httpAuthAutofilled = false;
+      }
+    } finally {
+      _applyingAuthAutofill = false;
+    }
+  }
+
+  /// 将 [_ParsedEntry] 转换回 aria2 风格文本（含 out= / checksum= 选项行）。
+  static String _entryToText(_ParsedEntry e) {
+    final buf = StringBuffer()..write(e.url);
+    if (e.fileName.isNotEmpty) buf.write('\n  out=${e.fileName}');
+    if (e.checksum.isNotEmpty) buf.write('\n  checksum=${e.checksum}');
+    return buf.toString();
+  }
+
+  /// 从文本解析 aria2 风格的下载条目列表。
+  ///
+  /// 支持格式：
+  /// ```
+  /// https://example.com/file.zip
+  ///   out=myname.zip
+  ///   checksum=sha-256=abc123...
+  ///
+  /// # 注释行（忽略）
+  /// https://example.com/plain.zip
+  /// ```
+  ///
+  /// [loose] 为 true 时从行内任意位置提取 URL，适合 TXT 文件导入；
+  /// 默认严格模式要求 URL 位于行首，适合手动输入。
+  static List<_ParsedEntry> _parseEntries(String text, {bool loose = false}) {
+    final lines = text.split('\n');
+    final entries = <_ParsedEntry>[];
+    _ParsedEntry? current;
+    final pattern = RegExp(r'(https?|ftp)://\S+', caseSensitive: false);
+    final strictPattern = RegExp(r'^(https?|ftp)://\S+', caseSensitive: false);
+
+    for (final line in lines) {
+      // 选项行：原始行以空格或 Tab 开头
+      if (line.startsWith(' ') || line.startsWith('\t')) {
+        if (current == null) continue;
+        final trimmed = line.trim();
+        if (trimmed.startsWith('out=')) {
+          current = _ParsedEntry(
+            current.url,
+            fileName: trimmed.substring(4),
+            checksum: current.checksum,
+          );
+        } else if (trimmed.startsWith('checksum=')) {
+          current = _ParsedEntry(
+            current.url,
+            fileName: current.fileName,
+            checksum: trimmed.substring(9),
+          );
+        }
+        continue;
+      }
+
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      if (trimmed.startsWith('#')) continue; // 注释行
+
+      // 新 URL 行：先把上一个入队
+      if (current != null) {
+        entries.add(current);
+        current = null;
+      }
+
+      final lower = trimmed.toLowerCase();
+      final magnetIdx = lower.indexOf('magnet:?');
+      final ed2kIdx = lower.indexOf('ed2k://');
+      if (magnetIdx != -1) {
+        current = _ParsedEntry(trimmed.substring(magnetIdx));
+      } else if (ed2kIdx != -1) {
+        current = _ParsedEntry(trimmed.substring(ed2kIdx));
+      } else if (loose) {
+        // loose 模式取行内第一个 URL 并设为 current，使后续选项行（out=/checksum=）
+        // 能正常附着。直接 add 会跳过 current，导致 TXT 导入时选项全部丢失。
+        final match = pattern.firstMatch(trimmed);
+        if (match != null) {
+          final url = _trimUrlTail(match.group(0)!);
+          if (url.isNotEmpty) current = _ParsedEntry(url);
+        }
+      } else {
+        final match = strictPattern.firstMatch(trimmed);
+        if (match != null) {
+          current = _ParsedEntry(match.group(0)!);
+        }
+      }
+    }
+    if (current != null) entries.add(current);
+    return entries;
+  }
+
+  /// 去掉 URL 末尾常见标点（TXT 文本中 URL 后可能跟随句号/逗号等）
+  static String _trimUrlTail(String url) =>
+      url.replaceAll(RegExp(r'[.,;:!?()\[\]{}]+$'), '');
+
+  /// 读取剪切板内容，自动填入所有识别到的条目（支持 aria2 格式）
+  Future<void> _pasteUrlFromClipboard() async {
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      if (!mounted) return;
+      if (data == null || data.text == null) return;
+      final text = data.text!.trim();
+
+      final entries = _parseEntries(text);
+      if (entries.isEmpty) return;
+
+      // 直接保留原始文本（含 aria2 选项行）
+      _urlController.text = text;
+    } catch (_) {
+      // 剪切板访问失败时静默忽略
+    }
+  }
+
+  @override
+  void dispose() {
+    SystemProxyStatusService.instance.removeListener(_onProxyStatusChanged);
+    // selecting 阶段：已拿到 task_id，直接发 [-1] 让 Rust 暂停任务
+    if (_btWaitPhase == 'selecting' && _btPendingTaskId != null) {
+      SelectBtFiles(
+        taskId: _btPendingTaskId!,
+        selectedIndices: const [-1],
+      ).sendSignalToRust();
+      BtFileSelectionService.registerPendingHandler(null);
+    } else if (_btWaitPhase == 'probing') {
+      // probing 阶段：直接暂停刚创建的任务，别让它卡在"准备中"等 300s 超时。
+      // 反查不到任务时 _abortProbingTask 保留 Service 回调走 [-1] 兜底。
+      _abortProbingTask();
+    } else if (!_btCancelPending) {
+      // 普通关闭（含 error 阶段），清除任何残留的 Service 回调。
+      // _btCancelPending 为真说明 probing 取消时已按需处理过回调（可能刻意
+      // 保留兜底），这里不能再清。
+      BtFileSelectionService.registerPendingHandler(null);
+    }
+    _metaSub?.cancel();
+    _btProgressSub?.cancel();
+    // dispose 期间还有预解析等待中：视同用户取消，避免 `_startDownloadInner`
+    // 的挂起协程在组件已卸载后误判"无清单"继续创建任务（对齐
+    // `_cancelPreviewResolve` 的取消语义）。
+    _previewHandle?.cancel();
+    _previewHandle = null;
+    _urlController.removeListener(_onUrlChanged);
+    _urlController.dispose();
+    _urlFocusNode.dispose();
+    _saveDirController.dispose();
+    _renameController.dispose();
+    _proxyUrlController.dispose();
+    _userAgentController.dispose();
+    _cookieController.dispose();
+    _checksumController.dispose();
+    _httpAuthUserController
+      ..removeListener(_onHttpAuthEdited)
+      ..dispose();
+    _httpAuthPasswordController
+      ..removeListener(_onHttpAuthEdited)
+      ..dispose();
+    for (final row in _headerRows) {
+      row.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _pickTorrentFiles() async {
+    if (_isPicking) return;
+    setState(() => _isPicking = true);
+    try {
+      final result = await FilePickerService.pickFiles(
+        dialogTitle: currentS.selectTorrentFile,
+        allowedExtensions: ['torrent'],
+        allowMultiple: true,
+      );
+      if (result != null && result.isNotEmpty && mounted) {
+        setState(() {
+          for (final file in result) {
+            if (!_torrentFilePaths.contains(file.path)) {
+              _torrentFilePaths.add(file.path);
+            }
+          }
+        });
+        // 自动解析最后一个新添加的 torrent 文件
+        final newPath = _torrentFilePaths.last;
+        if (!_torrentMeta.containsKey(newPath)) {
+          await _probeTorrentFile(newPath);
+        }
+      }
+    } on FilePickerException catch (e) {
+      if (mounted) _showPickerError(e);
+    } finally {
+      if (mounted) setState(() => _isPicking = false);
+    }
+  }
+
+  /// 发送 ProbeTorrentMeta 信号，触发 Rust 本地解析 .torrent 文件内容
+  Future<void> _probeTorrentFile(String path) async {
+    if (!mounted) return;
+    try {
+      final bytes = await File(path).readAsBytes();
+      if (!mounted) return;
+      setState(() {
+        _isProbing = true;
+        _probeError = '';
+        _probingPath = path;
+      });
+      ProbeTorrentMeta(probeId: path, torrentBytes: bytes).sendSignalToRust();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isProbing = false;
+          _probeError = e.toString();
+        });
+      }
+    }
+  }
+
+  void _removeTorrentFile(int index) {
+    final path = _torrentFilePaths[index];
+    setState(() {
+      _torrentFilePaths.removeAt(index);
+      _torrentMeta.remove(path);
+      _torrentSelections.remove(path);
+      if (_probingPath == path) {
+        _probingPath = null;
+        _isProbing = false;
+      }
+    });
+  }
+
+  /// 从 TXT 文件中导入链接，支持多文件选择
+  Future<void> _importFromTxt() async {
+    if (_isPicking) return;
+    setState(() => _isPicking = true);
+    try {
+      final result = await FilePickerService.pickFiles(
+        dialogTitle: currentS.importTxtFile,
+        allowedExtensions: ['txt', 'text'],
+        allowMultiple: true,
+      );
+      if (result == null || result.isEmpty || !mounted) return;
+
+      final imported = <_ParsedEntry>[];
+      for (final file in result) {
+        try {
+          final content = await File(file.path).readAsString();
+          imported.addAll(_parseEntries(content, loose: true));
+        } catch (_) {
+          // 单文件读取失败时跳过，继续处理其他文件
+        }
+      }
+
+      if (!mounted) return;
+
+      if (imported.isEmpty) {
+        FluxSonner.of(
+          context,
+        ).show(ShadToast(title: Text(currentS.importTxtNoUrls)));
+        return;
+      }
+
+      // 追加到已有内容，按 URL 去重，保留 fileName / checksum
+      final existing = _parseEntries(_urlController.text);
+      final existingUrls = existing.map((e) => e.url).toSet();
+      final toAdd = imported.where((e) => !existingUrls.contains(e.url));
+      final merged = [...existing, ...toAdd];
+      _urlController.text = merged.map(_entryToText).join('\n');
+
+      FluxSonner.of(
+        context,
+      ).show(ShadToast(title: Text(currentS.importTxtFound(imported.length))));
+    } on FilePickerException catch (e) {
+      if (mounted) _showPickerError(e);
+    } finally {
+      if (mounted) setState(() => _isPicking = false);
+    }
+  }
+
+  /// 根据文件名尝试自动匹配分类的保存目录。
+  /// 只在用户未手动修改过保存目录时生效。
+  void _tryAutoApplySaveDir(String fileName) {
+    if (fileName.isEmpty || _saveDirUserModified) return;
+    final categories =
+        widget.settingsProvider.customCategories
+            .where((c) => c.visible)
+            .toList()
+          ..sort((a, b) => a.position.compareTo(b.position));
+
+    // 先查普通分类（非 all / other）
+    for (final cat in categories) {
+      if (cat.builtinType == 'all' || cat.builtinType == 'other') continue;
+      if (cat.saveDir.isNotEmpty && cat.matches(fileName)) {
+        _saveDirController.text = cat.saveDir;
+        return;
+      }
+    }
+
+    // 再查 other 分类
+    final normals = categories
+        .where((c) => c.builtinType != 'all' && c.builtinType != 'other')
+        .toList();
+    final otherCat = categories
+        .where((c) => c.builtinType == 'other')
+        .firstOrNull;
+    if (otherCat != null && otherCat.saveDir.isNotEmpty) {
+      final matchesAny = normals.any((c) => c.matches(fileName));
+      if (!matchesAny) {
+        _saveDirController.text = otherCat.saveDir;
+      }
+    }
+  }
+
+  /// 从 URL 中提取文件名（取最后一段路径，必须包含 '.'）
+  static String _extractFilenameFromUrl(String url) {
+    try {
+      final uri = Uri.parse(url.trim());
+      final segments = uri.pathSegments;
+      if (segments.isNotEmpty) {
+        final last = Uri.decodeComponent(segments.last);
+        if (last.contains('.')) return last;
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  Future<void> _pickSaveDir() async {
+    if (_isPicking) return;
+    setState(() => _isPicking = true);
+    try {
+      final result = await FilePickerService.pickDirectory(
+        dialogTitle: currentS.selectSaveDir,
+        initialDirectory: _saveDirController.text.trim().isNotEmpty
+            ? _saveDirController.text.trim()
+            : null,
+      );
+      if (result != null && mounted) {
+        _saveDirController.text = result;
+        _saveDirUserModified = true;
+      }
+    } on FilePickerException catch (e) {
+      if (mounted) _showPickerError(e);
+    } finally {
+      if (mounted) setState(() => _isPicking = false);
+    }
+  }
+
+  void _showPickerError(FilePickerException e) {
+    final s = currentS;
+    final message = switch (e.reason) {
+      FilePickerFailReason.timeout => s.filePickerErrorTimeout,
+      FilePickerFailReason.noDialogTool => s.filePickerErrorNoTool,
+      FilePickerFailReason.comInitFailed => s.filePickerErrorNative,
+      FilePickerFailReason.nativeDialogFailed => s.filePickerErrorNative,
+      FilePickerFailReason.unknown => s.filePickerErrorGeneric,
+    };
+    FluxSonner.of(context).show(ShadToast.destructive(title: Text(message)));
+  }
+
+  bool get _isBatch => _urlCount > 1;
+  bool get _hasTorrentFiles => _torrentFilePaths.isNotEmpty;
+
+  /// Build the UI block for a single .torrent entry at index [ti].
+  Widget _buildTorrentFileEntry(int ti, AppColors c, S s) {
+    final path = _torrentFilePaths[ti];
+    final fileName = File(path).uri.pathSegments.last;
+    final meta = _torrentMeta[path];
+    final selection = _torrentSelections[path];
+    final isCurrentlyProbing = _isProbing && _probingPath == path;
+    final m = AppMetrics.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Header row: name + size + remove ──────────────────────────────
+        Row(
+          children: [
+            Icon(LucideIcons.fileDown, size: 13, color: c.accent),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                meta != null ? meta.name : fileName,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                  color: c.textPrimary,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+            if (meta != null) ...[
+              Text(
+                formatBtFileSize(meta.totalBytes.toInt()),
+                style: TextStyle(fontSize: 11, color: c.textMuted),
+              ),
+              const SizedBox(width: 8),
+            ],
+            GestureDetector(
+              onTap: () => _removeTorrentFile(ti),
+              child: Icon(LucideIcons.x, size: 14, color: c.textMuted),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        // ── Loading indicator ──────────────────────────────────────────────
+        if (isCurrentlyProbing)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            alignment: Alignment.center,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: c.accent,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  s.btProbing,
+                  style: TextStyle(fontSize: 12, color: c.textMuted),
+                ),
+              ],
+            ),
+          )
+        // ── Parse error ────────────────────────────────────────────────────
+        else if (_probeError.isNotEmpty && meta == null)
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: m.subtle(c.statusError),
+              borderRadius: m.brCard,
+              border: Border.all(color: m.borderSubtle(c.statusError)),
+            ),
+            child: Row(
+              children: [
+                Icon(LucideIcons.circleAlert, size: 13, color: c.statusError),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    s.btProbeError,
+                    style: TextStyle(fontSize: 12, color: c.statusError),
+                  ),
+                ),
+              ],
+            ),
+          )
+        // File selection view (tree by default, list optional).
+        else if (meta != null && selection != null)
+          BtFileSelectionView(
+            key: ValueKey('torrent-file-selection:$path'),
+            files: meta.files,
+            selectedIndices: selection,
+            onSelectionChanged: (updatedSelection) {
+              setState(() {
+                _torrentSelections[path] = updatedSelection;
+              });
+            },
+            maxHeight: 260,
+          ),
+        if (ti < _torrentFilePaths.length - 1) const SizedBox(height: 14),
+      ],
+    );
+  }
+
+  /// 构建下载按钮的标签文字。
+  ///
+  /// - torrent 已全部解析完成：显示「下载 N 个文件（X MB）」
+  /// - torrent 解析中：显示「解析中...」
+  /// - torrent 未解析（如解析失败）：显示「开始下载 N 个」
+  /// - 普通 URL 批量：显示「下载 N 个文件」
+  /// - 普通 URL 单条：显示「开始下载」
+  /// 计算 BT 等待阶段用户已选文件的总大小
+  int get _btSelectedTotalBytes {
+    int total = 0;
+    for (final f in _btFiles) {
+      if (_btSelectedIndices.contains(f.index.toInt())) {
+        total += f.size.toInt();
+      }
+    }
+    return total;
+  }
+
+  String _buildStartButtonLabel(S s) {
+    if (_hasTorrentFiles) {
+      if (_isProbing) return s.btProbing;
+      // 统计所有已解析 torrent 中用户选中的文件总数和总大小
+      int totalSelected = 0;
+      int totalBytes = 0;
+      bool allProbed = true;
+      for (final path in _torrentFilePaths) {
+        final meta = _torrentMeta[path];
+        final sel = _torrentSelections[path];
+        if (meta == null) {
+          allProbed = false;
+          continue;
+        }
+        if (sel != null) {
+          totalSelected += sel.length;
+          for (final f in meta.files) {
+            if (sel.contains(f.index.toInt())) {
+              totalBytes += f.size.toInt();
+            }
+          }
+        }
+      }
+      if (allProbed && totalSelected > 0) {
+        return s.btStartWithSelection(
+          totalSelected,
+          formatBtFileSize(totalBytes),
+        );
+      }
+      return s.startBatchDownload(_torrentFilePaths.length);
+    }
+    if (_isBatch) return s.startBatchDownload(_urlCount);
+    return s.startDownload;
+  }
+
+  /// 当前所有 torrent 文件是否都已解析完成（或解析失败）
+  bool get _allTorrentsProbed =>
+      !_isProbing &&
+      _torrentFilePaths.every(
+        (p) => _torrentMeta.containsKey(p) || _probeError.isNotEmpty,
+      );
+
+  /// 用户是否已从所有 torrent 中选择了至少一个文件
+  bool get _hasAnyTorrentSelection => _torrentFilePaths.any((p) {
+    final sel = _torrentSelections[p];
+    return sel != null && sel.isNotEmpty;
+  });
+
+  /// 提交是否被阻塞（防重复提交 / 探测中 / 种子未选文件）。
+  bool get _submitBlocked =>
+      _isSubmitting ||
+      _isProbing ||
+      (_hasTorrentFiles && !_hasAnyTorrentSelection && _allTorrentsProbed);
+
+  Future<void> _startDownload({
+    bool later = false,
+    String? queueOverride,
+  }) async {
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+
+    try {
+      await _startDownloadInner(later, queueOverride);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  /// 收集高级选项里的 Cookie（#256）。
+  String get _cookie => _cookieController.text.trim();
+
+  /// 把哈希算法 + 哈希值拼成 aria2 风格的 "algo=hexhash"（#247/#248）。
+  /// 哈希值为空时返回空串（跳过校验）。
+  String get _checksumSpec {
+    final hash = _checksumController.text.trim();
+    if (hash.isEmpty) return '';
+    return '$_selectedHashAlgo=$hash';
+  }
+
+  /// 解析最终生效的 checksum：高级选项手填的优先，否则回退到 URL 文本里
+  /// 解析出的 aria2 `checksum=` 选项（[entryChecksum]）。
+  String _resolveChecksum(String entryChecksum) {
+    final spec = _checksumSpec;
+    return spec.isNotEmpty ? spec : entryChecksum;
+  }
+
+  /// 把自定义请求头行整理成 Map（#347）。
+  /// 仅保留 key 非空的行；同名 key 后者覆盖前者。
+  Map<String, String> get _extraHeaders {
+    final map = <String, String>{};
+    for (final row in _headerRows) {
+      final key = row.keyController.text.trim();
+      if (key.isEmpty) continue;
+      map[key] = row.valueController.text.trim();
+    }
+    return map;
+  }
+
+  void _onProxyStatusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// 全局手动代理 URL（'' = 未配置）——选择器禁用规则与 wire 值共用。
+  String get _manualProxyUrl =>
+      manualProxyUrlFromSettings(widget.settingsProvider) ?? '';
+
+  Future<void> _startDownloadInner(bool later, String? queueOverride) async {
+    final saveDir = _saveDirController.text.trim();
+    if (saveDir.isEmpty) return;
+
+    // 队列归属挂在动作按钮上（表单不再有队列字段）：箭头菜单显式指定 >
+    // 动作默认——稍后下载 → 「稍后下载」队列；开始下载 → 默认队列
+    // （设置的默认下载队列 / 打开对话框时侧栏正筛选的队列）。
+    final queueId = queueOverride ?? (later ? kLaterQueueId : _selectedQueueId);
+
+    final proxyUrl = proxyUrlFromChoice(
+      _proxyChoice,
+      _manualProxyUrl,
+      _proxyUrlController.text,
+    );
+    final userAgent = _userAgentController.text.trim();
+    final cookie = _cookie;
+    final extraHeaders = _extraHeaders;
+
+    // Handle .torrent file downloads
+    if (_hasTorrentFiles) {
+      for (final path in _torrentFilePaths) {
+        final meta = _torrentMeta[path];
+        final selection = _torrentSelections[path];
+        if (meta != null && selection != null) {
+          // Already probed: send torrent bytes with pre-selected file indices
+          // so Rust skips the second file-selection dialog entirely.
+          final selectedIndices = selection.toList()..sort();
+          await DownloadController.sendTorrentFileSignal(
+            path,
+            saveDir,
+            proxyUrl: proxyUrl,
+            userAgent: userAgent,
+            queueId: queueId,
+            selectedFileIndices: selectedIndices,
+            torrentName: meta.name,
+            startPaused: later,
+          );
+        } else {
+          // Probe not yet complete (e.g. user clicked too fast, or parse
+          // failed): fall back to the legacy path; Rust will show the
+          // file-selection dialog after metadata resolves.
+          await widget.controller.createTaskFromTorrentFile(
+            torrentFilePath: path,
+            saveDir: saveDir,
+            proxyUrl: proxyUrl,
+            startPaused: later,
+          );
+        }
+      }
+      widget.settingsProvider.recordLastSaveDir(saveDir);
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+
+    final entries = _parseEntries(_urlController.text);
+    if (entries.isEmpty) return;
+
+    // 记录本次保存位置，供"跟随上次保存位置"开关使用
+    widget.settingsProvider.recordLastSaveDir(saveDir);
+
+    // 远程设备下发：不经本地引擎/rinf 信号，直接调云 API；_selectedDeviceId
+    // 为 null/空（本机）时下方 CreateTask/BatchCreateTask 路径完全不变。
+    final targetDeviceId = _selectedDeviceId;
+    if (targetDeviceId != null && targetDeviceId.isNotEmpty) {
+      await _dispatchEntriesToDevice(targetDeviceId, entries, saveDir);
+      return;
+    }
+
+    final parsed = int.tryParse(selectedThreads ?? '') ?? 0;
+    final segments = parsed > 0 ? parsed.clamp(1, 256) : 0;
+
+    // 记住用户本次选择的线程数，下次新建时沿用
+    if (_threadsUserModified) {
+      widget.settingsProvider.setLastDialogThreads(
+        segments > 0 ? segments.toString() : 'auto',
+      );
+    }
+
+    // ── 预解析：单条 http(s) 非磁力/种子/ed2k 链接，先探测是否为多文件清单 ──
+    // （contract-dart.md §选择弹窗）。多行/磁力/种子路径完全不变；外部下载
+    // 两条快速路径（回退对话框/独立小窗）经 ResolvePreviewClient 同样接入。
+    if (entries.length == 1 && isManifestPreviewableUrl(entries.first.url)) {
+      final entry = entries.first;
+      final manifest = await _resolvePreviewIfManifest(
+        url: entry.url,
+        cookies: cookie,
+        userAgent: userAgent,
+        extraHeaders: extraHeaders,
+      );
+      if (_previewCancelled) {
+        _previewCancelled = false;
+        return; // 用户取消等待：不提交，对话框保持打开
+      }
+      if (manifest != null) {
+        // 有清单 → 弹选择框（表单对话框保持底层）；确认发出 CreateTaskGroup
+        // 并两层一起关闭，取消则回到本表单（未被改动，可编辑重新提交）。
+        if (!mounted) return;
+        final created = await showManifestSelectDialog(
+          context,
+          queues: widget.controller.queues,
+          manifest: manifest,
+          sourceUrl: entry.url,
+          initialSaveDir: saveDir,
+          initialQueueId: queueId,
+          segments: segments,
+          cookies: cookie,
+          referrer: '',
+          userAgent: userAgent,
+          proxyUrl: proxyUrl,
+          extraHeaders: extraHeaders,
+          ignoreTlsErrors: _ignoreTlsErrors,
+        );
+        if (created && mounted) Navigator.of(context).pop();
+        return;
+      }
+      // manifest == null && !_previewCancelled：无清单/error/超时 → 落入下方
+      // 原有创建路径（行为零差异）。
+    }
+
+    // 单条磁力链接（立即下载）：对话框保持打开，转入 loading 阶段等待
+    // 文件元数据并进入选择视图；稍后下载则跳过此分支直接建暂停任务，
+    // 文件选择推迟到
+    // 任务真正启动时（引擎经 HostSelection 弹选择框）。
+    if (entries.length == 1 &&
+        !later &&
+        entries.first.url.toLowerCase().startsWith('magnet:')) {
+      final entry = entries.first;
+      // 快照现有任务 id：probing 阶段取消时靠它把本次创建的任务从历史同磁力
+      // 任务里挑出来（见 _resolveProbingTaskId）。
+      _btPreExistingTaskIds = widget.controller.tasks.map((t) => t.id).toSet();
+      // 先注册回调，再发 CreateTask 信号，保证信号到达时回调已就位（无竞态）
+      BtFileSelectionService.registerPendingHandler(_onBtFilesInfoReceived);
+      final rename = _renameController.text.trim();
+      final fileName = rename.isNotEmpty ? rename : entry.fileName;
+      widget.controller.createTask(
+        url: entry.url,
+        saveDir: saveDir,
+        fileName: fileName,
+        segments: segments,
+        cookies: cookie,
+        proxyUrl: proxyUrl,
+        userAgent: userAgent,
+        queueId: queueId,
+        checksum: _resolveChecksum(entry.checksum),
+        ignoreTlsErrors: _ignoreTlsErrors,
+        extraHeaders: extraHeaders,
+      );
+      setState(() {
+        _btWaitPhase = 'probing';
+        _btPendingTaskId = null;
+        _btSubmittedUrl = entry.url;
+        _btErrorMessage = '';
+      });
+      return;
+    }
+
+    if (entries.length == 1) {
+      // 单条非磁力 — 使用 CreateTask，支持重命名
+      final entry = entries.first;
+      // 重命名字段优先；其次使用 out= 中的文件名
+      final rename = _renameController.text.trim();
+      final fileName = rename.isNotEmpty ? rename : entry.fileName;
+      widget.controller.createTask(
+        url: entry.url,
+        saveDir: saveDir,
+        fileName: fileName,
+        segments: segments,
+        cookies: cookie,
+        proxyUrl: proxyUrl,
+        userAgent: userAgent,
+        queueId: queueId,
+        checksum: _resolveChecksum(entry.checksum),
+        ignoreTlsErrors: _ignoreTlsErrors,
+        extraHeaders: extraHeaders,
+        httpUser: _httpAuthUserController.text.trim(),
+        httpPassword: _httpAuthPasswordController.text,
+        saveSiteAuth: _saveSiteAuth,
+        startPaused: later,
+      );
+    } else {
+      // 多条 — 使用 BatchCreateTask（携带每条的 fileName/checksum，
+      // 自定义请求头批次内所有任务共享）。
+      widget.controller.batchCreateTask(
+        entries: entries
+            .map(
+              (e) => UrlEntry(
+                url: e.url,
+                fileName: e.fileName,
+                checksum: e.checksum,
+                audioUrl: '',
+              ),
+            )
+            .toList(),
+        saveDir: saveDir,
+        segments: segments,
+        proxyUrl: proxyUrl,
+        userAgent: userAgent,
+        queueId: queueId,
+        cookies: cookie,
+        ignoreTlsErrors: _ignoreTlsErrors,
+        extraHeaders: extraHeaders,
+        startPaused: later,
+      );
+    }
+
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  /// 把解析出的下载条目下发给远程设备。本地配对设备（局域网直连，免账号）
+  /// 走 [LocalPairingService.dispatchTask]；云账户设备走 FluxCloud dispatch
+  /// API（不经本地引擎/rinf 信号）。单条 URL 单次下发；多条批量逐条下发
+  /// （契约 v1 §3.2：多 URL 批量场景允许逐条 dispatch），任一条失败即中止
+  /// 并展示 s.dispatchFailed。成功后记忆本次目标设备并复用对话框既有
+  /// toast/关闭流程；失败保持对话框打开，方便用户重试或切回本机。
+  Future<void> _dispatchEntriesToDevice(
+    String deviceId,
+    List<_ParsedEntry> entries,
+    String saveDir,
+  ) async {
+    final localDevice = LocalPairingService.instance.localDevices
+        .where((d) => d.fingerprint == deviceId)
+        .firstOrNull;
+    if (localDevice != null) {
+      await _dispatchEntriesToLocalDevice(localDevice, entries, saveDir);
+      return;
+    }
+    final rename = _renameController.text.trim();
+    try {
+      for (final entry in entries) {
+        final fileName = entries.length == 1 && rename.isNotEmpty
+            ? rename
+            : entry.fileName;
+        await CloudClient.instance.dispatchTask(
+          toDevice: deviceId,
+          url: entry.url,
+          saveDir: saveDir,
+          fileName: fileName.isNotEmpty ? fileName : null,
+        );
+      }
+      widget.settingsProvider.setLastTargetDevice(deviceId);
+      if (!mounted) return;
+      final deviceName =
+          CloudAuthService.instance.remoteDevices
+              .where((d) => d.deviceId == deviceId)
+              .firstOrNull
+              ?.name ??
+          deviceId;
+      FluxSonner.of(
+        context,
+      ).show(ShadToast(title: Text(currentS.dispatchedToDevice(deviceName))));
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) return;
+      FluxSonner.of(
+        context,
+      ).show(ShadToast.destructive(title: Text(currentS.dispatchFailed)));
+    }
+  }
+
+  /// 把解析出的下载条目下发给本地配对设备（局域网直连，走 Rust 端
+  /// LinkManager，不经云 API）。[LocalPairingService.dispatchTask] 内部按
+  /// fingerprint 归属结果、直接返回 Future，这里直接 await，复用与云端
+  /// 分支相同的 toast/关闭流程，UI 行为对用户零差异。
+  Future<void> _dispatchEntriesToLocalDevice(
+    LocalDevice device,
+    List<_ParsedEntry> entries,
+    String saveDir,
+  ) async {
+    final rename = _renameController.text.trim();
+    final svc = LocalPairingService.instance;
+    try {
+      for (final entry in entries) {
+        final fileName = entries.length == 1 && rename.isNotEmpty
+            ? rename
+            : entry.fileName;
+        await svc.dispatchTask(
+          fingerprint: device.fingerprint,
+          url: entry.url,
+          saveDir: saveDir,
+          fileName: fileName,
+        );
+      }
+      widget.settingsProvider.setLastTargetDevice(device.fingerprint);
+      if (!mounted) return;
+      FluxSonner.of(
+        context,
+      ).show(ShadToast(title: Text(currentS.dispatchedToDevice(device.name))));
+      Navigator.of(context).pop();
+    } catch (_) {
+      if (!mounted) return;
+      FluxSonner.of(
+        context,
+      ).show(ShadToast.destructive(title: Text(currentS.dispatchFailed)));
+    }
+  }
+
+  /// 用户在对话框内确认了 BT 文件选择（磁力链接等待阶段）
+  void _onBtSelectionConfirmed() {
+    if (_btPendingTaskId == null) return;
+    if (_btSelectedIndices.isEmpty) return;
+    final indices = _btSelectedIndices.toList()..sort();
+    final tid = _btPendingTaskId!;
+    SelectBtFiles(taskId: tid, selectedIndices: indices).sendSignalToRust();
+    // 清理状态，防止 dispose 再次发送 [-1]
+    _btPendingTaskId = null;
+    _btWaitPhase = null;
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  /// 用户取消了 BT 文件选择（磁力链接等待阶段）
+  void _onBtSelectionCancelled() {
+    final tid = _btPendingTaskId;
+    if (tid != null) {
+      // selecting 阶段：已拿到 task_id，直接发 [-1] 让 Rust 暂停任务
+      SelectBtFiles(
+        taskId: tid,
+        selectedIndices: const [-1],
+      ).sendSignalToRust();
+      BtFileSelectionService.registerPendingHandler(null);
+      _btPendingTaskId = null;
+      _btWaitPhase = null;
+    } else {
+      // probing 阶段：task_id 未知，按 URL 反查刚创建的任务并暂停；反查不到
+      // 才退回"等 BtFilesInfo 到达发 [-1]"的兜底（见 _abortProbingTask）。
+      _abortProbingTask();
+      _btWaitPhase = null; // 退出等待状态，UI 恢复正常
+    }
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  // （原 `_isPreviewableUrl` 判定移至 resolve_preview_client.dart 的
+  // `isManifestPreviewableUrl`，三个入口共用。）
+
+  /// 经 [ResolvePreviewClient] 发起预解析并等待结果（90s 超时视同无清单）。
+  ///
+  /// 返回非 null = 拿到清单（`items` 非空且无 `error`）；返回 null 且
+  /// [_previewCancelled] 为 false = 无清单/error/超时，调用方应回退到原有
+  /// 创建路径；返回 null 且 [_previewCancelled] 为 true = 用户主动取消，
+  /// 调用方应中止整个提交（对话框保持打开）。
+  Future<ResolvePreviewResult?> _resolvePreviewIfManifest({
+    required String url,
+    required String cookies,
+    required String userAgent,
+    required Map<String, String> extraHeaders,
+  }) async {
+    _previewCancelled = false;
+    final handle = ResolvePreviewClient.start(
+      url: url,
+      cookies: cookies,
+      referrer: '',
+      userAgent: userAgent,
+      extraHeaders: extraHeaders,
+    );
+    setState(() => _previewHandle = handle);
+    final result = await handle.future;
+    if (identical(_previewHandle, handle)) {
+      _previewHandle = null;
+      if (mounted) setState(() {});
+    }
+    if (handle.cancelled) {
+      _previewCancelled = true;
+      return null;
+    }
+    return result;
+  }
+
+  /// 用户在等待预解析结果时点了取消：忽略后续迟到结果，恢复表单可编辑，
+  /// 不提交任何任务（既不建单任务、也不弹清单选择框）。
+  void _cancelPreviewResolve() {
+    final handle = _previewHandle;
+    if (handle == null) return;
+    _previewHandle = null;
+    handle.cancel();
+    setState(() {});
+  }
+
+  /// 预解析等待阶段的 actions（Cancel + loading 态的主按钮）。
+  List<Widget> _buildPreviewResolveActions(S s, AppColors c) {
+    return [
+      ShadButton.outline(
+        onPressed: _cancelPreviewResolve,
+        child: Text(s.manifestResolvingCancel),
+      ),
+      ShadButton(
+        onPressed: null,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 13,
+              height: 13,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Color(0xFFFFFFFF),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              s.manifestResolvingLabel,
+              style: const TextStyle(color: Color(0xFFFFFFFF)),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final s = LocaleScope.of(context);
+    final m = AppMetrics.of(context);
+    // 下发目标选择器展示不含本机的 remoteDevices，但 deviceLabel 判重名
+    // 基准必须是含本机的全量名册——本机与某台远端同名时，设置页/侧栏都会
+    // 给两台加短码，这里若只按 remoteDevices 判重名会漏判，同一台远端
+    // 设备在三处入口显示不同名字。取一次复用，避免 getter 在 options
+    // 循环里每项重建一次列表。
+    final remoteDevices = CloudAuthService.instance.remoteDevices;
+    final allDevices = CloudAuthService.instance.devices;
+
+    return ShadDialog(
+      // 左右各让 6px 从 padding 移入 scrollPadding：内容位置不变，
+      // 但滚动裁切边界外移，避免 ShadInput 外扩焦点圈被裁掉左缘。
+      padding: const EdgeInsets.fromLTRB(18, 24, 18, 24),
+      scrollPadding: const EdgeInsets.symmetric(horizontal: 6),
+      title: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: m.soft(c.accent),
+              borderRadius: m.brMd,
+            ),
+            child: Icon(LucideIcons.download, size: 14, color: c.accent),
+          ),
+          const SizedBox(width: 10),
+          Text(s.newDownload),
+        ],
+      ),
+      description: _btWaitPhase == 'error'
+          ? null
+          : Text(
+              _btWaitPhase != null
+                  ? s.btWaitingFiles
+                  : (_previewHandle != null
+                        ? s.manifestResolvingLabel
+                        : s.batchDownloadDesc),
+            ),
+      actions: _btWaitPhase != null
+          ? _buildBtWaitActions(s, c)
+          : _previewHandle != null
+          ? _buildPreviewResolveActions(s, c)
+          : [
+              ShadButton.outline(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(s.cancel),
+              ),
+              SplitActionButton(
+                enabled: !_submitBlocked,
+                icon: LucideIcons.clock,
+                label: s.downloadLater,
+                tooltip: s.laterIntoQueueTooltip(s.laterQueue),
+                onPressed: () => _startDownload(later: true),
+                onPickQueue: (anchor) => _showQueueMenu(anchor, later: true),
+              ),
+              SplitActionButton(
+                primary: true,
+                enabled: !_submitBlocked,
+                icon: LucideIcons.download,
+                label: _buildStartButtonLabel(s),
+                tooltip: s.startIntoQueueTooltip(_defaultTargetName(s)),
+                onPressed: () => _startDownload(),
+                onPickQueue: (anchor) => _showQueueMenu(anchor, later: false),
+              ),
+            ],
+      child: IgnorePointer(
+        ignoring: _previewHandle != null,
+        child: Opacity(
+          opacity: _previewHandle != null ? 0.5 : 1,
+          child: Padding(
+            // 右侧留出滚动条槽位，避免 ShadDialog 的覆盖式滚动条
+            // 遮挡自定义请求头行的删除按钮（右缘交互元素）。
+            padding: const EdgeInsets.only(top: 16, bottom: 16, right: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // ── BT 等待文件选择阶段 ──────────────────────────────────────────
+                if (_btWaitPhase != null) ...[
+                  _buildBtWaitBody(s, c),
+                ] else if (_hasTorrentFiles) ...[
+                  // Per-torrent header and selectable file view.
+                  for (int ti = 0; ti < _torrentFilePaths.length; ti++)
+                    _buildTorrentFileEntry(ti, c, s),
+                  const SizedBox(height: 8),
+                  // ── Add more / clear buttons ──────────────────────────────
+                  Row(
+                    children: [
+                      ShadButton.outline(
+                        size: ShadButtonSize.sm,
+                        enabled: !_isPicking && !_isProbing,
+                        onPressed: _pickTorrentFiles,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              LucideIcons.plus,
+                              size: 13,
+                              color: c.textSecondary,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              s.openTorrentFile,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: c.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () => setState(() {
+                          _torrentFilePaths.clear();
+                          _torrentMeta.clear();
+                          _torrentSelections.clear();
+                          _probingPath = null;
+                          _isProbing = false;
+                          _probeError = '';
+                        }),
+                        child: Text(
+                          s.cancel,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: c.textMuted,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                ] else if (!_hasTorrentFiles && _btWaitPhase == null) ...[
+                  // URL 输入区 — 始终多行
+                  Row(
+                    children: [
+                      _SectionLabel(text: s.downloadUrl, c: c),
+                      const Spacer(),
+                      if (_urlCount > 0)
+                        Text(
+                          s.urlCount(_urlCount),
+                          style: TextStyle(fontSize: 11, color: c.textMuted),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    height: 120,
+                    child: Localizations(
+                      locale: const Locale('en'),
+                      delegates: const [
+                        DefaultWidgetsLocalizations.delegate,
+                        DefaultMaterialLocalizations.delegate,
+                      ],
+                      child: Material(
+                        type: MaterialType.transparency,
+                        child: TextSelectionTheme(
+                          data: TextSelectionThemeData(
+                            selectionColor: m.textSelection(c.accent),
+                            cursorColor: c.accent,
+                            selectionHandleColor: c.accent,
+                          ),
+                          child: TextField(
+                            controller: _urlController,
+                            focusNode: _urlFocusNode,
+                            maxLines: null,
+                            expands: true,
+                            textAlignVertical: TextAlignVertical.top,
+                            cursorColor: c.accent,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: c.textPrimary,
+                            ),
+                            contextMenuBuilder: (context, editableTextState) {
+                              return Localizations(
+                                locale: const Locale('en'),
+                                delegates: const [
+                                  DefaultWidgetsLocalizations.delegate,
+                                  DefaultMaterialLocalizations.delegate,
+                                ],
+                                child:
+                                    AdaptiveTextSelectionToolbar.editableText(
+                                      editableTextState: editableTextState,
+                                    ),
+                              );
+                            },
+                            decoration: InputDecoration(
+                              hintText: s.batchUrlPlaceholder,
+                              hintStyle: TextStyle(
+                                fontSize: 12.5,
+                                color: c.textMuted,
+                              ),
+                              hintMaxLines: 5,
+                              contentPadding: const EdgeInsets.all(10),
+                              filled: true,
+                              fillColor: c.inputBg,
+                              hoverColor: Colors.transparent,
+                              border: OutlineInputBorder(
+                                borderRadius: m.brInput,
+                                borderSide: BorderSide(color: c.inputBorder),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: m.brInput,
+                                borderSide: BorderSide(color: c.inputBorder),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: m.brInput,
+                                borderSide: BorderSide(
+                                  color: c.inputFocusBorder,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  // .torrent 文件选择 + TXT 导入按钮
+                  Row(
+                    children: [
+                      ShadButton.ghost(
+                        size: ShadButtonSize.sm,
+                        enabled: !_isPicking,
+                        onPressed: _pickTorrentFiles,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              LucideIcons.fileDown,
+                              size: 13,
+                              color: c.accent,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              s.openTorrentFile,
+                              style: TextStyle(fontSize: 12, color: c.accent),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ShadButton.ghost(
+                        size: ShadButtonSize.sm,
+                        enabled: !_isPicking,
+                        onPressed: _importFromTxt,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              LucideIcons.fileText,
+                              size: 13,
+                              color: c.textMuted,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              s.importTxtFile,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: c.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // "下载到"目标设备 — 渐进披露：存在云账户远程设备或已配对本地
+                  // 设备时才出现，都没有时界面零变化（契约 v1 §3.2/§6.2 语义扩展到本地）。
+                  if (remoteDevices.isNotEmpty ||
+                      (LocalPairingService.instance.supported &&
+                          LocalPairingService.instance.hasLocalDevices)) ...[
+                    _SectionLabel(text: s.downloadTo, c: c),
+                    const SizedBox(height: 6),
+                    ShadSelect<String>(
+                      initialValue: _selectedDeviceId ?? '',
+                      options: [
+                        ShadOption(value: '', child: Text(s.thisDevice)),
+                        for (final device in remoteDevices)
+                          ShadOption(
+                            value: device.deviceId,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  deviceLabel(device, allDevices),
+                                  style: device.isOnline
+                                      ? null
+                                      : TextStyle(color: c.textMuted),
+                                ),
+                                if (!device.isOnline) ...[
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    s.deviceOffline,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: c.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        for (final device
+                            in LocalPairingService.instance.localDevices)
+                          ShadOption(
+                            value: device.fingerprint,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  device.name,
+                                  style: device.online
+                                      ? null
+                                      : TextStyle(color: c.textMuted),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  s.deviceLocalTag,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: c.textMuted,
+                                  ),
+                                ),
+                                if (!device.online) ...[
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    s.deviceOffline,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: c.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                      ],
+                      selectedOptionBuilder: (context, value) {
+                        if (value.isEmpty) return Text(s.thisDevice);
+                        final cloudDevice = remoteDevices
+                            .where((d) => d.deviceId == value)
+                            .firstOrNull;
+                        if (cloudDevice != null) {
+                          return Text(
+                            deviceLabel(cloudDevice, allDevices),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          );
+                        }
+                        final localDevice = LocalPairingService.instance.localDevices
+                            .where((d) => d.fingerprint == value)
+                            .firstOrNull;
+                        return Text(
+                          localDevice?.name ?? value,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        );
+                      },
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(
+                          () =>
+                              _selectedDeviceId = value.isEmpty
+                              ? null
+                              : value,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+
+                // 保存目录 + 线程数
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _SectionLabel(text: s.saveDir, c: c),
+                          const SizedBox(height: 6),
+                          DirPickerField(
+                            path: _saveDirController.text,
+                            placeholder: s.selectSaveDir,
+                            enabled: !_isPicking,
+                            onTap: _pickSaveDir,
+                            onPathSelected: (dir) {
+                              setState(() {
+                                _saveDirController.text = dir;
+                                _saveDirUserModified = true;
+                              });
+                              RecentDirs.instance.push(dir);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (!_allMagnet && !_hasTorrentFiles) ...[
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: 110,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SectionLabel(text: s.threads, c: c),
+                            const SizedBox(height: 6),
+                            ThreadSelector(
+                              value: selectedThreads,
+                              onChanged: (v) => setState(() {
+                                selectedThreads = v;
+                                _threadsUserModified = true;
+                              }),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                // 重命名 — 仅单条 URL 时显示（torrent 文件自动识别名称）
+                if (!_isBatch) ...[
+                  const SizedBox(height: 14),
+                  _SectionLabel(text: s.renameOptional, c: c),
+                  const SizedBox(height: 6),
+                  ShadInput(
+                    controller: _renameController,
+                    placeholder: Text(s.autoDetectFilename),
+                  ),
+                ],
+
+                const SizedBox(height: 10),
+                // 高级选项 — 可折叠，含任务独立代理
+                GestureDetector(
+                  onTap: () => setState(() => _showAdvanced = !_showAdvanced),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _showAdvanced
+                            ? LucideIcons.chevronDown
+                            : LucideIcons.chevronRight,
+                        size: 14,
+                        color: c.textMuted,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        s.taskProxyAdvanced,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: c.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_showAdvanced) ...[
+                  // HTTP Basic 认证 — 仅单条 URL 非种子路径生效
+                  if (!_isBatch && !_allMagnet && !_hasTorrentFiles) ...[
+                    const SizedBox(height: 10),
+                    _SectionLabel(text: s.taskHttpAuth, c: c),
+                    const SizedBox(height: 4),
+                    Text(
+                      s.taskHttpAuthDesc,
+                      style: TextStyle(fontSize: 11, color: c.textMuted),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ShadInput(
+                            controller: _httpAuthUserController,
+                            placeholder: Text(s.taskHttpAuthUser),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ShadInput(
+                            controller: _httpAuthPasswordController,
+                            placeholder: Text(s.taskHttpAuthPassword),
+                            obscureText: !_showHttpAuthPassword,
+                            trailing: MouseRegion(
+                              cursor: SystemMouseCursors.click,
+                              child: GestureDetector(
+                                onTap: () => setState(
+                                  () => _showHttpAuthPassword =
+                                      !_showHttpAuthPassword,
+                                ),
+                                child: Icon(
+                                  _showHttpAuthPassword
+                                      ? LucideIcons.eyeOff
+                                      : LucideIcons.eye,
+                                  size: 14,
+                                  color: c.textMuted,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            s.taskHttpAuthSaveForSite,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: c.textPrimary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ShadSwitch(
+                          value: _saveSiteAuth,
+                          onChanged: (v) =>
+                              setState(() => _saveSiteAuth = v),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _SectionLabel(text: s.taskProxy, c: c),
+                      const SizedBox(width: 4),
+                      ShadTooltip(
+                        waitDuration: const Duration(milliseconds: 200),
+                        builder: (_) => Text(
+                          s.taskProxyFormatHint,
+                          style: const TextStyle(fontSize: 12, height: 1.5),
+                        ),
+                        child: ShadGestureDetector(
+                          cursor: SystemMouseCursors.help,
+                          child: Icon(
+                            LucideIcons.circleAlert,
+                            size: 13,
+                            color: c.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    s.taskProxyDesc,
+                    style: TextStyle(fontSize: 11, color: c.textMuted),
+                  ),
+                  const SizedBox(height: 6),
+                  TaskProxySelector(
+                    value: _proxyChoice,
+                    onChanged: (v) => setState(() => _proxyChoice = v),
+                    systemProxyDetected:
+                        SystemProxyStatusService.instance.detected,
+                    systemProxySummary:
+                        SystemProxyStatusService.instance.summary,
+                    manualProxyUrl: _manualProxyUrl,
+                    customController: _proxyUrlController,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              s.taskIgnoreTlsErrors,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: c.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              s.taskIgnoreTlsErrorsDesc,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: c.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      ShadSwitch(
+                        value: _ignoreTlsErrors,
+                        onChanged: (value) =>
+                            setState(() => _ignoreTlsErrors = value),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  _SectionLabel(text: s.userAgent, c: c),
+                  const SizedBox(height: 4),
+                  Text(
+                    s.userAgentTaskPlaceholder,
+                    style: TextStyle(fontSize: 11, color: c.textMuted),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 150,
+                        child: ShadSelect<String>(
+                          initialValue: _selectedUaPreset,
+                          options: [
+                            ShadOption(
+                              value: 'default',
+                              child: Text(s.queueUaInheritGlobal),
+                            ),
+                            ShadOption(
+                              value: 'chrome',
+                              child: Text(s.userAgentPresetChrome),
+                            ),
+                            ShadOption(
+                              value: 'firefox',
+                              child: Text(s.userAgentPresetFirefox),
+                            ),
+                            ShadOption(
+                              value: 'edge',
+                              child: Text(s.userAgentPresetEdge),
+                            ),
+                            ShadOption(
+                              value: 'safari',
+                              child: Text(s.userAgentPresetSafari),
+                            ),
+                            ShadOption(
+                              value: 'custom',
+                              child: Text(s.userAgentPresetCustom),
+                            ),
+                          ],
+                          selectedOptionBuilder: (context, value) {
+                            final label = switch (value) {
+                              'chrome' => 'Chrome',
+                              'firefox' => 'Firefox',
+                              'edge' => 'Edge',
+                              'safari' => 'Safari',
+                              'custom' => s.userAgentPresetCustom,
+                              _ => s.queueUaInheritGlobal,
+                            };
+                            return Text(
+                              label,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            );
+                          },
+                          onChanged: (preset) {
+                            if (preset == null) return;
+                            setState(() => _selectedUaPreset = preset);
+                            if (preset != 'custom') {
+                              _userAgentController.text =
+                                  kUaPresets[preset] ?? '';
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ShadInput(
+                          controller: _userAgentController,
+                          placeholder: Text(s.userAgentTaskPlaceholder),
+                          onChanged: (value) {
+                            final detected = detectUaPreset(value);
+                            if (detected != _selectedUaPreset) {
+                              setState(() => _selectedUaPreset = detected);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Cookie（#256）
+                  const SizedBox(height: 10),
+                  _SectionLabel(text: s.taskCookie, c: c),
+                  const SizedBox(height: 4),
+                  Text(
+                    s.taskCookieDesc,
+                    style: TextStyle(fontSize: 11, color: c.textMuted),
+                  ),
+                  const SizedBox(height: 6),
+                  ShadInput(
+                    controller: _cookieController,
+                    placeholder: Text(s.taskCookiePlaceholder),
+                    maxLines: 2,
+                  ),
+                  // 哈希校验（#247/#248）
+                  const SizedBox(height: 10),
+                  _SectionLabel(text: s.taskChecksum, c: c),
+                  const SizedBox(height: 4),
+                  Text(
+                    s.taskChecksumDesc,
+                    style: TextStyle(fontSize: 11, color: c.textMuted),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 110,
+                        child: ShadSelect<String>(
+                          initialValue: _selectedHashAlgo,
+                          options: const [
+                            ShadOption(value: 'md5', child: Text('md5')),
+                            ShadOption(value: 'sha-1', child: Text('sha-1')),
+                            ShadOption(
+                              value: 'sha-256',
+                              child: Text('sha-256'),
+                            ),
+                            ShadOption(
+                              value: 'sha-512',
+                              child: Text('sha-512'),
+                            ),
+                          ],
+                          selectedOptionBuilder: (context, value) => Text(
+                            value,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                          onChanged: (algo) {
+                            if (algo == null) return;
+                            setState(() => _selectedHashAlgo = algo);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ShadInput(
+                          controller: _checksumController,
+                          placeholder: Text(s.taskChecksumPlaceholder),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // 自定义请求头（#347）
+                  const SizedBox(height: 10),
+                  _SectionLabel(text: s.taskHeaders, c: c),
+                  const SizedBox(height: 4),
+                  Text(
+                    s.taskHeadersDesc,
+                    style: TextStyle(fontSize: 11, color: c.textMuted),
+                  ),
+                  const SizedBox(height: 6),
+                  for (int hi = 0; hi < _headerRows.length; hi++) ...[
+                    if (hi > 0) const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: ShadInput(
+                            controller: _headerRows[hi].keyController,
+                            placeholder: Text(s.taskHeadersKeyPlaceholder),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          flex: 3,
+                          child: ShadInput(
+                            controller: _headerRows[hi].valueController,
+                            placeholder: Text(s.taskHeadersValuePlaceholder),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () => setState(() {
+                            _headerRows.removeAt(hi).dispose();
+                          }),
+                          child: Icon(
+                            LucideIcons.x,
+                            size: 16,
+                            color: c.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: ShadButton.ghost(
+                      size: ShadButtonSize.sm,
+                      onPressed: () =>
+                          setState(() => _headerRows.add(_HeaderRow())),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(LucideIcons.plus, size: 13, color: c.accent),
+                          const SizedBox(width: 6),
+                          Text(
+                            s.taskHeadersAdd,
+                            style: TextStyle(fontSize: 12, color: c.accent),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 构建磁力链接等待阶段的 actions 按钮
+  List<Widget> _buildBtWaitActions(S s, AppColors c) {
+    if (_btWaitPhase == 'probing') {
+      // 解析中：只显示取消按钮
+      return [
+        ShadButton.outline(
+          onPressed: _onBtSelectionCancelled,
+          child: Text(s.cancel),
+        ),
+      ];
+    }
+    if (_btWaitPhase == 'error') {
+      // 解析失败：只显示关闭按钮（任务已是 error 状态，无需再发 [-1]）
+      return [
+        ShadButton.outline(
+          onPressed: () {
+            _btWaitPhase = null;
+            if (mounted) Navigator.of(context).pop();
+          },
+          child: Text(s.close),
+        ),
+      ];
+    }
+    // selecting 阶段
+    return [
+      ShadButton.outline(
+        onPressed: _onBtSelectionCancelled,
+        child: Text(s.cancel),
+      ),
+      ShadButton(
+        onPressed: _btSelectedIndices.isEmpty ? null : _onBtSelectionConfirmed,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(LucideIcons.download, size: 13, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              s.btFileSelectConfirm(
+                _btSelectedIndices.length,
+                formatBtFileSize(_btSelectedTotalBytes),
+              ),
+              style: const TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  /// 构建磁力链接等待阶段的对话框主体
+  Widget _buildBtWaitBody(S s, AppColors c) {
+    final m = AppMetrics.of(context);
+    if (_btWaitPhase == 'error') {
+      // 解析失败：错误提示
+      return Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: m.subtle(c.statusError),
+          borderRadius: m.brCard,
+          border: Border.all(color: m.borderSubtle(c.statusError)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(LucideIcons.circleAlert, size: 13, color: c.statusError),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    s.btResolveFailed,
+                    style: TextStyle(fontSize: 12.5, color: c.statusError),
+                  ),
+                  if (_btErrorMessage.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      _btErrorMessage,
+                      style: TextStyle(fontSize: 11.5, color: c.textMuted),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_btWaitPhase == 'probing') {
+      // 解析中：loading 动画
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: c.accent,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              s.btResolvingMagnet,
+              style: TextStyle(fontSize: 13, color: c.textMuted),
+            ),
+          ],
+        ),
+      );
+    }
+    // selecting 阶段：文件选择视图（默认树形，可切换列表）
+    return BtFileSelectionView(
+      files: _btFiles,
+      selectedIndices: _btSelectedIndices,
+      onSelectionChanged: (selection) {
+        setState(() {
+          _btSelectedIndices = selection;
+        });
+      },
+      maxHeight: 340,
+    );
+  }
+
+  /// 默认目标队列的显示名（「开始下载」tooltip 用）。
+  String _defaultTargetName(S s) {
+    final q = widget.controller.queues
+        .where((q) => q.queueId == _selectedQueueId)
+        .firstOrNull;
+    return q == null ? s.mainQueue : queueDisplayName(s, q);
+  }
+
+  /// 在动作按钮箭头下方弹队列菜单：选择即提交（[later] 决定是否以
+  /// 暂停态创建）。菜单是动作列表而非选择器——不保留选中态。
+  void _showQueueMenu(BuildContext anchor, {required bool later}) {
+    final s = LocaleScope.of(context);
+    final c = AppColors.of(context);
+    final queues = widget.controller.queues;
+    if (queues.isEmpty) {
+      unawaited(_startDownload(later: later));
+      return;
+    }
+    final box = anchor.findRenderObject();
+    if (box is! RenderBox || !box.hasSize) return;
+    final origin = box.localToGlobal(Offset(0, box.size.height + 6));
+    showContextMenu(
+      context,
+      origin,
+      items: [
+        for (final q in queues)
+          ContextMenuItem(
+            icon: q.queueId == kLaterQueueId
+                ? LucideIcons.clock
+                : LucideIcons.layers,
+            label: queueDisplayName(s, q),
+            color: c.textPrimary,
+            action: () => unawaited(
+              _startDownload(later: later, queueOverride: q.queueId),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// 解析后的下载条目：URL + 可选文件名 + 可选 checksum
+class _ParsedEntry {
+  final String url;
+
+  /// 来自 `out=` 选项的文件名，空字符串表示自动识别
+  final String fileName;
+
+  /// 来自 `checksum=` 选项的校验值，格式 "algo=hexhash"，空字符串跳过校验
+  final String checksum;
+
+  const _ParsedEntry(this.url, {this.fileName = '', this.checksum = ''});
+}
+
+/// 自定义请求头的一行输入：持有 key / value 两个文本控制器（#347）。
+class _HeaderRow {
+  final TextEditingController keyController = TextEditingController();
+  final TextEditingController valueController = TextEditingController();
+
+  void dispose() {
+    keyController.dispose();
+    valueController.dispose();
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  final AppColors c;
+
+  const _SectionLabel({required this.text, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: TextStyle(
+        fontSize: 11.5,
+        fontWeight: FontWeight.w500,
+        color: c.textSecondary,
+      ),
+    );
+  }
+}

@@ -1,0 +1,15 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+# Windows 批处理必须 CRLF(当前仓库无此类文件,防御未来引入)
+[*.{bat,cmd}]
+end_of_line = crlf
+
+# Inno Setup 语言包:UTF-8 BOM + CRLF(Inno Setup 6 依赖 BOM,剥掉会导致安装器中文乱码)
+[*.isl]
+charset = utf-8-bom
+end_of_line = crlf

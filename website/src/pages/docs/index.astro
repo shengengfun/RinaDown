@@ -1,0 +1,17 @@
+---
+/**
+ * /docs/ 入口(唯一 SSR docs 页):按 cookie(用户主动选择过语言)或
+ * Accept-Language 302 到对应语言的分区索引页(设计决策 D3)。
+ */
+import { parseAcceptLanguage } from "../../lib/locale-detect";
+
+export const prerender = false;
+
+const cookie = Astro.cookies.get("fluxdown-locale")?.value;
+const lang =
+  cookie === "zh" || cookie === "en"
+    ? cookie
+    : parseAcceptLanguage(Astro.request.headers.get("accept-language"));
+
+return Astro.redirect(`/docs/${lang}/`, 302);
+---

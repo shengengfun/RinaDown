@@ -1,0 +1,17 @@
+[package]
+name = "fluxdown_protocol"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json = "1"
+utoipa = { version = "5.5.0", optional = true }
+
+
+[features]
+openapi = ["dep:utoipa"]

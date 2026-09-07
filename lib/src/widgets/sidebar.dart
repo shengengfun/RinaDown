@@ -1,0 +1,2086 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:shadcn_ui/shadcn_ui.dart';
+import 'package:window_manager/window_manager.dart';
+import '../bindings/bindings.dart';
+import '../models/custom_category.dart';
+import '../models/download_controller.dart';
+import '../models/download_queue.dart';
+
+import '../services/app_icon_service.dart';
+import '../services/update_service.dart';
+import '../i18n/locale_provider.dart';
+import '../models/settings_provider.dart';
+import '../models/ua_presets.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_metrics.dart';
+import 'category_edit_dialog.dart';
+import 'context_menu.dart';
+import 'queue_manager_dialog.dart';
+import 'rss_manager_dialog.dart';
+import 'rss_wizard_dialog.dart';
+import '../models/rss_provider.dart';
+import '../services/cloud/cloud_auth_service.dart';
+import '../services/cloud/device_identity.dart';
+import '../services/link/local_pairing_service.dart';
+import 'add_device_dialog.dart';
+
+class Sidebar extends StatefulWidget {
+  final DownloadController controller;
+  final SettingsProvider settingsProvider;
+  final RssProvider rssProvider;
+  const Sidebar({
+    super.key,
+    required this.controller,
+    required this.settingsProvider,
+    required this.rssProvider,
+  });
+
+  @override
+  State<Sidebar> createState() => _SidebarState();
+}
+
+class _SidebarState extends State<Sidebar> {
+  @override
+  void initState() {
+    super.initState();
+    if (CloudAuthService.instance.isLoggedIn) {
+      unawaited(CloudAuthService.instance.refreshDevices());
+    }
+    CloudAuthService.instance.addListener(_onDeviceRosterChanged);
+    widget.controller.addListener(_scheduleFilterSync);
+    widget.settingsProvider.addListener(_scheduleFilterSync);
+    _scheduleFilterSync();
+  }
+
+  @override
+  void dispose() {
+    CloudAuthService.instance.removeListener(_onDeviceRosterChanged);
+    widget.controller.removeListener(_scheduleFilterSync);
+    widget.settingsProvider.removeListener(_scheduleFilterSync);
+    super.dispose();
+  }
+
+  /// 队列 / 分类的默认激活项与分区可见性对齐。
+  ///
+  /// 触发源有三个（队列装载完、分区显隐变化、分类增删），全部收敛到
+  /// [DownloadController.syncSidebarFilters]（幂等）。排到帧末执行：这些
+  /// 回调可能发生在 build 期间，绝不在 build 内 notify。
+  bool _syncScheduled = false;
+  void _scheduleFilterSync() {
+    if (_syncScheduled) return;
+    _syncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncScheduled = false;
+      if (!mounted) return;
+      widget.controller.syncSidebarFilters(
+        queuesVisible: widget.settingsProvider.showSidebarQueues,
+        defaultQueueId: widget.settingsProvider.defaultQueueId,
+        categoryVisible: widget.settingsProvider.showSidebarCategory,
+        visibleCategories: widget.settingsProvider.visibleCategories,
+      );
+    });
+  }
+
+  /// RSS 条目流是否正占着主区。
+  ///
+  /// RSS 项与其余分区不是同一类东西：状态 / 队列 / 分类 / 设备互相叠加成
+  /// 一组任务筛选，RSS 却是整页切换。所以选中订阅时，任务侧的高亮必须全部
+  /// 熄灭——否则侧边栏在同时宣称「你在全部任务」和「你在这条订阅」。
+  bool get _rssActive => widget.rssProvider.selectedSourceId.isNotEmpty;
+
+  /// 设备名册（远程设备增删/在线态）变化时，清理已失效的设备筛选。
+  /// 绝不在 build 内 notify —— 排到帧末执行。
+  void _onDeviceRosterChanged() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.controller.pruneDeviceFilter({
+        for (final d in CloudAuthService.instance.remoteDevices) d.deviceId,
+      });
+    });
+  }
+
+  // ─────────────────────────────────────────────
+  // 图标映射
+  // ─────────────────────────────────────────────
+
+  static IconData _statusIcon(StatusTab tab) => switch (tab) {
+    StatusTab.all => LucideIcons.layoutGrid,
+    StatusTab.downloading => LucideIcons.download,
+    StatusTab.completed => LucideIcons.circleCheck,
+    StatusTab.paused => LucideIcons.circlePause,
+    StatusTab.error => LucideIcons.circleAlert,
+    StatusTab.seeding => LucideIcons.arrowUpCircle,
+  };
+
+  static String _statusLabel(S s, StatusTab tab) => switch (tab) {
+    StatusTab.all => s.tabAll,
+    StatusTab.downloading => s.tabDownloading,
+    StatusTab.completed => s.tabCompleted,
+    StatusTab.paused => s.tabPaused,
+    StatusTab.error => s.tabError,
+    StatusTab.seeding => s.tabSeeding,
+  };
+
+  // ─────────────────────────────────────────────
+  // Build
+  // ─────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Container(
+      color: c.surface1,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildLogo(c),
+          const SizedBox(height: 10),
+          // Only the data-driven sections rebuild on controller changes.
+          Expanded(
+            child: ListenableBuilder(
+              listenable: Listenable.merge([
+                widget.controller,
+                widget.settingsProvider,
+                widget.rssProvider,
+                CloudAuthService.instance,
+                LocalPairingService.instance,
+              ]),
+              builder: (context, _) {
+                final ctrl = widget.controller;
+                final sp = widget.settingsProvider;
+                final s = LocaleScope.of(context);
+                return SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (sp.showSidebarStatus) ...[
+                        _buildStatusSection(ctrl, s, c),
+                        const SizedBox(height: 6),
+                      ],
+                      if (sp.showSidebarQueues) ...[
+                        _buildQueuesSection(ctrl, s, c),
+                        const SizedBox(height: 6),
+                      ],
+                      if (sp.showSidebarRss) ...[
+                        _buildRssSection(ctrl, s, c),
+                        const SizedBox(height: 6),
+                      ],
+                      if (sp.showSidebarCategory)
+                        _buildCategorySection(ctrl, s, c),
+                      if (sp.showSidebarDeviceEffective(
+                        CloudAuthService.instance.hasRemoteDevices ||
+                            LocalPairingService.instance.hasLocalDevices,
+                      )) ...[
+                        _buildDeviceSection(ctrl, s, c),
+                        const SizedBox(height: 6),
+                      ],
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+          const _UpdateFooter(),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // Logo
+  // ─────────────────────────────────────────────
+
+  Widget _buildLogo(AppColors c) {
+    // macOS: traffic light 按钮已在左上角，logo/名称隐藏，只保留拖拽区占位
+    if (Platform.isMacOS) {
+      return DragToMoveArea(child: Container(height: 40, color: c.surface1));
+    }
+    return DragToMoveArea(
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            // 跟随「设置-外观-应用图标」切换：内置闪电/自定义图标启用时显示其预览
+            ListenableBuilder(
+              listenable: AppIconService.instance,
+              builder: (context, _) {
+                final svc = AppIconService.instance;
+                final m = AppMetrics.of(context);
+                if (svc.isBolt) {
+                  return ClipRRect(
+                    borderRadius: m.brMd,
+                    child: Image.asset(
+                      AppIconService.builtinBoltAsset,
+                      width: 22,
+                      height: 22,
+                      filterQuality: FilterQuality.medium,
+                    ),
+                  );
+                }
+                final customPreview = svc.isCustom ? svc.previewPngPath : null;
+                if (customPreview != null) {
+                  return ClipRRect(
+                    borderRadius: m.brMd,
+                    child: Image(
+                      key: ValueKey(svc.previewRevision),
+                      image: FileImage(File(customPreview)),
+                      width: 22,
+                      height: 22,
+                      filterQuality: FilterQuality.medium,
+                      gaplessPlayback: true,
+                    ),
+                  );
+                }
+                // 暗色主题：蓝色箭头 + 透明背景（无白色圆角矩形，避免在深色侧边栏上显得突兀）
+                // 亮色主题：完整圆角图标（白底 + 蓝色箭头）
+                if (c.tokens.appearance == Brightness.dark) {
+                  return Image.asset(
+                    'assets/logo/logo_on_dark.png',
+                    width: 22,
+                    height: 22,
+                    filterQuality: FilterQuality.medium,
+                  );
+                }
+                return ClipRRect(
+                  borderRadius: m.brMd,
+                  child: Image.asset(
+                    'assets/logo/fluxdown_logo.png',
+                    width: 22,
+                    height: 22,
+                    filterQuality: FilterQuality.medium,
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 9),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Flux',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: c.accent,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  TextSpan(
+                    text: 'Down',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: c.textPrimary,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // 状态区块（主导航）
+  // ─────────────────────────────────────────────
+
+  Widget _buildStatusSection(DownloadController ctrl, S s, AppColors c) {
+    // RSS 条目流占着主区时，任务侧的三个分区都不是「当前所在位置」——
+    // 它们只是回到任务列表的入口，此刻高亮任何一项都是在指向看不见的东西。
+    final selectedStatus = _rssActive ? null : ctrl.statusTab;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onSecondaryTapUp: (d) => _showSectionContextMenu(
+            context,
+            d.globalPosition,
+            s,
+            onHide: () => widget.settingsProvider.setShowSidebarStatus(false),
+          ),
+          child: _SectionHeader(title: s.sidebarStatus, c: c),
+        ),
+        const SizedBox(height: 4),
+        for (final tab in StatusTab.values)
+          _NavItem(
+            icon: _statusIcon(tab),
+            label: _statusLabel(s, tab),
+            count: ctrl.countForStatus(tab),
+            isSelected: selectedStatus == tab,
+            showActivityDot:
+                (tab == StatusTab.downloading && ctrl.downloadingCount > 0) ||
+                (tab == StatusTab.seeding && ctrl.seedingCount > 0),
+            onTap: () => _selectTaskView(() => ctrl.setStatusTab(tab)),
+          ),
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // 队列区块（可折叠，含新建按钮）
+  // ─────────────────────────────────────────────
+
+  Widget _buildQueuesSection(DownloadController ctrl, S s, AppColors c) {
+    final queues = ctrl.queues;
+    final queueFilter = _rssActive ? null : ctrl.queueFilter;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onSecondaryTapUp: (d) => _showSectionContextMenu(
+            context,
+            d.globalPosition,
+            s,
+            onHide: () => widget.settingsProvider.setShowSidebarQueues(false),
+          ),
+          child: _CollapsibleSectionHeader(
+            title: s.sidebarQueues,
+            expanded: widget.settingsProvider.sidebarQueuesExpanded,
+            c: c,
+            onToggle: () => widget.settingsProvider.setSidebarQueuesExpanded(
+              !widget.settingsProvider.sidebarQueuesExpanded,
+            ),
+            trailing: _QueueAddButton(
+              c: c,
+              onTap: () => _showCreateQueueDialog(context, ctrl, s, c),
+            ),
+          ),
+        ),
+        if (widget.settingsProvider.sidebarQueuesExpanded) ...[
+          const SizedBox(height: 4),
+          // 存量未分组任务（queue_id 为空的历史数据；引擎播种时已迁移，
+          // 通常为 0——仅在仍有残留时显示入口）
+          if (ctrl.countForQueue('') > 0)
+            _NavItem(
+              icon: LucideIcons.inbox,
+              label: s.ungroupedTasks,
+              count: ctrl.countForQueue(''),
+              isSelected: queueFilter == '',
+              onTap: () => _selectTaskView(() => ctrl.setQueueFilter('')),
+            ),
+          // 命名队列（内置 main/later 在前，自定义随后，按 position 排序）
+          for (final queue in queues)
+            _QueueNavItem(
+              queue: queue,
+              count: ctrl.countForQueue(queue.queueId),
+              isSelected: queueFilter == queue.queueId,
+              c: c,
+              onTap: () =>
+                  _selectTaskView(() => ctrl.setQueueFilter(queue.queueId)),
+              onToggleRun: () => queue.isRunning
+                  ? ctrl.stopQueue(queue.queueId)
+                  : ctrl.startQueue(queue.queueId),
+              onManage: () =>
+                  showQueueManagerDialog(context, ctrl, queue.queueId),
+              onDelete: queue.isBuiltin
+                  ? null
+                  : () => _showDeleteQueueDialog(context, ctrl, s, c, queue),
+            ),
+        ],
+      ],
+    );
+  }
+
+  /// 切回任务列表视图：收回 RSS 选中态后再应用任务侧的筛选。
+  ///
+  /// RSS 条目流与任务列表共用主区，所以每个「选任务视图」的入口都要顺手把
+  /// RSS 选中态清掉——否则点了状态/队列/分类，主区却还停在条目流上。
+  void _selectTaskView(VoidCallback apply) {
+    widget.rssProvider.select('');
+    apply();
+  }
+
+  // ─────────────────────────────────────────────
+  // RSS 订阅区块（与队列区块同构：可折叠 + 新建按钮 + 悬浮操作）
+  // ─────────────────────────────────────────────
+
+  Widget _buildRssSection(DownloadController ctrl, S s, AppColors c) {
+    final rss = widget.rssProvider;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onSecondaryTapUp: (d) => _showSectionContextMenu(
+            context,
+            d.globalPosition,
+            s,
+            onHide: () => widget.settingsProvider.setShowSidebarRss(false),
+          ),
+          child: _CollapsibleSectionHeader(
+            title: s.sidebarRss,
+            expanded: widget.settingsProvider.sidebarRssExpanded,
+            c: c,
+            onToggle: () => widget.settingsProvider.setSidebarRssExpanded(
+              !widget.settingsProvider.sidebarRssExpanded,
+            ),
+            trailing: _QueueAddButton(
+              c: c,
+              onTap: () => showRssWizardDialog(context, rss, ctrl),
+            ),
+          ),
+        ),
+        if (widget.settingsProvider.sidebarRssExpanded) ...[
+          const SizedBox(height: 4),
+          if (rss.sources.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+              child: Text(
+                s.rssSidebarEmptyHint,
+                style: TextStyle(fontSize: 11, color: c.textMuted, height: 1.4),
+              ),
+            ),
+          for (final source in rss.sources)
+            _RssNavItem(
+              source: source,
+              isSelected: rss.selectedSourceId == source.sourceId,
+              c: c,
+              onTap: () => rss.select(source.sourceId),
+              isRefreshing: rss.isRefreshing(source.sourceId),
+              onRefresh: () => rss.refresh(source.sourceId),
+              onManage: () =>
+                  showRssManagerDialog(context, rss, ctrl, source.sourceId),
+              onDelete: () =>
+                  _showDeleteRssDialog(context, rss, s, c, source),
+            ),
+        ],
+      ],
+    );
+  }
+
+  /// 删除订阅确认。文案必须点明「已创建的下载任务不会被删」——这是用户
+  /// 最担心的事，不说清楚没人敢点。
+  void _showDeleteRssDialog(
+    BuildContext context,
+    RssProvider rss,
+    S s,
+    AppColors c,
+    RssSourceEntry source,
+  ) {
+    showShadDialog(
+      context: context,
+      barrierColor: c.dialogBarrier,
+      animateIn: const [],
+      animateOut: const [],
+      builder: (ctx) => ShadDialog.alert(
+        title: Text(s.rssDeleteSource),
+        description: Text(s.rssDeleteConfirmDesc(rssDisplayName(source))),
+        actions: [
+          ShadButton.outline(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(s.cancel),
+          ),
+          ShadButton.destructive(
+            onPressed: () {
+              rss.remove(source.sourceId);
+              Navigator.of(ctx).pop();
+            },
+            child: Text(s.rssDeleteSource),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 新建队列对话框
+  void _showCreateQueueDialog(
+    BuildContext context,
+    DownloadController ctrl,
+    S s,
+    AppColors c,
+  ) {
+    final nameCtrl = TextEditingController();
+    showShadDialog(
+      context: context,
+      barrierColor: AppColors.of(context).dialogBarrier,
+      animateIn: const [],
+      animateOut: const [],
+      builder: (ctx) => _QueueDialog(
+        title: s.createQueueAction,
+        nameCtrl: nameCtrl,
+        s: s,
+        c: c,
+        onConfirm:
+            (
+              name,
+              speedLimit,
+              uploadLimit,
+              maxConcurrent,
+              saveDir,
+              defaultSegments,
+              defaultUserAgent,
+            ) {
+              ctrl.createQueue(
+                name: name,
+                speedLimitKbps: speedLimit,
+                uploadLimitKbps: uploadLimit,
+                maxConcurrent: maxConcurrent,
+                defaultSaveDir: saveDir,
+                defaultSegments: defaultSegments,
+                defaultUserAgent: defaultUserAgent,
+              );
+            },
+      ),
+    ).then((_) => nameCtrl.dispose());
+  }
+
+
+  // 删除队列确认对话框
+  void _showDeleteQueueDialog(
+    BuildContext context,
+    DownloadController ctrl,
+    S s,
+    AppColors c,
+    DownloadQueue queue,
+  ) {
+    showShadDialog(
+      context: context,
+      barrierColor: AppColors.of(context).dialogBarrier,
+      animateIn: const [],
+      animateOut: const [],
+      builder: (ctx) => ShadDialog(
+        title: Text(s.deleteQueueAction),
+        description: Text(s.queueDeleteConfirmDesc(queue.name)),
+        actions: [
+          ShadButton.outline(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(s.cancel),
+          ),
+          ShadButton.destructive(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ctrl.deleteQueue(queue.queueId);
+            },
+            child: Text(s.deleteQueueAction),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // 分类区块（可折叠）
+  // ─────────────────────────────────────────────
+
+  /// 内置分类的 i18n 名称映射
+  static String _builtinCategoryLabel(S s, String? builtinType) =>
+      switch (builtinType) {
+        'all' => s.categoryAll,
+        'video' => s.categoryVideo,
+        'audio' => s.categoryAudio,
+        'document' => s.categoryDocument,
+        'image' => s.categoryImage,
+        'program' => s.categoryProgram,
+        'archive' => s.categoryArchive,
+        'other' => s.categoryOther,
+        _ => '',
+      };
+
+  Widget _buildCategorySection(DownloadController ctrl, S s, AppColors c) {
+    final customFilter = _rssActive ? null : ctrl.customCategoryFilter;
+    final visibleCategories = widget.settingsProvider.visibleCategories;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onSecondaryTapUp: (d) => _showSectionContextMenu(
+            context,
+            d.globalPosition,
+            s,
+            onHide: () => widget.settingsProvider.setShowSidebarCategory(false),
+          ),
+          child: _CollapsibleSectionHeader(
+            title: s.sidebarCategory,
+            expanded: widget.settingsProvider.sidebarCategoryExpanded,
+            c: c,
+            onToggle: () => widget.settingsProvider.setSidebarCategoryExpanded(
+              !widget.settingsProvider.sidebarCategoryExpanded,
+            ),
+          ),
+        ),
+        if (widget.settingsProvider.sidebarCategoryExpanded) ...[
+          const SizedBox(height: 4),
+          for (final cat in visibleCategories)
+            GestureDetector(
+              onSecondaryTapUp: (d) => _showCategoryItemContextMenu(
+                context,
+                d.globalPosition,
+                s,
+                c,
+                cat,
+              ),
+              child: _NavItem(
+                icon: categoryIconData(cat.icon),
+                label: cat.isBuiltin
+                    ? _builtinCategoryLabel(s, cat.builtinType)
+                    : cat.name,
+                count: ctrl.countForUnifiedCategory(cat, visibleCategories),
+                isSelected: customFilter?.id == cat.id,
+                onTap: () => _selectTaskView(
+                  () => ctrl.setCustomCategoryFilter(
+                    cat,
+                    allVisible: visibleCategories,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // 设备区块（可折叠，多设备协同渐进披露；无远程设备也无本地配对设备且未强制开启时整区不渲染）
+  // ─────────────────────────────────────────────
+
+  /// 设备类型徽标：桌面(monitor)/移动(smartphone)/未知或服务器(server)。
+  static IconData _deviceTypeIcon(String? platform) => switch (platform) {
+    'windows' || 'macos' || 'linux' => LucideIcons.monitor,
+    'android' || 'ios' => LucideIcons.smartphone,
+    _ => LucideIcons.server,
+  };
+
+  Widget _buildDeviceSection(DownloadController ctrl, S s, AppColors c) {
+    final deviceFilter = ctrl.deviceFilter;
+    final remoteDevices = CloudAuthService.instance.remoteDevices;
+    // deviceLabel 判重名基准必须含本机：本机与某台远端同名时，本机也在
+    // 设置页/新建下载里被加了短码，侧栏若只按 remoteDevices 判重名会漏判，
+    // 同一台远端设备在三处入口显示不同名字。
+    final allDevices = CloudAuthService.instance.devices;
+    // 本地配对设备（局域网直连，免账号）。移动端 supported 恒为 false，
+    // localDevices 恒为空列表，天然不需要额外的平台判断。
+    final localDevices = LocalPairingService.instance.localDevices;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onSecondaryTapUp: (d) => _showSectionContextMenu(
+            context,
+            d.globalPosition,
+            s,
+            onHide: () => widget.settingsProvider.setShowSidebarDevice(false),
+          ),
+          child: _CollapsibleSectionHeader(
+            title: s.deviceSection,
+            expanded: widget.settingsProvider.sidebarDeviceExpanded,
+            c: c,
+            onToggle: () => widget.settingsProvider.setSidebarDeviceExpanded(
+              !widget.settingsProvider.sidebarDeviceExpanded,
+            ),
+          ),
+        ),
+        if (widget.settingsProvider.sidebarDeviceExpanded) ...[
+          const SizedBox(height: 4),
+          _NavItem(
+            icon: LucideIcons.globe,
+            label: s.allDevices,
+            isSelected: !_rssActive && deviceFilter == null,
+            onTap: () => _selectTaskView(() => ctrl.setDeviceFilter(null)),
+          ),
+          _NavItem(
+            icon: LucideIcons.monitor,
+            label: s.thisDevice,
+            count: ctrl.countForDevice(''),
+            isSelected: !_rssActive && deviceFilter == '',
+            isOnline: true,
+            onTap: () => _selectTaskView(() => ctrl.setDeviceFilter('')),
+          ),
+          for (final device in remoteDevices)
+            _NavItem(
+              icon: _deviceTypeIcon(device.platform),
+              label: deviceLabel(device, allDevices),
+              count: ctrl.countForDevice(device.deviceId),
+              isSelected: !_rssActive && deviceFilter == device.deviceId,
+              isOnline: device.isOnline,
+              onTap: () =>
+                  _selectTaskView(() => ctrl.setDeviceFilter(device.deviceId)),
+            ),
+          for (final device in localDevices)
+            _LocalDeviceStatusRow(
+              // 局域网直连设备用不同图标（antenna）与云账户设备
+              // （monitor/smartphone/server）区分，无需额外文案标签。
+              icon: LucideIcons.antenna,
+              label: device.name,
+              online: device.online,
+              statusLabel: device.online ? s.deviceOnline : s.deviceOffline,
+            ),
+          // 「＋ 添加设备」：直接弹出添加设备弹窗（未登录默认本地配对页），
+          // 无需先进入设置页；设置页内的入口用于隐藏该侧栏项后的管理编辑。
+          // 移动端不支持本地互联——本地配对是免账号添加设备的唯一路径
+          // （云账户设备登录后自动出现，无需手动添加），故整体隐藏该入口。
+          if (LocalPairingService.instance.supported)
+            _NavItem(
+              icon: LucideIcons.plus,
+              label: s.addDeviceEntry,
+              isSelected: false,
+              onTap: () => showAddDeviceDialog(context),
+            ),
+        ],
+      ],
+    );
+  }
+
+  void _showSectionContextMenu(
+    BuildContext context,
+    Offset position,
+    S s, {
+    required VoidCallback onHide,
+  }) {
+    final c = AppColors.of(context);
+    showContextMenu(
+      context,
+      position,
+      items: [
+        ContextMenuItem(
+          icon: LucideIcons.eyeOff,
+          label: s.hideSection,
+          color: c.textSecondary,
+          action: onHide,
+        ),
+      ],
+    );
+  }
+
+  void _showCategoryItemContextMenu(
+    BuildContext context,
+    Offset position,
+    S s,
+    AppColors c,
+    CustomCategory cat,
+  ) {
+    // 只有 "全部文件" 才完全锁定（无法编辑/重置）；"其他" 与普通内置分类一样可编辑
+    final isSpecial = cat.builtinType == 'all';
+
+    showContextMenu(
+      context,
+      position,
+      items: [
+        // 编辑（非 all/other 可编辑）
+        if (!isSpecial)
+          ContextMenuItem(
+            icon: LucideIcons.pencil,
+            label: s.editCategory,
+            color: c.textSecondary,
+            action: () => showCategoryEditDialog(
+              context,
+              existing: cat,
+              onSave: (updated) =>
+                  widget.settingsProvider.updateCustomCategory(updated),
+              onDelete: cat.builtinType == 'all'
+                  ? null
+                  : () => widget.settingsProvider.removeCustomCategory(cat.id),
+            ),
+          ),
+        // 隐藏
+        ContextMenuItem(
+          icon: LucideIcons.eyeOff,
+          label: s.hideSection,
+          color: c.textSecondary,
+          action: () => widget.settingsProvider.updateCustomCategory(
+            cat.copyWith(visible: false),
+          ),
+        ),
+        // 内置分类(非all): 重置选项
+        if (cat.isBuiltin && !isSpecial)
+          ContextMenuItem(
+            icon: LucideIcons.rotateCcw,
+            label: s.resetBuiltinCategories,
+            color: c.textMuted,
+            action: () =>
+                widget.settingsProvider.resetBuiltinCategory(cat.builtinType!),
+          ),
+        // 非"全部文件"的所有分类（含内置视频/音频等）均可删除
+        if (cat.builtinType != 'all')
+          ContextMenuItem(
+            icon: LucideIcons.trash2,
+            label: s.deleteCategory,
+            color: AppColors.red,
+            action: () => widget.settingsProvider.removeCustomCategory(cat.id),
+          ),
+      ],
+      dividerAfterIndices: {isSpecial ? 0 : 1},
+    );
+  }
+}
+
+// =============================================================================
+// Section Headers
+// =============================================================================
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final AppColors c;
+
+  const _SectionHeader({required this.title, required this.c});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 10.5,
+          fontWeight: FontWeight.w500,
+          color: c.textMuted,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _CollapsibleSectionHeader extends StatefulWidget {
+  final String title;
+  final bool expanded;
+  final AppColors c;
+  final VoidCallback onToggle;
+  final Widget? trailing;
+
+  const _CollapsibleSectionHeader({
+    required this.title,
+    required this.expanded,
+    required this.c,
+    required this.onToggle,
+    this.trailing,
+  });
+
+  @override
+  State<_CollapsibleSectionHeader> createState() =>
+      _CollapsibleSectionHeaderState();
+}
+
+class _CollapsibleSectionHeaderState extends State<_CollapsibleSectionHeader> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onToggle,
+        child: Container(
+          color: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+          child: Row(
+            children: [
+              Text(
+                widget.title,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                  color: _isHovered ? c.textSecondary : c.textMuted,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const Spacer(),
+              Icon(
+                widget.expanded
+                    ? LucideIcons.chevronDown
+                    : LucideIcons.chevronRight,
+                size: 11,
+                color: _isHovered ? c.textSecondary : c.textMuted,
+              ),
+              if (widget.trailing != null) ...[
+                const SizedBox(width: 4),
+                widget.trailing!,
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Nav Item
+// =============================================================================
+
+class _NavItem extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final int? count;
+  final bool isSelected;
+  final bool showActivityDot;
+  /// 设备在线态圆点（null=不显示；true=实心绿/在线；false=空心灰/离线）。
+  final bool? isOnline;
+  final VoidCallback onTap;
+
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    this.count,
+    required this.isSelected,
+    this.showActivityDot = false,
+    this.isOnline,
+    required this.onTap,
+  });
+
+  @override
+  State<_NavItem> createState() => _NavItemState();
+}
+
+class _NavItemState extends State<_NavItem> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    final m = AppMetrics.of(context);
+    final selected = widget.isSelected;
+    final Widget? statusDot = widget.showActivityDot
+        ? Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: AppColors.green,
+              shape: BoxShape.circle,
+              border: Border.all(color: c.surface1, width: 1),
+            ),
+          )
+        : widget.isOnline == null
+        ? null
+        : Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: widget.isOnline! ? AppColors.green : Colors.transparent,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: widget.isOnline! ? c.surface1 : c.textMuted,
+                width: widget.isOnline! ? 1 : 1.2,
+              ),
+            ),
+          );
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          height: 32,
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: selected
+                ? c.accentBg
+                : _isHovered
+                ? c.hoverBg
+                : Colors.transparent,
+            borderRadius: m.brMd,
+          ),
+          child: Row(
+            children: [
+              // 活跃下载点 or 图标
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    widget.icon,
+                    size: 14,
+                    color: selected ? c.accent : c.textSecondary,
+                  ),
+                  if (statusDot != null)
+                    Positioned(top: -2, right: -3, child: statusDot),
+                ],
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  widget.label,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: selected ? c.accent : c.textSecondary,
+                    fontWeight: selected ? FontWeight.w500 : FontWeight.normal,
+                  ),
+                ),
+              ),
+              if (widget.count != null) const SizedBox(width: 4),
+              if (widget.count != null)
+                Text(
+                  widget.count.toString(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: selected ? c.accent : c.textMuted,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 局域网直连设备的只读状态行：仅展示“设备名 + 在线/离线”，不接选中态、
+/// 悬浮态、计数徽标。
+///
+/// 局域网下发（LinkManager.dispatch）是 fire-and-forget，对端任务状态没有
+/// 任何数据回流通道（不同于云端设备走 SSE 全量拉取 + 增量事件），
+/// [DownloadController.countForDevice]/[DownloadController.setDeviceFilter]
+/// 两个 API 都只读 DownloadController 内部的云端任务快照，对局域网指纹
+/// 永远是 0/空——做成可点击的筛选项只会呈现“点了没反应”的空壳。改成纯
+/// 展示行后，本文件里触发 setDeviceFilter 的调用点不会再出现局域网
+/// 指纹，pruneDeviceFilter（只按云端 remoteDevices 名册校验）也就不会再
+/// 把局域网指纹误判成“已失效的远程设备”回收——它本来就不会被选中。
+/// 行高/内边距/字号与 [_NavItem] 保持一致，在同一设备区块内视觉协调；
+/// 无悬浮/选中态，不涉及颜色过渡，天然不触发 no-lerp-from-transparent。
+class _LocalDeviceStatusRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool online;
+  final String statusLabel;
+
+  const _LocalDeviceStatusRow({
+    required this.icon,
+    required this.label,
+    required this.online,
+    required this.statusLabel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = AppColors.of(context);
+    return Container(
+      height: 32,
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: c.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 12.5, color: c.textSecondary),
+            ),
+          ),
+          Text(
+            statusLabel,
+            style: TextStyle(
+              fontSize: 11,
+              color: online ? c.statusSuccess : c.textMuted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Queue section helpers
+// =============================================================================
+
+/// "+" 按钮：新建队列
+class _QueueAddButton extends StatefulWidget {
+  final AppColors c;
+  final VoidCallback onTap;
+
+  const _QueueAddButton({required this.c, required this.onTap});
+
+  @override
+  State<_QueueAddButton> createState() => _QueueAddButtonState();
+}
+
+class _QueueAddButtonState extends State<_QueueAddButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    final m = AppMetrics.of(context);
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: Container(
+          width: 16,
+          height: 16,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _isHovered ? c.hoverBg : Colors.transparent,
+            borderRadius: m.brSm,
+          ),
+          child: Icon(LucideIcons.plus, size: 11, color: c.textMuted),
+        ),
+      ),
+    );
+  }
+}
+
+/// 队列导航项：运行状态点 + 悬浮操作（启停/管理/删除）+ 右键菜单。
+/// 内置队列（main/later）无删除入口，显示名经 [queueDisplayName] 本地化。
+class _QueueNavItem extends StatefulWidget {
+  final DownloadQueue queue;
+  final int count;
+  final bool isSelected;
+  final AppColors c;
+  final VoidCallback onTap;
+  final VoidCallback onToggleRun;
+  final VoidCallback onManage;
+
+  /// null = 不可删除（内置队列）。
+  final VoidCallback? onDelete;
+
+  const _QueueNavItem({
+    required this.queue,
+    required this.count,
+    required this.isSelected,
+    required this.c,
+    required this.onTap,
+    required this.onToggleRun,
+    required this.onManage,
+    required this.onDelete,
+  });
+
+  @override
+  State<_QueueNavItem> createState() => _QueueNavItemState();
+}
+
+class _QueueNavItemState extends State<_QueueNavItem> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    final m = AppMetrics.of(context);
+    final s = LocaleScope.of(context);
+    final queue = widget.queue;
+    final selected = widget.isSelected;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onSecondaryTapUp: (d) => _showContextMenu(context, d.globalPosition),
+        child: Container(
+          height: 32,
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: selected
+                ? c.accentBg
+                : _isHovered
+                ? c.hoverBg
+                : Colors.transparent,
+            borderRadius: m.brMd,
+          ),
+          child: Row(
+            children: [
+              // 已停止的队列整行弱化，与运行中队列形成明显层次
+              Icon(
+                queue.queueId == kLaterQueueId
+                    ? LucideIcons.clock
+                    : LucideIcons.layers,
+                size: 14,
+                color: selected
+                    ? c.accent
+                    : queue.isRunning
+                    ? c.textSecondary
+                    : c.textMuted,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  queueDisplayName(s, queue),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: selected
+                        ? c.accent
+                        : queue.isRunning
+                        ? c.textSecondary
+                        : c.textMuted,
+                    fontWeight: selected ? FontWeight.w500 : FontWeight.normal,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              // 定时已启用且至少有一个生效时刻才显示标识（引擎已归一，
+              // 此处再防御旧数据：启用但两时刻皆空不算真正生效）。
+              if (queue.scheduleEnabled &&
+                  (queue.scheduleStart.isNotEmpty ||
+                      queue.scheduleStop.isNotEmpty)) ...[
+                Icon(LucideIcons.alarmClock, size: 10, color: c.textMuted),
+                const SizedBox(width: 5),
+              ],
+              // 运行状态点（常显）：绿色 = 运行中，灰色 = 已停止
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: queue.isRunning ? AppColors.green : c.textMuted,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              if (_isHovered) ...[
+                _QueueActionIcon(
+                  icon: queue.isRunning ? LucideIcons.pause : LucideIcons.play,
+                  c: c,
+                  onTap: widget.onToggleRun,
+                ),
+                const SizedBox(width: 2),
+                _QueueActionIcon(
+                  icon: LucideIcons.slidersHorizontal,
+                  c: c,
+                  onTap: widget.onManage,
+                ),
+                if (widget.onDelete != null) ...[
+                  const SizedBox(width: 2),
+                  _QueueActionIcon(
+                    icon: LucideIcons.trash2,
+                    c: c,
+                    onTap: widget.onDelete!,
+                    isDestructive: true,
+                  ),
+                ],
+              ] else ...[
+                Text(
+                  widget.count.toString(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: selected ? c.accent : c.textMuted,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showContextMenu(BuildContext context, Offset position) {
+    final s = LocaleScope.of(context);
+    final c = AppColors.of(context);
+    final queue = widget.queue;
+    showContextMenu(
+      context,
+      position,
+      items: [
+        ContextMenuItem(
+          icon: queue.isRunning ? LucideIcons.pause : LucideIcons.play,
+          label: queue.isRunning ? s.stopQueueAction : s.startQueueAction,
+          color: c.textSecondary,
+          action: widget.onToggleRun,
+        ),
+        ContextMenuItem(
+          icon: LucideIcons.slidersHorizontal,
+          label: s.manageQueueAction,
+          color: c.textSecondary,
+          action: widget.onManage,
+        ),
+        if (widget.onDelete != null)
+          ContextMenuItem(
+            icon: LucideIcons.trash2,
+            label: s.deleteQueueAction,
+            color: AppColors.red,
+            action: widget.onDelete!,
+          ),
+      ],
+      dividerAfterIndices: widget.onDelete != null ? const {1} : const {},
+    );
+  }
+}
+
+class _QueueActionIcon extends StatefulWidget {
+  final IconData icon;
+  final AppColors c;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  const _QueueActionIcon({
+    required this.icon,
+    required this.c,
+    required this.onTap,
+    this.isDestructive = false,
+  });
+
+  @override
+  State<_QueueActionIcon> createState() => _QueueActionIconState();
+}
+
+class _QueueActionIconState extends State<_QueueActionIcon> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.isDestructive ? AppColors.red : widget.c.textSecondary;
+    final m = AppMetrics.of(context);
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            color: _isHovered
+                ? m.soft(color)
+                : m.soft(color).withValues(alpha: 0),
+            borderRadius: m.brSm,
+          ),
+          child: Icon(widget.icon, size: 11, color: color),
+        ),
+      ),
+    );
+  }
+}
+
+/// RSS 订阅导航项：健康度圆点 + 未读 badge + 悬浮操作（刷新/管理/删除）。
+///
+/// 健康度**内联**在节点上（而不是藏进对话框）是 qBittorrent 至今没做的事
+/// （qB#20305）：feed 悄悄停止工作时，用户扫一眼侧边栏就该看得出来。
+class _RssNavItem extends StatefulWidget {
+  final RssSourceEntry source;
+  final bool isSelected;
+  final AppColors c;
+  final VoidCallback onTap;
+  final VoidCallback onRefresh;
+  final VoidCallback onManage;
+  final VoidCallback onDelete;
+
+  /// 该订阅是否正在抓取中（抓取 off-actor，常要几秒）。
+  final bool isRefreshing;
+
+  const _RssNavItem({
+    required this.source,
+    required this.isSelected,
+    required this.c,
+    required this.onTap,
+    required this.isRefreshing,
+    required this.onRefresh,
+    required this.onManage,
+    required this.onDelete,
+  });
+
+  @override
+  State<_RssNavItem> createState() => _RssNavItemState();
+}
+
+class _RssNavItemState extends State<_RssNavItem> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.c;
+    final m = AppMetrics.of(context);
+    final source = widget.source;
+    final selected = widget.isSelected;
+    final unhealthy = source.lastError.isNotEmpty;
+    final label = rssDisplayName(source);
+    final textColor = selected
+        ? c.accent
+        : unhealthy
+        ? AppColors.red
+        : source.enabled
+        ? c.textSecondary
+        : c.textMuted;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onSecondaryTapUp: (d) => _showContextMenu(context, d.globalPosition),
+        child: Tooltip(
+          message: unhealthy ? '$label\n${source.lastError}' : label,
+          waitDuration: const Duration(milliseconds: 600),
+          child: Container(
+            height: 32,
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: selected
+                  ? c.accentBg
+                  : _isHovered
+                  ? c.hoverBg
+                  : c.hoverBg.withValues(alpha: 0),
+              borderRadius: m.brMd,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  unhealthy ? LucideIcons.circleAlert : LucideIcons.rss,
+                  size: 14,
+                  color: unhealthy ? AppColors.red : textColor,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: textColor,
+                      fontWeight: selected
+                          ? FontWeight.w500
+                          : FontWeight.normal,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // 抓取中的 spinner 未悬浮时也要看得见——抓取要好几秒，鼠标
+                // 一移开就没反馈的话，用户依然分不清「在跑」还是「没生效」。
+                if (_isHovered) ...[
+                  if (widget.isRefreshing)
+                    _rssSpinner(c)
+                  else
+                    _QueueActionIcon(
+                      icon: LucideIcons.refreshCw,
+                      c: c,
+                      onTap: widget.onRefresh,
+                    ),
+                  const SizedBox(width: 2),
+                  _QueueActionIcon(
+                    icon: LucideIcons.slidersHorizontal,
+                    c: c,
+                    onTap: widget.onManage,
+                  ),
+                  const SizedBox(width: 2),
+                  _QueueActionIcon(
+                    icon: LucideIcons.trash2,
+                    c: c,
+                    onTap: widget.onDelete,
+                    isDestructive: true,
+                  ),
+                ] else if (widget.isRefreshing)
+                  _rssSpinner(c)
+                else if (source.unreadCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 5,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: m.soft(c.accent),
+                      borderRadius: m.brSm,
+                    ),
+                    child: Text(
+                      source.unreadCount.toString(),
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: c.accent,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  )
+                else if (!source.enabled)
+                  Icon(LucideIcons.pause, size: 10, color: c.textMuted),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 与 [_QueueActionIcon] 等宽的 spinner——占位一致，抓取开始/结束时整行
+  /// 不会左右抖动。
+  Widget _rssSpinner(AppColors c) => SizedBox(
+    width: 18,
+    height: 18,
+    child: Center(
+      child: SizedBox(
+        width: 11,
+        height: 11,
+        child: CircularProgressIndicator(strokeWidth: 1.4, color: c.accent),
+      ),
+    ),
+  );
+
+  void _showContextMenu(BuildContext context, Offset position) {
+    final s = LocaleScope.of(context);
+    final c = AppColors.of(context);
+    showContextMenu(
+      context,
+      position,
+      items: [
+        ContextMenuItem(
+          icon: LucideIcons.refreshCw,
+          label: s.rssRefreshNow,
+          color: c.textSecondary,
+          action: widget.onRefresh,
+        ),
+        ContextMenuItem(
+          icon: LucideIcons.slidersHorizontal,
+          label: s.rssManageTitle,
+          color: c.textSecondary,
+          action: widget.onManage,
+        ),
+        ContextMenuItem(
+          icon: LucideIcons.trash2,
+          label: s.rssDeleteSource,
+          color: AppColors.red,
+          action: widget.onDelete,
+        ),
+      ],
+      dividerAfterIndices: const {1},
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// 队列对话框 UA 预设（'' = 继承全局，其余取共享预设表）
+// ─────────────────────────────────────────────
+
+/// 根据 UA 字符串反推预设 key（'' = 继承全局设置）
+String _detectQueueUaPreset(String ua) {
+  final detected = detectUaPreset(ua);
+  return detected == 'default' ? '' : detected;
+}
+
+/// 新建队列对话框（编辑走 [showQueueManagerDialog]）。
+class _QueueDialog extends StatefulWidget {
+  final String title;
+  final TextEditingController nameCtrl;
+  final S s;
+  final AppColors c;
+  final void Function(
+    String name,
+    int speedLimit,
+    int uploadLimit,
+    int maxConcurrent,
+    String saveDir,
+    int defaultSegments,
+    String defaultUserAgent,
+  )
+  onConfirm;
+
+  const _QueueDialog({
+    required this.title,
+    required this.nameCtrl,
+    required this.s,
+    required this.c,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_QueueDialog> createState() => _QueueDialogState();
+}
+
+class _QueueDialogState extends State<_QueueDialog> {
+  late final TextEditingController _speedCtrl;
+  late final TextEditingController _uploadCtrl;
+  late final TextEditingController _concurrentCtrl;
+  late final TextEditingController _saveDirCtrl;
+  late final TextEditingController _uaCtrl;
+  late String _selectedSegments;
+  late String _selectedUaPreset;
+
+  static const _segmentOptions = ['0', '4', '8', '16', '32', '64'];
+
+  @override
+  void initState() {
+    super.initState();
+    _speedCtrl = TextEditingController();
+    _uploadCtrl = TextEditingController();
+    _concurrentCtrl = TextEditingController();
+    _saveDirCtrl = TextEditingController();
+    _uaCtrl = TextEditingController();
+    _selectedSegments = '0';
+    _selectedUaPreset = '';
+  }
+
+  @override
+  void dispose() {
+    _speedCtrl.dispose();
+    _uploadCtrl.dispose();
+    _concurrentCtrl.dispose();
+    _saveDirCtrl.dispose();
+    _uaCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onUaPresetChanged(String? preset) {
+    if (preset == null) return;
+    setState(() => _selectedUaPreset = preset);
+    if (preset != 'custom') {
+      _uaCtrl.text = kUaPresets[preset] ?? '';
+    }
+  }
+
+  void _onUaTextChanged(String value) {
+    final detected = _detectQueueUaPreset(value);
+    if (detected != _selectedUaPreset) {
+      setState(() => _selectedUaPreset = detected);
+    }
+  }
+
+  void _confirm() {
+    final name = widget.nameCtrl.text.trim();
+    if (name.isEmpty) return;
+    // 钳制到合法范围：速度 0-1073741824 KB/s，并发 0-100（0 = 使用全局设置）
+    final speedLimit = (int.tryParse(_speedCtrl.text.trim()) ?? 0).clamp(
+      0,
+      1 << 30,
+    );
+    final uploadLimit = (int.tryParse(_uploadCtrl.text.trim()) ?? 0).clamp(
+      0,
+      1 << 30,
+    );
+    final maxConcurrent = (int.tryParse(_concurrentCtrl.text.trim()) ?? 0)
+        .clamp(0, 100);
+    final saveDir = _saveDirCtrl.text.trim();
+    final defaultSegments = int.tryParse(_selectedSegments) ?? 0;
+    final defaultUserAgent = _uaCtrl.text.trim();
+    Navigator.of(context).pop();
+    widget.onConfirm(
+      name,
+      speedLimit,
+      uploadLimit,
+      maxConcurrent,
+      saveDir,
+      defaultSegments,
+      defaultUserAgent,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.s;
+    final c = widget.c;
+    return ShadDialog(
+      title: Text(widget.title),
+      actions: [
+        ShadButton.outline(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(s.cancel),
+        ),
+        ShadButton(onPressed: _confirm, child: Text(s.confirm)),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              s.queueNameLabel,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+                color: c.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            ShadInput(
+              controller: widget.nameCtrl,
+              placeholder: Text(s.queueNameHint),
+              autofocus: true,
+              onSubmitted: (_) => _confirm(),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.queueSpeedLimit,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: c.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ShadInput(
+                        controller: _speedCtrl,
+                        placeholder: Text(s.queueSpeedLimitHint),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            s.queueUploadLimit,
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: c.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          ShadTooltip(
+                            waitDuration: const Duration(milliseconds: 200),
+                            effects: const [],
+                            builder: (_) => Text(
+                              s.queueUploadLimitDesc,
+                              style: const TextStyle(fontSize: 12, height: 1.5),
+                            ),
+                            child: ShadGestureDetector(
+                              cursor: SystemMouseCursors.help,
+                              onTap: () {},
+                              child: Icon(
+                                LucideIcons.circleHelp,
+                                size: 13,
+                                color: c.textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      ShadInput(
+                        controller: _uploadCtrl,
+                        placeholder: Text(s.queueSpeedLimitHint),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.queueMaxConcurrent,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: c.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      ShadInput(
+                        controller: _concurrentCtrl,
+                        placeholder: Text(s.queueMaxConcurrentHint),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        s.queueDefaultSegments,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                          color: c.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ShadSelect<String>(
+                          initialValue: _selectedSegments,
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() => _selectedSegments = v);
+                            }
+                          },
+                          options: _segmentOptions
+                              .map(
+                                (opt) => ShadOption(
+                                  value: opt,
+                                  child: Text(
+                                    opt == '0'
+                                        ? s.queueDefaultSegmentsHint
+                                        : opt,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          selectedOptionBuilder: (ctx, v) =>
+                              Text(v == '0' ? s.queueDefaultSegmentsHint : v),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              s.queueDefaultUserAgent,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+                color: c.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                SizedBox(
+                  width: 130,
+                  child: ShadSelect<String>(
+                    initialValue: _selectedUaPreset,
+                    options: [
+                      ShadOption(
+                        value: '',
+                        child: Text(s.queueUaInheritGlobal),
+                      ),
+                      ShadOption(
+                        value: 'chrome',
+                        child: Text(s.userAgentPresetChrome),
+                      ),
+                      ShadOption(
+                        value: 'firefox',
+                        child: Text(s.userAgentPresetFirefox),
+                      ),
+                      ShadOption(
+                        value: 'edge',
+                        child: Text(s.userAgentPresetEdge),
+                      ),
+                      ShadOption(
+                        value: 'safari',
+                        child: Text(s.userAgentPresetSafari),
+                      ),
+                      ShadOption(
+                        value: 'custom',
+                        child: Text(s.userAgentPresetCustom),
+                      ),
+                    ],
+                    selectedOptionBuilder: (ctx, v) {
+                      final label = switch (v) {
+                        'chrome' => 'Chrome',
+                        'firefox' => 'Firefox',
+                        'edge' => 'Edge',
+                        'safari' => 'Safari',
+                        'custom' => s.userAgentPresetCustom,
+                        _ => s.queueUaInheritGlobal,
+                      };
+                      return Text(
+                        label,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      );
+                    },
+                    onChanged: _onUaPresetChanged,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ShadInput(
+                    controller: _uaCtrl,
+                    placeholder: Text(s.queueUaHint),
+                    onChanged: _onUaTextChanged,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// =============================================================================
+// Sidebar footer: version display + update UI
+// =============================================================================
+
+class _UpdateFooter extends StatelessWidget {
+  const _UpdateFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: UpdateService.instance,
+      builder: (context, _) {
+        final svc = UpdateService.instance;
+        final c = AppColors.of(context);
+        final status = svc.status;
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (status == UpdateStatus.downloading) _buildProgressBar(svc, c),
+            Container(
+              height: 28,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: c.border, width: 1)),
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    _versionText(svc),
+                    style: TextStyle(fontSize: 10.5, color: c.textMuted),
+                  ),
+                  const Spacer(),
+                  _buildAction(context, svc, c, status),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _versionText(UpdateService svc) {
+    final v = svc.currentVersion;
+    final label = v == 'dev' ? 'dev' : 'v$v';
+    if (svc.status == UpdateStatus.available ||
+        svc.status == UpdateStatus.downloading ||
+        svc.status == UpdateStatus.readyToInstall) {
+      return '$label -> v${svc.checkResult?.latestVersion ?? ''}';
+    }
+    return label;
+  }
+
+  Widget _buildAction(
+    BuildContext context,
+    UpdateService svc,
+    AppColors c,
+    UpdateStatus status,
+  ) {
+    switch (status) {
+      case UpdateStatus.available:
+        return _UpdateActionButton(
+          icon: LucideIcons.download,
+          tooltip: LocaleScope.of(
+            context,
+          ).downloadUpdateVersion(svc.checkResult?.latestVersion ?? ''),
+          color: AppColors.red,
+          onTap: svc.downloadUpdate,
+        );
+      case UpdateStatus.downloading:
+        final p = svc.progress;
+        final pct = (p != null && p.totalBytes > 0)
+            ? '${(p.downloadedBytes / p.totalBytes * 100).toStringAsFixed(0)}%'
+            : '...';
+        return Text(
+          pct,
+          style: TextStyle(
+            fontSize: 10,
+            color: c.accent,
+            fontWeight: FontWeight.w600,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        );
+      case UpdateStatus.readyToInstall:
+        return _UpdateActionButton(
+          icon: LucideIcons.rotateCcw,
+          tooltip: LocaleScope.of(context).installAndRestart,
+          color: AppColors.green,
+          onTap: svc.installUpdate,
+        );
+      case UpdateStatus.checking:
+        return SizedBox(
+          width: 12,
+          height: 12,
+          child: CircularProgressIndicator(
+            strokeWidth: 1.5,
+            color: c.textMuted,
+          ),
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  Widget _buildProgressBar(UpdateService svc, AppColors c) {
+    final p = svc.progress;
+    final fraction = (p != null && p.totalBytes > 0)
+        ? (p.downloadedBytes / p.totalBytes).clamp(0.0, 1.0)
+        : 0.0;
+
+    return SizedBox(
+      height: 3,
+      child: LinearProgressIndicator(
+        value: fraction,
+        backgroundColor: c.surface2,
+        valueColor: AlwaysStoppedAnimation<Color>(c.accent),
+        minHeight: 3,
+      ),
+    );
+  }
+}
+
+class _UpdateActionButton extends StatefulWidget {
+  final IconData icon;
+  final String tooltip;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _UpdateActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  State<_UpdateActionButton> createState() => _UpdateActionButtonState();
+}
+
+class _UpdateActionButtonState extends State<_UpdateActionButton> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final m = AppMetrics.of(context);
+    return ShadTooltip(
+      builder: (_) => Text(widget.tooltip),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: _isHovered
+                  ? m.active(widget.color)
+                  : m.active(widget.color).withValues(alpha: 0),
+              borderRadius: m.brSm,
+            ),
+            child: Icon(widget.icon, size: 13, color: widget.color),
+          ),
+        ),
+      ),
+    );
+  }
+}

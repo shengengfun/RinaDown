@@ -1,0 +1,81 @@
+name: 🐛 Bug 反馈 / Bug Report
+description: 报告一个可复现的问题 / Report a reproducible problem
+title: "🐛 [Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请尽量填写完整，便于我们快速定位。
+        Thanks for reporting! Please fill in as much as possible so we can reproduce quickly.
+
+        > 💡 也可以直接在应用内（状态栏反馈按钮）或[官网反馈页](https://fluxdown.zerx.dev/feedback)提交，会自动附带系统信息与日志。
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述 / Description
+      description: 清晰简洁地描述遇到的问题 / A clear description of the bug
+      placeholder: 点击暂停后进度条不更新……
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤 / Steps to Reproduce
+      description: 我们如何重现这个问题 / How can we reproduce it
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为 / Expected Behavior
+      description: 你期望发生什么 / What you expected to happen
+    validations:
+      required: true
+  - type: dropdown
+    id: protocol
+    attributes:
+      label: 相关协议 / Protocol
+      description: 若与特定下载协议有关 / If related to a specific protocol
+      options:
+        - 不涉及 / N.A.
+        - HTTP/HTTPS
+        - FTP
+        - BitTorrent / Magnet
+        - HLS
+        - DASH
+        - ED2K
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / Version
+      description: FluxDown 版本号（关于页可见）/ App version (see About page)
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统 / OS
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Android
+        - iOS
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / Logs
+      description: 粘贴相关日志（设置 → 关于 → 导出日志）/ Paste relevant logs (Settings → About → Export Logs)
+      render: log
+    validations:
+      required: false

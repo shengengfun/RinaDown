@@ -1,0 +1,55 @@
+---
+/**
+ * 文档侧边栏导航(零水合静态组件)。
+ * 当前项由服务端 Astro.url.pathname 判定;zh 缺译项带 "EN" 角标(指向回退页)。
+ */
+import type { DocsNavGroup } from "../../lib/docs-nav";
+
+interface Props {
+  groups: DocsNavGroup[];
+  currentPath: string;
+  lang: "en" | "zh";
+}
+
+const { groups, currentPath, lang } = Astro.props;
+const norm = (p: string) => p.replace(/\/$/, "");
+const cur = norm(currentPath);
+---
+
+<nav class="space-y-6" aria-label={lang === "zh" ? "文档导航" : "Docs navigation"}>
+  {
+    groups.map((g) => (
+      <div>
+        <h3 class="mb-2 text-xs font-semibold uppercase tracking-wider text-dark-text-muted">
+          {g.label}
+        </h3>
+        <ul class="space-y-0.5">
+          {g.items.map((item) => {
+            const active = norm(item.href) === cur;
+            return (
+              <li>
+                <a
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  class:list={[
+                    "block rounded-lg px-3 py-1.5 text-sm transition-all duration-200",
+                    active
+                      ? "border-l-2 border-brand-sky bg-brand-sky/10 font-medium text-brand-sky"
+                      : "border-l-2 border-transparent text-dark-text-secondary hover:translate-x-0.5 hover:bg-dark-surface2 hover:text-dark-text",
+                  ]}
+                >
+                  {item.title}
+                  {item.fallback && (
+                    <span class="ml-1.5 align-middle rounded border border-dark-border px-1 text-[10px] text-dark-text-muted">
+                      EN
+                    </span>
+                  )}
+                </a>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+    ))
+  }
+</nav>

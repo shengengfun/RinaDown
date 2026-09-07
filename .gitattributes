@@ -1,0 +1,40 @@
+# 仓库行尾符策略:入库统一 LF,文本文件全平台检出 LF。
+# text=auto 保留 git 的二进制启发式检测;eol=lf 只作用于被判定为文本的文件。
+# 存量 CRLF 已随本策略一次性 renormalize(见 .git-blame-ignore-revs)。
+* text=auto eol=lf
+
+# Windows 专属文本:检出 CRLF(cmd.exe 对 LF 批处理解析不可靠)
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Inno Setup 语言包:UTF-8 BOM + CRLF(Inno Setup 6 Unicode .isl 依赖 BOM)
+installer/windows/*.isl text eol=crlf
+
+# 二进制:显式声明,防 text=auto 误判
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.gz binary
+*.tgz binary
+*.tar binary
+*.exe binary
+*.dll binary
+*.dylib binary
+*.so binary
+*.a binary
+*.lib binary
+*.pdf binary
+*.mp4 binary
+*.mp3 binary
+*.sqlite binary
+*.jar binary
+*.fxplug binary

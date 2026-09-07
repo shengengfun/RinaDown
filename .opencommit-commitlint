@@ -1,0 +1,23 @@
+{
+  "hash": "64f7b3a1e25ea356fb6164da2ea26affaa6c9b9d69577b52a7fe2594f6b9da6b",
+  "prompts": [
+    "The type should always be one of the following values:\n  - feat\n  - fix\n  - docs\n  - perf\n  - refactor\n  - style\n  - test\n  - chore\n  - ci\n  - revert.",
+    "The type should always be in lower-case case.",
+    "The type should never be empty.",
+    "The scope should always be in lower-case case.",
+    "The subject should never be empty.",
+    "The subject should never end with '.'.",
+    "The header should always have 100 characters or less.",
+    "There should always be a blank line at the beginning of the body."
+  ],
+  "consistency": {
+    "简体中文": {
+      "localLanguage": "简体中文",
+      "commitFix": "fix(server): 将端口变量 port 统一为大写常量 PORT",
+      "commitFeat": "feat(server): 支持通过环境变量 process.env.PORT 指定监听端口",
+      "commitFixOmitScope": "fix: 将端口变量 port 统一为大写常量 PORT",
+      "commitFeatOmitScope": "feat: 支持通过环境变量 process.env.PORT 指定监听端口",
+      "commitDescription": "端口变量重命名为常量 PORT 以符合命名约定；支持环境变量后应用可在任意可用端口上运行，部署更灵活"
+    }
+  }
+}

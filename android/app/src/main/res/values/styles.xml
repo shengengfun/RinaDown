@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MainActivity 仅做无界面路由，不创建窗口或 FlutterEngine。 -->
+    <style name="RouterTheme" parent="@android:style/Theme.NoDisplay" />
+    <!-- FluxdownMainActivity（主界面）：窗口一创建即不透明，避免冷启动先透出壁纸的闪屏。
+         背景用 launch_background（白/壁纸色）作为 splash。 -->
+    <style name="MainTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+    </style>
+    <!-- ExternalDownloadActivity（外部下载唤起）：透明窗口，让下载弹窗透出来源应用；
+         Flutter 首帧前与弹窗下方都保持透明。 -->
+    <style name="ExternalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackground">@android:color/transparent</item>
+    </style>
+</resources>

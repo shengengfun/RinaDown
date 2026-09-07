@@ -1,0 +1,2281 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write # 允许推送 Docker 镜像到 ghcr.io（build-server-docker job）
+  actions: write # 允许在 release job 末尾删除旧 artifact（避免 500MB 配额耗尽）
+
+# ── SignPath 代码签名（Windows PE，OSS 免费证书）──
+# 需要仓库 secret SIGNPATH_API_TOKEN（SignPath 控制台 CI 用户的 API token）。
+# 生产证书由 SignPath 审核 setup 并导入后，把 SIGNPATH_SIGNING_POLICY 改为 release-signing。
+env:
+  SIGNPATH_ORGANIZATION_ID: 8e88ecd8-8099-49f5-9edf-e43053de7d3e
+  SIGNPATH_PROJECT_SLUG: FluxDown
+  SIGNPATH_SIGNING_POLICY: test-signing
+  SIGNPATH_ARTIFACT_CONFIG: windows-exe-zip
+
+jobs:
+  # ── 前置 Job: 检测上一个版本 tag → 当前 tag 之间哪些组件目录有变更 ──
+  # 规则：
+  #   fluxDown/**            → 浏览器扩展（extension）
+  #   web/**、native/server/** → headless 服务器（server，Docker 镜像 + 多平台二进制）
+  #   native/engine/**       → 桌面客户端 + 服务器 + 移动端（共享下载引擎）
+  #   docker/**              → 服务器（部署文件变更需重发镜像）
+  #   android/**、lib/src/mobile/** → 移动端资产（Android APK）
+  #   website/**             → 官网（独立走 deploy-website.yml 部署，不发 release）
+  #   docs/**、*.md          → 纯文档，不触发任何构建
+  #   其余任何路径            → 桌面客户端（app）
+  # 找不到上一个 v* tag（首个版本）时全部视为有变更。
+  changes:
+    name: Detect Changed Components
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.detect.outputs.app }}
+      extension: ${{ steps.detect.outputs.extension }}
+      server: ${{ steps.detect.outputs.server }}
+      mobile: ${{ steps.detect.outputs.mobile }}
+      cli: ${{ steps.detect.outputs.cli }}
+      engine: ${{ steps.detect.outputs.engine }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      # 分支守卫：预览版 tag（vX.Y.Z-rc.N）必须打在 main 分支上，
+      # 稳定版 tag（vX.Y.Z）必须打在 stable 分支上。打错分支整条流水线在此失败。
+      - name: Verify tag branch (stable=stable, frontier=main)
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          case "$TAG" in
+            *-*) BRANCH=main ;;
+            *)   BRANCH=stable ;;
+          esac
+          git fetch origin "$BRANCH" --quiet
+          if git merge-base --is-ancestor "$TAG" "origin/$BRANCH"; then
+            echo "::notice::Tag $TAG is on origin/$BRANCH — OK"
+          else
+            echo "::error::Tag $TAG is NOT on origin/$BRANCH（稳定版须从 stable 打，预览版 -rc.N 须从 main 打）"
+            exit 1
+          fi
+
+      - name: Detect changes since previous version tag
+        id: detect
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          # 只匹配 v0.1.2 形式的版本 tag（glob 从头锚定，
+          # 自动忽略 release 流程创建的 extension-v* / website-v* 组件 tag）
+          PREV=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "${TAG}^" 2>/dev/null || true)
+
+          APP=false; EXTENSION=false; SERVER=false; MOBILE=false; CLI=false; ENGINE=false
+          if [ -z "$PREV" ]; then
+            echo "No previous version tag found — building everything"
+            APP=true; EXTENSION=true; SERVER=true; MOBILE=true; CLI=true; ENGINE=true
+          else
+            echo "Diff range: ${PREV}..${TAG}"
+            CHANGED=$(git diff --name-only "${PREV}" "${TAG}")
+            echo "── Changed files ──"
+            echo "$CHANGED"
+            while IFS= read -r f; do
+              [ -z "$f" ] && continue
+              case "$f" in
+                fluxDown/*)          EXTENSION=true ;;
+                web/*)               SERVER=true ;;
+                native/server/*)     SERVER=true ;;
+                native/cli/*)        CLI=true ;;
+                native/api/*)        APP=true; SERVER=true; CLI=true ;;
+                native/protocol/*)   APP=true; SERVER=true; CLI=true ;;
+                native/engine-protocol/*) APP=true; SERVER=true ;;
+                native/daemon/*|native/agent/*|crates/*) APP=true ;;
+                native/engine/*)     APP=true; SERVER=true; MOBILE=true; CLI=true; ENGINE=true ;;
+                Cargo.toml|Cargo.lock) APP=true; SERVER=true; MOBILE=true; CLI=true; ENGINE=true ;;
+                docker/*)            SERVER=true ;;
+                packaging/*|installer/*) APP=true; SERVER=true ;;
+                android/*)           MOBILE=true ;;
+                lib/src/mobile/*)    MOBILE=true ;;
+                # 其余共享 Dart 代码（models/i18n/theme/bindings…）同时影响桌面端与移动端
+                lib/*)               APP=true; MOBILE=true ;;
+                pubspec.yaml|pubspec.lock) APP=true; MOBILE=true ;;
+                website/*)  ;;
+                docs/*|*.md) ;;
+                *)          APP=true ;;
+              esac
+            done <<< "$CHANGED"
+          fi
+
+          {
+            echo "app=$APP"
+            echo "extension=$EXTENSION"
+            echo "server=$SERVER"
+            echo "mobile=$MOBILE"
+            echo "cli=$CLI"
+            echo "engine=$ENGINE"
+          } >> "$GITHUB_OUTPUT"
+          echo "::notice::Components changed in ${PREV:-<none>}..${TAG}: app=$APP extension=$EXTENSION server=$SERVER mobile=$MOBILE cli=$CLI engine=$ENGINE"
+
+  # ── 前置 Job: 引擎协议与依赖门禁 ──
+  verify-engine:
+    name: Verify Engine and MSE
+    needs: changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Skip unchanged engine
+        if: needs.changes.outputs.engine != 'true'
+        run: echo "Engine is unchanged; protocol verification is not required."
+
+      - name: Checkout repository
+        if: needs.changes.outputs.engine == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        if: needs.changes.outputs.engine == 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        if: needs.changes.outputs.engine == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: engine-verify-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            engine-verify-${{ runner.os }}-
+
+      - name: Verify librqbit patch source
+        id: librqbit
+        if: needs.changes.outputs.engine == 'true'
+        shell: bash
+        run: |
+          cargo metadata --locked --format-version 1 > "$RUNNER_TEMP/cargo-metadata.json"
+          python - "$RUNNER_TEMP/cargo-metadata.json" <<'PY'
+          import json
+          import os
+          import pathlib
+          import sys
+
+          metadata = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+          packages = [package for package in metadata["packages"] if package["name"] == "librqbit"]
+          if len(packages) != 1:
+              raise SystemExit(f"expected one librqbit package, found {len(packages)}")
+          package = packages[0]
+          manifest = pathlib.Path(package["manifest_path"]).as_posix()
+          if package["version"] != "9.0.0":
+              raise SystemExit(f"unexpected librqbit version: {package['version']}")
+          source = package["source"] or ""
+          prefix = "git+https://github.com/lingdiansr/rqbit?rev="
+          if not source.startswith(prefix):
+              raise SystemExit(f"librqbit must resolve from a pinned MSE fork revision, got: {source}")
+          requested_rev, separator, resolved_rev = source.removeprefix(prefix).partition("#")
+          if not separator or requested_rev != resolved_rev:
+              raise SystemExit(f"librqbit requested and resolved revisions differ: {source}")
+          if "/native/engine/vendor/" in manifest:
+              raise SystemExit(f"librqbit must not resolve from the vendored copy: {manifest}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              print(f"manifest={manifest}", file=output)
+          print(f"verified fork librqbit {package['version']}: {manifest} ({source})")
+          PY
+
+      - name: Test resolved librqbit MSE fork
+        if: needs.changes.outputs.engine == 'true'
+        run: |
+          cargo test --manifest-path "${{ steps.librqbit.outputs.manifest }}" --lib mse
+          cargo test --manifest-path "${{ steps.librqbit.outputs.manifest }}" --lib read_buf
+          cargo test --manifest-path "${{ steps.librqbit.outputs.manifest }}" --lib fresh_redial
+          cargo test --manifest-path "${{ steps.librqbit.outputs.manifest }}" --lib --no-run
+
+      - name: Verify engine workspace
+        if: needs.changes.outputs.engine == 'true'
+        run: |
+          cargo check --locked -p fluxdown_engine
+          cargo test --locked -p fluxdown_engine
+          cargo fmt --check
+
+  # ── 并行 Job 1: 构建 Windows 安装包（x64 + ARM64）──
+  build-windows:
+    name: Build Windows (${{ matrix.arch }})
+    needs: [changes, verify-engine]
+    if: needs.changes.outputs.app == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: |
+          V="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=$V" >> "$GITHUB_OUTPUT"
+          echo "CLEAN_VERSION=${V%%-*}" >> "$GITHUB_OUTPUT"
+
+      - name: Compute repo stats (donate card)
+        id: stats
+        shell: bash
+        run: |
+          echo "FIRST_COMMIT_DATE=$(git log --reverse --format=%ad --date=format:%Y-%m-%d | head -1)" >> "$GITHUB_OUTPUT"
+          echo "RELEASE_COUNT=$(git tag -l 'v[0-9]*' | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          echo "COMMIT_COUNT=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+
+      # ── Rust toolchain ──
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: rust-${{ runner.os }}-${{ matrix.arch }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            rust-${{ runner.os }}-${{ matrix.arch }}-
+
+      - name: Cache Rinf CLI
+        id: cache-rinf
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/rinf.exe
+          key: rinf-cli-${{ runner.os }}-${{ matrix.arch }}-8.9.0
+
+      # ── Flutter SDK（x64 用预编译包，ARM64 用 git clone 原生安装）──
+      - name: Setup Flutter (x64)
+        if: matrix.arch == 'x64'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Setup Flutter (ARM64 via git)
+        if: matrix.arch == 'arm64'
+        shell: bash
+        run: |
+          git clone https://github.com/flutter/flutter.git -b stable --depth 1 "$USERPROFILE/flutter"
+          echo "$USERPROFILE/flutter/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Flutter (ARM64)
+        if: matrix.arch == 'arm64'
+        uses: actions/cache@v4
+        with:
+          path: ~/flutter/bin/cache
+          key: flutter-arm64-stable
+
+      - name: Flutter precache & version info
+        run: |
+          flutter --version
+          flutter precache --windows
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      # ── Rinf code generation ──
+      - name: Install Rinf CLI
+        if: steps.cache-rinf.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          CARGO_HTTP_MULTIPLEXING: "false"
+          CARGO_NET_RETRY: "10"
+        run: |
+          for i in 1 2 3; do
+            cargo install rinf_cli@8.9.0 && exit 0
+            echo "cargo install failed (attempt $i), retrying in 15s..."
+            sleep 15
+          done
+          exit 1
+
+      - name: Generate Rinf bindings
+        run: rinf gen
+
+      # ── Build ──
+      - name: Pre-build Rust hub (debug cargo output)
+        shell: bash
+        run: |
+          cd native/hub
+          echo "::group::Cargo build (cdylib) verbose output"
+          cargo build --release --lib --verbose 2>&1 || echo "::error::Cargo build failed with exit code $?"
+          echo "::endgroup::"
+
+      - name: Build Flutter Windows app
+        # Windows 使用 native-tls（Schannel），无需 aws-lc-sys，无需任何额外 TLS 环境变量
+        run: flutter build windows --release --build-name=${{ steps.version.outputs.CLEAN_VERSION }} --build-number=1 --dart-define=APP_VERSION=${{ steps.version.outputs.VERSION }} --dart-define=ANALYTICS_APP_KEY=${{ secrets.ANALYTICS_APP_KEY }} --dart-define=FLUXCLOUD_BASE_URL=${{ secrets.FLUXCLOUD_BASE_URL }} --dart-define=STATS_FIRST_COMMIT_DATE=${{ steps.stats.outputs.FIRST_COMMIT_DATE }} --dart-define=STATS_RELEASE_COUNT=${{ steps.stats.outputs.RELEASE_COUNT }} --dart-define=STATS_COMMIT_COUNT=${{ steps.stats.outputs.COMMIT_COUNT }}
+
+      # ── ARM64: Flutter 在 ARM64 runner 上以 x64 仿真运行，输出到 build\windows\x64
+      #    但后续步骤（Inno Setup / portable zip）需要 build\windows\arm64 ──
+      - name: Normalize build output path for ARM64
+        if: matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          if ((Test-Path "build\windows\x64") -and -not (Test-Path "build\windows\arm64")) {
+            Rename-Item -Path "build\windows\x64" -NewName "arm64"
+            Write-Host "Renamed build\windows\x64 -> build\windows\arm64"
+          }
+
+      - name: Build and bundle native desktop services
+        shell: bash
+        run: |
+          cargo build --release --locked \
+            -p fluxdown_ui_app -p fluxdown_agent -p fluxdown_daemon \
+            --features fluxdown_daemon/plugins,fluxdown_daemon/components
+          RELEASE_DIR="build/windows/${{ matrix.arch }}/runner/Release"
+          cp target/release/fluxdown-desktop.exe "$RELEASE_DIR/"
+          cp target/release/fluxdown-agent.exe "$RELEASE_DIR/"
+          cp target/release/fluxdownd.exe "$RELEASE_DIR/"
+
+      # ── Bundle MSVC CRT runtime DLLs ──
+      # Flutter 的 Windows 构建产物不含 VC 运行库；开发机普遍装有 VCRedist
+      # 从未暴露，但干净系统（winget 安装器验证环境、精简版 Windows）上
+      # 所有 exe 直接 STATUS_DLL_NOT_FOUND (0xC0000135)。把 CRT DLL 随应用
+      # 目录分发（Flutter 官方推荐的自包含发行方式），安装器与 portable zip
+      # 同时受益，无需安装器额外拉 VCRedist。
+      # DLL 架构按 flux_down.exe 的 PE 头实测，而不是相信 matrix.arch
+      # （ARM64 job 里 Flutter 经 x64 仿真运行，产物实际架构以 PE 头为准）。
+      - name: Bundle MSVC CRT runtime DLLs
+        shell: pwsh
+        run: |
+          $release = "build\windows\${{ matrix.arch }}\runner\Release"
+          $bytes = [System.IO.File]::ReadAllBytes("$release\flux_down.exe")
+          $peOff = [BitConverter]::ToInt32($bytes, 0x3C)
+          $machine = [BitConverter]::ToUInt16($bytes, $peOff + 4)
+          $archDir = switch ($machine) {
+            0x8664 { 'x64' }
+            0xAA64 { 'arm64' }
+            default { throw ("Unexpected PE machine type: 0x{0:X4}" -f $machine) }
+          }
+          Write-Host "flux_down.exe PE machine: $archDir"
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vsRoot = & $vswhere -latest -products * -property installationPath
+          if (-not $vsRoot) { throw "Visual Studio installation not found via vswhere" }
+          $crtDir = Get-ChildItem "$vsRoot\VC\Redist\MSVC\*\$archDir\Microsoft.VC1*.CRT" -Directory |
+            Sort-Object FullName | Select-Object -Last 1
+          if (-not $crtDir) { throw "MSVC CRT redist for $archDir not found under $vsRoot" }
+          Copy-Item "$($crtDir.FullName)\msvcp140*.dll", "$($crtDir.FullName)\vcruntime140*.dll" $release -Force
+          foreach ($required in 'msvcp140.dll', 'vcruntime140.dll') {
+            if (-not (Test-Path "$release\$required")) { throw "$required missing after CRT copy" }
+          }
+          Get-ChildItem "$release\msvcp140*.dll", "$release\vcruntime140*.dll" |
+            ForEach-Object { Write-Host "bundled $($_.Name) ($($_.Length) bytes)" }
+
+      # ── SignPath 签名 Round 1: 应用 exe（flux_down / fluxdown_nmh / fluxdown_updater）──
+      # 必须在 Inno Setup 打包与 portable zip 之前完成，
+      # 保证安装器内嵌与便携版解压出的 exe 均已带签名。
+      - name: Collect unsigned app executables
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build\signing\app | Out-Null
+          Copy-Item "build\windows\${{ matrix.arch }}\runner\Release\*.exe" "build\signing\app\"
+
+      - name: Upload unsigned app executables
+        id: upload-unsigned-app
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-app-exe-${{ matrix.arch }}
+          path: build/signing/app/*.exe
+
+      - name: Sign app executables (SignPath)
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY }}
+          artifact-configuration-slug: ${{ env.SIGNPATH_ARTIFACT_CONFIG }}
+          github-artifact-id: ${{ steps.upload-unsigned-app.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: build/signing/app-signed
+
+      - name: Replace app executables with signed versions
+        shell: pwsh
+        run: |
+          Copy-Item "build\signing\app-signed\*.exe" "build\windows\${{ matrix.arch }}\runner\Release\" -Force
+
+      # ── Inno Setup installer ──
+      # NOTE: fluxdown_nmh.exe and fluxdown_updater.exe are built automatically
+      # by CMake custom targets defined in windows/CMakeLists.txt during flutter build.
+      - name: Ensure Inno Setup is installed
+        if: matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) {
+            choco install innosetup -y --no-progress
+            echo "C:\Program Files (x86)\Inno Setup 6" | Out-File -FilePath $env:GITHUB_PATH -Append
+          }
+
+      # 语言文件已 vendor 进仓库（上游 issrc main 分支移除了 Unofficial 目录，
+      # 原 raw.githubusercontent.com 下载地址 404），直接复制到 Inno Setup 目录
+      - name: Install Inno Setup Chinese Simplified language file
+        shell: pwsh
+        run: |
+          $issLangDir = "C:\Program Files (x86)\Inno Setup 6\Languages"
+          Copy-Item "installer\windows\ChineseSimplified.isl" -Destination "$issLangDir\ChineseSimplified.isl" -Force
+
+      - name: Build installer with Inno Setup
+        run: |
+          iscc /DMyAppVersion=${{ steps.version.outputs.VERSION }} /DMyAppArch=${{ matrix.arch }} installer\windows\setup.iss
+
+      # ── SignPath 签名 Round 2: Inno Setup 安装器本体 ──
+      - name: Upload unsigned installer
+        id: upload-unsigned-installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer-${{ matrix.arch }}
+          path: build/installer/FluxDown-*.exe
+
+      - name: Sign installer (SignPath)
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY }}
+          artifact-configuration-slug: ${{ env.SIGNPATH_ARTIFACT_CONFIG }}
+          github-artifact-id: ${{ steps.upload-unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: build/signing/installer-signed
+
+      - name: Replace installer with signed version
+        shell: pwsh
+        run: |
+          Copy-Item "build\signing\installer-signed\*.exe" "build\installer\" -Force
+
+      # ── Compress portable version ──
+      - name: Create portable zip
+        shell: pwsh
+        run: |
+          New-Item -Path "build\windows\${{ matrix.arch }}\runner\Release\portable" -ItemType File -Force | Out-Null
+          Compress-Archive -Path "build\windows\${{ matrix.arch }}\runner\Release\*" -DestinationPath "build\installer\FluxDown-${{ steps.version.outputs.VERSION }}-windows-${{ matrix.arch }}-portable.zip"
+
+      # ── Upload artifacts（供 release job 使用）──
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-${{ matrix.arch }}
+          path: build/installer/FluxDown-*.exe
+
+      - name: Upload portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable-${{ matrix.arch }}
+          path: build/installer/FluxDown-*-portable.zip
+
+  # ── 并行 Job 2: 构建浏览器扩展 ──
+  build-extension:
+    name: Build Browser Extension
+    runs-on: ubuntu-latest
+    needs: changes
+    # 浏览器扩展发布后无法更改版本号，故预发布（预览版）tag 不打包扩展。
+    if: needs.changes.outputs.extension == 'true' && !contains(github.ref_name, '-')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set extension version from tag
+        working-directory: fluxDown
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
+          echo "Updated extension version to $VERSION"
+          grep '"version"' package.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: fluxDown
+
+      - name: Build Chrome extension
+        run: npm run build
+        working-directory: fluxDown
+
+      - name: Build Firefox extension
+        run: npm run build:firefox
+        working-directory: fluxDown
+
+      - name: Package Chrome extension
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          mkdir -p build/extension
+          cd fluxDown/.output
+          zip -r ../../build/extension/FluxDown-${VERSION}-chrome.zip chrome-mv3/
+          ls -la ../../build/extension/
+
+      - name: Install web-ext
+        run: npm install -g web-ext
+
+      # ── Firefox 双版本策略：AMO 市场用 X.Y.Z（与 tag 一致），GitHub Release XPI 用 X.Y.Z.1
+      #    两个版本号不同，彻底避免同版本号重复提交冲突。
+      #    X.Y.Z   → --channel=listed  → AMO 公开市场，等待人工审核
+      #    X.Y.Z.1 → --channel=unlisted → 立即签名，XPI 附到 GitHub Release 供离线安装
+
+      # Step 1: 提交 AMO 市场版本（X.Y.Z），continue-on-error 不阻塞 Release
+      - name: Submit Firefox to AMO marketplace (listed, vX.Y.Z)
+        continue-on-error: true
+        run: |
+          web-ext sign \
+            --source-dir fluxDown/.output/firefox-mv2 \
+            --channel=listed \
+            --api-key=${{ secrets.AMO_JWT_ISSUER }} \
+            --api-secret=${{ secrets.AMO_JWT_SECRET }} \
+            --approval-timeout=0 \
+            --artifacts-dir build/extension/firefox-listed/
+
+      # Step 2: 将 manifest 版本改为 X.Y.Z.1，unlisted 签名产出 GitHub Release 用 XPI
+      # AMO 服务端有时返回 500，continue-on-error 避免阻断整个 Release
+      - name: Sign Firefox extension for GitHub Release (unlisted, vX.Y.Z.1)
+        continue-on-error: true
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          mkdir -p build/extension
+          python3 -c "import json;f='fluxDown/.output/firefox-mv2/manifest.json';m=json.load(open(f));m['version']='$VERSION.1';open(f,'w').write(json.dumps(m,indent=2))"
+          echo "Manifest version set to $VERSION.1 for unlisted signing"
+
+          web-ext sign \
+            --source-dir fluxDown/.output/firefox-mv2 \
+            --channel=unlisted \
+            --api-key=${{ secrets.AMO_JWT_ISSUER }} \
+            --api-secret=${{ secrets.AMO_JWT_SECRET }} \
+            --artifacts-dir build/extension/ 2>&1 | tee /tmp/amo_sign.log
+          if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+            if grep -q "already exists" /tmp/amo_sign.log; then
+              echo "::warning::Version $VERSION.1 already on AMO (CI re-run). Downloading existing XPI..."
+              _amo_jwt() {
+                local iat exp header payload sig
+                iat=$(date +%s); exp=$((iat + 300))
+                header=$(printf '{"alg":"HS256","typ":"JWT"}' | base64 -w0 | tr '+/' '-_' | tr -d '=')
+                payload=$(printf '{"iss":"%s","jti":"%s","iat":%s,"exp":%s}' \
+                  "$AMO_ISSUER" "$iat" "$iat" "$exp" | base64 -w0 | tr '+/' '-_' | tr -d '=')
+                sig=$(printf '%s.%s' "$header" "$payload" \
+                  | openssl dgst -sha256 -hmac "$AMO_SECRET" -binary | base64 -w0 | tr '+/' '-_' | tr -d '=')
+                printf '%s.%s.%s' "$header" "$payload" "$sig"
+              }
+              VERS_DATA=$(curl -sf -H "Authorization: JWT $(_amo_jwt)" \
+                "https://addons.mozilla.org/api/v5/addons/addon/fluxdown%40fluxdown.app/versions/?filter=all_with_unlisted")
+              XPI_URL=$(echo "$VERS_DATA" | python3 -c "import sys,json;d=json.load(sys.stdin);v=next((x for x in(d.get('results')or[])if x.get('version')=='$VERSION.1'),None);sys.exit('not found') if not(v and(v.get('file')or{}).get('url')) else print(v['file']['url'])")
+              curl -sf -L -H "Authorization: JWT $(_amo_jwt)" \
+                -o "build/extension/${VERSION}.xpi" "$XPI_URL"
+            elif grep -q "was uploaded before and deleted" /tmp/amo_sign.log; then
+              echo "::error::Version $VERSION.1 was deleted from AMO. Please use a new version number."
+              exit 1
+            else
+              cat /tmp/amo_sign.log
+              exit 1
+            fi
+          fi
+
+          XPI_FILE=$(ls build/extension/*.xpi 2>/dev/null | head -1)
+          if [ -n "$XPI_FILE" ]; then
+            mv "$XPI_FILE" "build/extension/FluxDown-${VERSION}-firefox.xpi"
+            echo "Firefox XPI ready: FluxDown-${VERSION}-firefox.xpi (internal version $VERSION.1)"
+          else
+            echo "::error::No signed XPI found."
+            exit 1
+          fi
+        env:
+          AMO_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+          AMO_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+
+      # ── Upload artifacts（供 release job 使用）──
+      - name: Upload Chrome extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-extension-chrome
+          path: build/extension/FluxDown-*-chrome.zip
+          if-no-files-found: error
+
+      # ── Chrome Web Store 自动发布（需 CHROME_CLIENT_ID / CHROME_CLIENT_SECRET / CHROME_REFRESH_TOKEN）──
+      # ⚠️  Refresh Token 在 Google OAuth 同意屏幕处于 Testing 模式时 7 天过期。
+      #    发布前必须将同意屏幕切换到 Production，再重新走一次 OAuth 流程获取长期 token。
+      - name: Publish Chrome extension to Web Store
+        continue-on-error: true
+        env:
+          CHROME_CLIENT_ID: ${{ secrets.CHROME_CLIENT_ID }}
+          CHROME_CLIENT_SECRET: ${{ secrets.CHROME_CLIENT_SECRET }}
+          CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          ZIP_FILE="build/extension/FluxDown-${VERSION}-chrome.zip"
+          EXTENSION_ID="meleenglfggcmcajknpeeeiobnpfmahc"
+
+          # 用 refresh_token 换取新的 access_token
+          ACCESS_TOKEN=$(curl -sf -X POST https://oauth2.googleapis.com/token \
+            -d "client_id=${CHROME_CLIENT_ID}" \
+            -d "client_secret=${CHROME_CLIENT_SECRET}" \
+            -d "refresh_token=${CHROME_REFRESH_TOKEN}" \
+            -d "grant_type=refresh_token" \
+            | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+          # 上传新版本 zip
+          echo "Uploading ${ZIP_FILE} to Chrome Web Store..."
+          UPLOAD_RESP=$(curl -sf \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "x-goog-api-version: 2" \
+            -X PUT -T "${ZIP_FILE}" \
+            "https://www.googleapis.com/upload/chromewebstore/v1.1/items/${EXTENSION_ID}")
+
+          echo "Upload response: ${UPLOAD_RESP}"
+          UPLOAD_STATE=$(echo "${UPLOAD_RESP}" | python3 -c \
+            "import sys,json; print(json.load(sys.stdin).get('uploadState','UNKNOWN'))")
+
+          if [ "${UPLOAD_STATE}" != "SUCCESS" ]; then
+            echo "::error::Chrome Web Store upload failed (uploadState=${UPLOAD_STATE})"
+            exit 1
+          fi
+
+          # 发布已上传的草稿版本
+          PUBLISH_RESP=$(curl -sf \
+            -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+            -H "x-goog-api-version: 2" \
+            -H "Content-Length: 0" \
+            -X POST \
+            "https://www.googleapis.com/chromewebstore/v1.1/items/${EXTENSION_ID}/publish")
+
+          echo "Publish response: ${PUBLISH_RESP}"
+          STATUS=$(echo "${PUBLISH_RESP}" | python3 -c \
+            "import sys,json; print(','.join(json.load(sys.stdin).get('status',[])))")
+          echo "Publish status codes: ${STATUS}"
+
+          if echo "${STATUS}" | grep -qi "error"; then
+            echo "::error::Chrome Web Store publish failed (status=${STATUS})"
+            exit 1
+          fi
+
+          echo "::notice::Chrome extension v${VERSION} submitted to Web Store review"
+
+      # ── Edge Add-ons 商店自动发布（需 EDGE_CLIENT_ID / EDGE_API_KEY / EDGE_PRODUCT_ID）──
+      # Edge 复用 Chrome MV3 构建（同为 MV3），但 Edge 商店拒绝 manifest 含 key 字段的包
+      # （PackageValidationError: "The manifest shouldn't contain the key field"），
+      # 而 Chrome 侧载固定扩展 ID 依赖 key（见 fluxDown/wxt.config.ts），
+      # 因此上传前解包剔除 key 重新打一个 Edge 专用 zip。API v1.1：ApiKey 鉴权。
+      # ⚠️  API key 每 72 天过期，过期后需在 Partner Center → Publish API 重新生成并更新 EDGE_API_KEY secret。
+      - name: Publish Edge extension to Edge Add-ons
+        continue-on-error: true
+        env:
+          EDGE_CLIENT_ID: ${{ secrets.EDGE_CLIENT_ID }}
+          EDGE_API_KEY: ${{ secrets.EDGE_API_KEY }}
+          EDGE_PRODUCT_ID: ${{ secrets.EDGE_PRODUCT_ID }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          set -uo pipefail
+          CHROME_ZIP="build/extension/FluxDown-${VERSION}-chrome.zip"
+          BASE="https://api.addons.microsoftedge.microsoft.com/v1/products/${EDGE_PRODUCT_ID}"
+          AUTH=(-H "Authorization: ApiKey ${EDGE_API_KEY}" -H "X-ClientID: ${EDGE_CLIENT_ID}")
+
+          # 0) 重打 Edge 专用包：剔除 manifest.json 中的 key 字段
+          PKG_DIR=$(mktemp -d)
+          unzip -q "$CHROME_ZIP" -d "$PKG_DIR"
+          MANIFEST=$(find "$PKG_DIR" -maxdepth 2 -name manifest.json | head -1)
+          if [ -z "$MANIFEST" ]; then
+            echo "::error::manifest.json not found in ${CHROME_ZIP}"; exit 1
+          fi
+          python3 -c "import json,sys;p=sys.argv[1];m=json.load(open(p));m.pop('key',None);open(p,'w').write(json.dumps(m,indent=2))" "$MANIFEST"
+          ZIP_FILE="$PWD/build/extension/FluxDown-${VERSION}-edge.zip"
+          (cd "$PKG_DIR" && zip -qr "$ZIP_FILE" .)
+          echo "Edge package rebuilt without manifest key: $ZIP_FILE"
+
+          # 1) 上传 zip 包到 draft（202 + Location 头携带 operationID）
+          echo "Uploading ${ZIP_FILE} to Edge Add-ons..."
+          UP_HEADERS=$(curl -sS -D - -o /dev/null -X POST "${BASE}/submissions/draft/package" \
+            "${AUTH[@]}" -H "Content-Type: application/zip" --data-binary "@${ZIP_FILE}")
+          OP=$(echo "$UP_HEADERS" | tr -d '\r' | awk -F': ' 'tolower($1)=="location"{print $2}' | awk -F/ '{print $NF}')
+          if [ -z "$OP" ]; then
+            echo "::error::Edge upload did not return an operation id"; echo "$UP_HEADERS"; exit 1
+          fi
+          echo "Upload operation: $OP"
+
+          # 2) 轮询上传处理状态（InProgress → Succeeded / Failed）
+          STATUS="?"
+          for i in $(seq 1 20); do
+            sleep 10
+            RESP=$(curl -sS "${BASE}/submissions/draft/package/operations/${OP}" "${AUTH[@]}")
+            STATUS=$(echo "$RESP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('status','?'))" 2>/dev/null || echo "?")
+            echo "  upload status: $STATUS"
+            [ "$STATUS" = "Succeeded" ] && break
+            if [ "$STATUS" = "Failed" ]; then echo "::error::Edge upload failed: $RESP"; exit 1; fi
+          done
+          if [ "$STATUS" != "Succeeded" ]; then
+            echo "::error::Edge upload timed out (status=$STATUS)"; exit 1
+          fi
+
+          # 3) 提交发布（202 + Location 头携带发布 operationID）
+          echo "Publishing Edge submission..."
+          PUB_HEADERS=$(curl -sS -D - -o /dev/null -X POST "${BASE}/submissions" \
+            "${AUTH[@]}" -H "Content-Type: application/json" \
+            --data "{\"notes\":\"Automated release v${VERSION}\"}")
+          PUB_OP=$(echo "$PUB_HEADERS" | tr -d '\r' | awk -F': ' 'tolower($1)=="location"{print $2}' | awk -F/ '{print $NF}')
+          echo "Publish operation: ${PUB_OP:-<none>}"
+          echo "::notice::Edge extension v${VERSION} submitted to Edge Add-ons review"
+
+      - name: Upload Firefox extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-extension-firefox
+          path: build/extension/FluxDown-*-firefox.xpi
+          if-no-files-found: warn
+
+  # ── 并行 Job 3: 构建 Linux AppImage + tar.gz（x64）──
+  build-linux:
+    name: Build Linux (x64)
+    runs-on: ubuntu-22.04
+    needs: [changes, verify-engine]
+    if: needs.changes.outputs.app == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Get version from tag
+        id: version
+        run: |
+          V="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=$V" >> "$GITHUB_OUTPUT"
+          echo "CLEAN_VERSION=${V%%-*}" >> "$GITHUB_OUTPUT"
+
+      - name: Compute repo stats (donate card)
+        id: stats
+        run: |
+          echo "FIRST_COMMIT_DATE=$(git log --reverse --format=%ad --date=format:%Y-%m-%d | head -1)" >> "$GITHUB_OUTPUT"
+          echo "RELEASE_COUNT=$(git tag -l 'v[0-9]*' | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          echo "COMMIT_COUNT=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+
+      # ── 系统依赖 ──
+      # 注：已切换到 rustls，无需 libssl-dev（运行时亦无 libssl 依赖）
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            cmake ninja-build clang pkg-config \
+            libgtk-3-dev \
+            libnotify-dev \
+            libsecret-1-dev \
+            patchelf \
+            libfuse2 \
+            zstd
+
+      # ── Rust toolchain ──
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      # 智能 Rust 缓存：自动管理 ~/.cargo 和 workspace target/
+      # Workspace Cargo.toml 在根目录，target/ 为 hub + nmh 共享目录
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Cache Rinf CLI
+        id: cache-rinf
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/rinf
+          key: rinf-cli-ubuntu2204-x64-8.9.0
+
+      # ── Flutter SDK ──
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter precache & version info
+        run: |
+          flutter --version
+          flutter precache --linux
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      # ── Rinf code generation ──
+      - name: Install Rinf CLI
+        if: steps.cache-rinf.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          CARGO_HTTP_MULTIPLEXING: "false"
+          CARGO_NET_RETRY: "10"
+        run: |
+          for i in 1 2 3; do
+            cargo install rinf_cli@8.9.0 && exit 0
+            echo "cargo install failed (attempt $i), retrying in 15s..."
+            sleep 15
+          done
+          exit 1
+
+      - name: Generate Rinf bindings
+        run: rinf gen
+
+      # ── Build ──
+      - name: Build Flutter Linux app
+        run: flutter build linux --release --build-name=${{ steps.version.outputs.CLEAN_VERSION }} --build-number=1 --dart-define=APP_VERSION=${{ steps.version.outputs.VERSION }} --dart-define=ANALYTICS_APP_KEY=${{ secrets.ANALYTICS_APP_KEY }} --dart-define=FLUXCLOUD_BASE_URL=${{ secrets.FLUXCLOUD_BASE_URL }} --dart-define=STATS_FIRST_COMMIT_DATE=${{ steps.stats.outputs.FIRST_COMMIT_DATE }} --dart-define=STATS_RELEASE_COUNT=${{ steps.stats.outputs.RELEASE_COUNT }} --dart-define=STATS_COMMIT_COUNT=${{ steps.stats.outputs.COMMIT_COUNT }}
+
+      - name: Build and bundle native desktop services
+        run: |
+          cargo build --release --locked \
+            -p fluxdown_ui_app -p fluxdown_agent -p fluxdown_daemon \
+            --features fluxdown_daemon/plugins,fluxdown_daemon/components
+          BUNDLE_DIR="build/linux/x64/release/bundle"
+          cp target/release/fluxdown-desktop "$BUNDLE_DIR/"
+          cp target/release/fluxdown-agent "$BUNDLE_DIR/"
+          cp target/release/fluxdownd "$BUNDLE_DIR/"
+          chmod +x "$BUNDLE_DIR/fluxdown-desktop" "$BUNDLE_DIR/fluxdown-agent" "$BUNDLE_DIR/fluxdownd"
+
+      # NOTE: fluxdown_nmh and fluxdown_updater are built automatically
+      # by CMake custom targets defined in linux/CMakeLists.txt during flutter build.
+
+      # ── Package tar.gz（命名目录后压缩，解压得 FluxDown-x.y.z-linux-x64/）──
+      - name: Create portable tar.gz
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          BUNDLE_DIR="build/linux/x64/release/bundle"
+          DIST_DIR="FluxDown-${VERSION}-linux-x64"
+          mkdir -p build/installer
+          mkdir -p "$DIST_DIR"
+          cp -a "$BUNDLE_DIR/." "$DIST_DIR/"
+          tar -czf "build/installer/FluxDown-${VERSION}-linux-x64.tar.gz" "$DIST_DIR"
+          rm -rf "$DIST_DIR"
+
+      # ── Package AppImage ──
+      - name: Download appimagetool
+        run: |
+          wget -qO appimagetool-x86_64.AppImage \
+            "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x appimagetool-x86_64.AppImage
+
+      - name: Build AppImage
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          BUNDLE_DIR="build/linux/x64/release/bundle"
+
+          # 创建 AppDir，顶层即 bundle 内容（flux_down、data/、lib/ 都在根）
+          mkdir -p AppDir
+          cp -a "$BUNDLE_DIR/." AppDir/
+
+          # .desktop 文件复制到 AppDir 根（AppImage 约定）
+          cp linux/com.fluxdown.app.desktop AppDir/
+
+          # 图标复制到 AppDir 根，文件名必须与 .desktop 中 Icon= 一致
+          cp assets/logo/fluxdown_logo.png AppDir/com.fluxdown.app.png
+
+          # AppRun 入口：设置 LD_LIBRARY_PATH，让 flux_down 找到 lib/ 下的共享库
+          {
+            echo '#!/bin/bash'
+            echo 'HERE="$(dirname "$(readlink -f "${0}")")"'
+            echo 'export LD_LIBRARY_PATH="${HERE}/lib:${LD_LIBRARY_PATH:-}"'
+            echo 'exec "${HERE}/flux_down" "$@"'
+          } > AppDir/AppRun
+          chmod +x AppDir/AppRun
+
+          # 打包 AppImage（APPIMAGE_EXTRACT_AND_RUN=1 避免 CI 无 FUSE 时失败）
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 \
+            ./appimagetool-x86_64.AppImage AppDir \
+            "build/installer/FluxDown-${VERSION}-linux-x64.AppImage"
+
+      # ── Package deb（Debian/Ubuntu）──
+      # 安装布局：Flutter bundle → /opt/fluxdown/，wrapper 脚本 → /usr/bin/flux_down
+      # 保持 RPATH=$ORIGIN/lib 正确（可执行文件在 /opt/fluxdown/，lib 在 /opt/fluxdown/lib/）
+      # Flutter 查找 data/ 目录时用 argv[0]=/opt/fluxdown/flux_down，找 /opt/fluxdown/data/ ✓
+      - name: Create deb package
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          BUNDLE_DIR="build/linux/x64/release/bundle"
+          PKG_DIR="deb_pkg"
+
+          # 创建目录结构
+          mkdir -p "$PKG_DIR/DEBIAN"
+          mkdir -p "$PKG_DIR/opt/fluxdown"
+          mkdir -p "$PKG_DIR/usr/bin"
+          mkdir -p "$PKG_DIR/usr/share/applications"
+          mkdir -p "$PKG_DIR/usr/share/icons/hicolor/256x256/apps"
+
+          # 复制 Flutter bundle 到 /opt/fluxdown/（保持原有相对目录）
+          cp -a "$BUNDLE_DIR/." "$PKG_DIR/opt/fluxdown/"
+
+          # /usr/bin/flux_down 是 wrapper 脚本，将启动 /opt/fluxdown/flux_down
+          {
+            echo '#!/bin/bash'
+            echo 'exec /opt/fluxdown/flux_down "$@"'
+          } > "$PKG_DIR/usr/bin/flux_down"
+          chmod 755 "$PKG_DIR/usr/bin/flux_down"
+
+          # 复制 .desktop 文件和图标到标准 XDG 路径
+          cp linux/com.fluxdown.app.desktop "$PKG_DIR/usr/share/applications/"
+          cp assets/logo/fluxdown_logo.png \
+            "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/com.fluxdown.app.png"
+
+          # 计算安装后总大小（KB，供 control 字段使用）
+          INSTALLED_SIZE_KB=$(du -sk "$PKG_DIR/opt/" "$PKG_DIR/usr/" \
+            | awk '{sum+=$1} END {print sum}')
+
+          # 生成 DEBIAN/control
+          {
+            echo "Package: fluxdown"
+            echo "Version: ${VERSION}"
+            echo "Architecture: amd64"
+            echo "Maintainer: FluxDown Team <contact@fluxdown.app>"
+            echo "Homepage: https://fluxdown.zerx.dev"
+            echo "Section: net"
+            echo "Priority: optional"
+            echo "Installed-Size: ${INSTALLED_SIZE_KB}"
+            echo "Depends: libgtk-3-0, libnotify4"
+            echo "Description: Free IDM-alternative download manager"
+            echo " FluxDown is a Rust-powered, open-source download manager."
+            echo " Supports HTTP/HTTPS/FTP, BitTorrent magnetic links, and HLS/DASH streaming"
+            echo " with multi-threaded acceleration and seamless browser integration."
+          } > "$PKG_DIR/DEBIAN/control"
+
+          # 生成 DEBIAN/postinst（安装后刷新桌面数据库和图标缓存）
+          {
+            echo '#!/bin/bash'
+            echo 'set -e'
+            echo 'update-desktop-database -q /usr/share/applications/ 2>/dev/null || true'
+            echo 'gtk-update-icon-cache -q /usr/share/icons/hicolor/ 2>/dev/null || true'
+          } > "$PKG_DIR/DEBIAN/postinst"
+          chmod 755 "$PKG_DIR/DEBIAN/postinst"
+
+          # 打包 deb（--root-owner-group 将所有文件所有者设为 root:root）
+          # 注：NMH JSON 清单由 app 首次运行时自动写入用户目录，卸载时无法从 root 脚本定位，
+          # 残留的 JSON 文件仅指向不存在的二进制，浏览器会静默忽略，无需主动清理。
+          mkdir -p build/installer
+          dpkg-deb --build --root-owner-group "$PKG_DIR" \
+            "build/installer/FluxDown-${VERSION}-linux-x64.deb"
+
+      # ── Package Arch（.pkg.tar.zst）──
+      # 与 deb 相同的安装布局：/opt/fluxdown/ + /usr/bin/ wrapper
+      - name: Create Arch package
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          BUNDLE_DIR="build/linux/x64/release/bundle"
+          PKG_DIR="arch_pkg"
+
+          # 创建目录结构
+          mkdir -p "$PKG_DIR/opt/fluxdown"
+          mkdir -p "$PKG_DIR/usr/bin"
+          mkdir -p "$PKG_DIR/usr/share/applications"
+          mkdir -p "$PKG_DIR/usr/share/icons/hicolor/256x256/apps"
+
+          # 复制 Flutter bundle 到 /opt/fluxdown/
+          cp -a "$BUNDLE_DIR/." "$PKG_DIR/opt/fluxdown/"
+
+          # /usr/bin/flux_down wrapper 脚本
+          {
+            echo '#!/bin/bash'
+            echo 'exec /opt/fluxdown/flux_down "$@"'
+          } > "$PKG_DIR/usr/bin/flux_down"
+          chmod 755 "$PKG_DIR/usr/bin/flux_down"
+
+          # .desktop 和图标
+          cp linux/com.fluxdown.app.desktop "$PKG_DIR/usr/share/applications/"
+          cp assets/logo/fluxdown_logo.png \
+            "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/com.fluxdown.app.png"
+
+          # 计算安装后总字节数（.PKGINFO 的 size 字段）
+          INSTALLED_SIZE=$(du -sb "$PKG_DIR/opt/" "$PKG_DIR/usr/" \
+            | awk '{sum+=$1} END {print sum}')
+
+          # 生成 .PKGINFO（pacman 安装包元数据）
+          {
+            echo "# Generated by FluxDown CI"
+            echo "pkgname = fluxdown"
+            echo "pkgver = ${VERSION}-1"
+            echo "pkgdesc = Free IDM-alternative download manager"
+            echo "url = https://fluxdown.zerx.dev"
+            echo "builddate = $(date +%s)"
+            echo "packager = FluxDown CI <ci@fluxdown.app>"
+            echo "size = ${INSTALLED_SIZE}"
+            echo "arch = x86_64"
+            echo "license = custom"
+            echo "depend = gtk3"
+            echo "depend = libnotify"
+          } > "$PKG_DIR/.PKGINFO"
+
+          # 打包 .pkg.tar.zst（.PKGINFO 必须显式列在首位）
+          # --owner=0 --group=0：确保包内所有文件归属 root:root，避免 CI runner uid 写入包中
+          mkdir -p build/installer
+          cd "$PKG_DIR"
+          tar --zstd --owner=0 --group=0 -cf \
+            "../build/installer/FluxDown-${VERSION}-linux-x64.pkg.tar.zst" \
+            .PKGINFO opt/ usr/
+          cd ..
+
+      # ── Upload artifacts（供 release job 使用）──
+      - name: Upload Linux AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: build/installer/FluxDown-*-linux-x64.AppImage
+          if-no-files-found: error
+
+      - name: Upload Linux deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-deb
+          path: build/installer/FluxDown-*-linux-x64.deb
+          if-no-files-found: error
+
+      - name: Upload Linux Arch package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arch
+          path: build/installer/FluxDown-*-linux-x64.pkg.tar.zst
+          if-no-files-found: error
+
+      - name: Upload Linux portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-portable
+          path: build/installer/FluxDown-*-linux-x64.tar.gz
+          if-no-files-found: error
+
+  # ── 并行 Job 4: 构建 macOS DMG + tar.gz（Intel x64 + Apple Silicon arm64）──
+  build-macos:
+    name: Build macOS (${{ matrix.arch }})
+    needs: [changes, verify-engine]
+    if: needs.changes.outputs.app == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: macos-15-intel # Intel runner (macos-13 已废弃)
+            flutter_target: macos
+            rust_target: x86_64-apple-darwin
+          - arch: arm64
+            runner: macos-15 # Apple Silicon runner
+            flutter_target: macos
+            rust_target: aarch64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Get version from tag
+        id: version
+        run: |
+          V="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=$V" >> "$GITHUB_OUTPUT"
+          echo "CLEAN_VERSION=${V%%-*}" >> "$GITHUB_OUTPUT"
+
+      - name: Compute repo stats (donate card)
+        id: stats
+        run: |
+          echo "FIRST_COMMIT_DATE=$(git log --reverse --format=%ad --date=format:%Y-%m-%d | head -1)" >> "$GITHUB_OUTPUT"
+          echo "RELEASE_COUNT=$(git tag -l 'v[0-9]*' | wc -l | tr -d ' ')" >> "$GITHUB_OUTPUT"
+          echo "COMMIT_COUNT=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
+
+      # ── Rust toolchain ──
+      # 预装两个 Apple target：macOS Release 为 universal 构建，Xcode 阶段 hub（Rinf）
+      # 与 super_native_extensions 两个 cargokit 会并发补装缺失 target，rustup 下载
+      # 缓存无跨进程锁会偶发竞态（.partial rename 失败）；预装后 cargokit 直接跳过。
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Cache Rinf CLI
+        id: cache-rinf
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/rinf
+          key: rinf-cli-${{ runner.os }}-${{ matrix.arch }}-8.9.0
+
+      # ── Flutter SDK ──
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter precache & version info
+        run: |
+          flutter --version
+          flutter precache --macos
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      # ── Rinf code generation ──
+      - name: Install Rinf CLI
+        if: steps.cache-rinf.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          CARGO_HTTP_MULTIPLEXING: "false"
+          CARGO_NET_RETRY: "10"
+        run: |
+          for i in 1 2 3; do
+            cargo install rinf_cli@8.9.0 && exit 0
+            echo "cargo install failed (attempt $i), retrying in 15s..."
+            sleep 15
+          done
+          exit 1
+
+      - name: Generate Rinf bindings
+        run: rinf gen
+
+      # ── Build ──
+      - name: Build Flutter macOS app
+        run: |
+          flutter build macos --release \
+            --build-name=${{ steps.version.outputs.CLEAN_VERSION }} \
+            --build-number=1 \
+            --dart-define=APP_VERSION=${{ steps.version.outputs.VERSION }} \
+            --dart-define=ANALYTICS_APP_KEY=${{ secrets.ANALYTICS_APP_KEY }} \
+            --dart-define=FLUXCLOUD_BASE_URL=${{ secrets.FLUXCLOUD_BASE_URL }} \
+            --dart-define=STATS_FIRST_COMMIT_DATE=${{ steps.stats.outputs.FIRST_COMMIT_DATE }} \
+            --dart-define=STATS_RELEASE_COUNT=${{ steps.stats.outputs.RELEASE_COUNT }} \
+            --dart-define=STATS_COMMIT_COUNT=${{ steps.stats.outputs.COMMIT_COUNT }}
+
+
+      - name: Build and bundle native desktop services
+        run: |
+          cargo build --release --locked \
+            -p fluxdown_ui_app -p fluxdown_agent -p fluxdown_daemon \
+            --features fluxdown_daemon/plugins,fluxdown_daemon/components
+          MACOS_DIR="build/macos/Build/Products/Release/FluxDown.app/Contents/MacOS"
+          cp target/release/fluxdown-desktop "$MACOS_DIR/"
+          cp target/release/fluxdown-agent "$MACOS_DIR/"
+          cp target/release/fluxdownd "$MACOS_DIR/"
+          chmod +x "$MACOS_DIR/fluxdown-desktop" "$MACOS_DIR/fluxdown-agent" "$MACOS_DIR/fluxdownd"
+      # NOTE: fluxdown_nmh and fluxdown_updater are built automatically
+      # by Xcode shell script build phases defined in macos/Runner.xcodeproj during flutter build.
+
+      # ── Package tar.gz portable ──
+      - name: Create portable tar.gz
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          APP_PATH="build/macos/Build/Products/Release/FluxDown.app"
+          mkdir -p build/installer
+          DIST_DIR="FluxDown-${VERSION}-macos-${{ matrix.arch }}"
+          mkdir -p "$DIST_DIR"
+          cp -R "$APP_PATH" "$DIST_DIR/"
+          tar -czf "build/installer/FluxDown-${VERSION}-macos-${{ matrix.arch }}.tar.gz" "$DIST_DIR"
+          rm -rf "$DIST_DIR"
+
+      # ── Package DMG ──
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Create DMG
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          APP_PATH="build/macos/Build/Products/Release/FluxDown.app"
+          mkdir -p build/installer
+
+          mkdir -p dmg_src
+          cp -R "$APP_PATH" dmg_src/
+
+          create-dmg \
+            --volname "FluxDown ${VERSION}" \
+            --window-pos 200 120 \
+            --window-size 660 400 \
+            --icon-size 100 \
+            --icon "FluxDown.app" 160 185 \
+            --hide-extension "FluxDown.app" \
+            --app-drop-link 500 185 \
+            --no-internet-enable \
+            "build/installer/FluxDown-${VERSION}-macos-${{ matrix.arch }}.dmg" \
+            dmg_src/ || \
+          hdiutil create \
+            -volname "FluxDown ${VERSION}" \
+            -srcfolder dmg_src \
+            -ov -format UDZO \
+            "build/installer/FluxDown-${VERSION}-macos-${{ matrix.arch }}.dmg"
+
+      # ── Upload artifacts（供 release job 使用）──
+      - name: Upload macOS DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg-${{ matrix.arch }}
+          path: build/installer/FluxDown-*-macos-${{ matrix.arch }}.dmg
+          if-no-files-found: error
+
+      - name: Upload macOS portable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-portable-${{ matrix.arch }}
+          path: build/installer/FluxDown-*-macos-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
+
+  # ── 并行 Job 4b: 构建 Android APK（覆盖常用硬件 ABI + 通用包）──
+  # 触发条件：下载引擎（native/engine）或移动端代码（android/**、lib/src/mobile/**、
+  # 共享 Dart 代码）变更。Rinf 经 cargokit 在 flutter build apk 期间为各 ABI 编译 Rust cdylib。
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    needs: [changes, verify-engine]
+    if: needs.changes.outputs.mobile == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from tag
+        id: version
+        run: |
+          V="${GITHUB_REF#refs/tags/v}"
+          echo "VERSION=$V" >> "$GITHUB_OUTPUT"
+          echo "CLEAN_VERSION=${V%%-*}" >> "$GITHUB_OUTPUT"
+
+      # ── JDK 17（Android Gradle Plugin 要求）──
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # ── Android SDK / NDK（Flutter 构建时需要）──
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      # ── Rust toolchain + Android 目标三元组（cargokit 编译各 ABI 的 cdylib）──
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Cache Rinf CLI
+        id: cache-rinf
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/rinf
+          key: rinf-cli-${{ runner.os }}-x64-8.9.0
+
+      # ── Flutter SDK ──
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter version info
+        run: flutter --version
+
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      # ── Rinf code generation ──
+      - name: Install Rinf CLI
+        if: steps.cache-rinf.outputs.cache-hit != 'true'
+        shell: bash
+        env:
+          CARGO_HTTP_MULTIPLEXING: "false"
+          CARGO_NET_RETRY: "10"
+        run: |
+          for i in 1 2 3; do
+            cargo install rinf_cli@8.9.0 && exit 0
+            echo "cargo install failed (attempt $i), retrying in 15s..."
+            sleep 15
+          done
+          exit 1
+
+      - name: Generate Rinf bindings
+        run: rinf gen
+
+      # ── Release 签名密钥（可选）──
+      # 提供 ANDROID_KEYSTORE_BASE64 等 secrets 时生成正式签名 key.properties，
+      # 否则 android/app/build.gradle.kts 自动回退 debug 签名，构建不中断。
+      - name: Configure release signing
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        run: |
+          # secrets 不能用于 step 级 if，改为运行时判空：无密钥则跳过，gradle 回退 debug 签名。
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "::warning::ANDROID_KEYSTORE_BASE64 未配置 — 使用 debug 签名构建 APK（仅供测试，不可上架）"
+            exit 0
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storeFile=upload-keystore.jks
+          keyAlias=${ANDROID_KEY_ALIAS}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          storePassword=${ANDROID_STORE_PASSWORD}
+          EOF
+          echo "Release signing configured"
+
+      # ── Build：按 ABI 拆分（arm64-v8a / armeabi-v7a / x86_64）+ 通用包 ──
+      # split-per-abi 产出各硬件专属小体积包；universal 供未知 ABI/手动分发兜底。
+      # versionCode 由语义版本派生（major*1000000 + minor*10000 + patch*100），
+      # 保证覆盖安装（应用内更新）时 versionCode 单调递增。
+      - name: Derive Android versionCode
+        id: vercode
+        run: |
+          IFS=. read -r MAJ MIN PAT <<< "${{ steps.version.outputs.CLEAN_VERSION }}"
+          echo "CODE=$((MAJ * 1000000 + MIN * 10000 + PAT * 100))" >> "$GITHUB_OUTPUT"
+
+      - name: Build split-per-ABI APKs
+        run: |
+          flutter build apk --release --split-per-abi \
+            --build-name=${{ steps.version.outputs.CLEAN_VERSION }} \
+            --build-number=${{ steps.vercode.outputs.CODE }} \
+            --dart-define=APP_VERSION=${{ steps.version.outputs.VERSION }} \
+            --dart-define=FLUXCLOUD_BASE_URL=${{ secrets.FLUXCLOUD_BASE_URL }}
+
+      - name: Build universal APK
+        run: |
+          flutter build apk --release \
+            --build-name=${{ steps.version.outputs.CLEAN_VERSION }} \
+            --build-number=${{ steps.vercode.outputs.CODE }} \
+            --dart-define=APP_VERSION=${{ steps.version.outputs.VERSION }} \
+            --dart-define=FLUXCLOUD_BASE_URL=${{ secrets.FLUXCLOUD_BASE_URL }}
+
+      # ── 收集并统一命名（Flutter 输出到 build/app/outputs/flutter-apk/）──
+      - name: Collect and rename APKs
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          SRC="build/app/outputs/flutter-apk"
+          mkdir -p build/android
+          cp "$SRC/app-arm64-v8a-release.apk"   "build/android/FluxDown-${VERSION}-android-arm64-v8a.apk"
+          cp "$SRC/app-armeabi-v7a-release.apk" "build/android/FluxDown-${VERSION}-android-armeabi-v7a.apk"
+          cp "$SRC/app-x86_64-release.apk"      "build/android/FluxDown-${VERSION}-android-x86_64.apk"
+          cp "$SRC/app-release.apk"             "build/android/FluxDown-${VERSION}-android-universal.apk"
+          ls -la build/android/
+
+      - name: Upload Android APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: build/android/FluxDown-*.apk
+          if-no-files-found: error
+
+  # ── 并行 Job 5a: 构建服务器 Web SPA（一次构建，供所有平台二进制包复用）──
+  build-web:
+    name: Build Server Web SPA
+    runs-on: ubuntu-latest
+    needs: [changes, verify-engine]
+    if: needs.changes.outputs.server == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install web dependencies
+        working-directory: web
+        run: bun install --frozen-lockfile
+
+      - name: Build web SPA
+        working-directory: web
+        run: bun run build
+        env:
+          VITE_FLUXCLOUD_BASE_URL: ${{ secrets.FLUXCLOUD_BASE_URL }}
+
+      - name: Upload webroot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-webroot
+          path: web/dist
+
+  # ── 并行 Job 5b: 构建 Headless 服务器多平台二进制（下载解压即运行）──
+  # 全部使用原生 runner，规避 ring/bundled-sqlite/zstd 等 C 依赖的交叉编译工具链问题：
+  #   linux   → musl 静态链接（零 glibc 依赖，任何发行版/NAS 直接运行）
+  #   windows → MSVC + Schannel（native-tls），无额外运行时依赖
+  #   macos   → arm64 runner 原生编译 + 交叉编译 x64（Apple SDK 双架构开箱即用）
+  # 不提供 x86(32位)：macOS/Win11 已无 32 位，Linux i686 无实际需求；
+  # 如需 armv7（老 NAS/树莓派 32 位）可后续用 cross-rs 追加 matrix 项。
+  # 打包布局：单文件 fluxdown-server(.exe)——Web SPA 由 native/server/build.rs
+  # 在编译期经 FLUXDOWN_EMBED_WEBROOT 嵌进二进制，产物不再附带 web/ 目录。
+  build-server-binaries:
+    name: Build Server (${{ matrix.platform }})
+    needs: [changes, verify-engine, build-web]
+    if: needs.changes.outputs.server == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+          - platform: windows-x64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - platform: windows-arm64
+            runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+          - platform: macos-x64
+            runner: macos-latest
+            target: x86_64-apple-darwin
+          - platform: macos-arm64
+            runner: macos-latest
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # musl-gcc：ring/bundled-sqlite/zstd 等 C 依赖静态编译所需
+      - name: Install musl toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: server-${{ matrix.platform }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            server-${{ matrix.platform }}-
+
+      # 前端产物必须在 cargo build 之前就位：build.rs 按 FLUXDOWN_EMBED_WEBROOT
+      # 把 web/dist 全量 include_bytes! 进二进制（单文件分发）。
+      - name: Download webroot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: server-webroot
+          path: webroot
+
+      # FLUXDOWN_SERVER_VERSION：编译期注入 tag 版本号（/ping、stats、OpenAPI 显示）
+      - name: Build server binary
+        env:
+          FLUXDOWN_SERVER_VERSION: ${{ steps.version.outputs.VERSION }}
+          FLUXDOWN_ANALYTICS_APP_KEY: ${{ secrets.ANALYTICS_APP_KEY }}
+          FLUXDOWN_EMBED_WEBROOT: ${{ github.workspace }}/webroot
+        run: cargo build --release --locked -p fluxdown_server --target ${{ matrix.target }}
+
+      - name: Package (tar.gz)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          PKG="fluxdown-server-${VERSION}-${{ matrix.platform }}"
+          mkdir -p "build/server/${PKG}" release-assets
+          cp "target/${{ matrix.target }}/release/fluxdown-server" "build/server/${PKG}/"
+          tar -C build/server -czf "release-assets/FluxDown-Server-${VERSION}-${{ matrix.platform }}.tar.gz" "${PKG}"
+          ls -la release-assets/
+
+      # ── SignPath 签名: fluxdown-server.exe（打包前签名，zip 内即为已签名二进制）──
+      - name: Collect unsigned server executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build\signing\unsigned | Out-Null
+          Copy-Item "target\${{ matrix.target }}\release\fluxdown-server.exe" "build\signing\unsigned\"
+
+      - name: Upload unsigned server executable
+        if: runner.os == 'Windows'
+        id: upload-unsigned-server
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-server-exe-${{ matrix.platform }}
+          path: build/signing/unsigned/*.exe
+
+      - name: Sign server executable (SignPath)
+        if: runner.os == 'Windows'
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY }}
+          artifact-configuration-slug: ${{ env.SIGNPATH_ARTIFACT_CONFIG }}
+          github-artifact-id: ${{ steps.upload-unsigned-server.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: build/signing/signed
+
+      - name: Replace server executable with signed version
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Copy-Item "build\signing\signed\fluxdown-server.exe" "target\${{ matrix.target }}\release\fluxdown-server.exe" -Force
+
+      - name: Package (zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $Version = "${{ steps.version.outputs.VERSION }}"
+          $Pkg = "fluxdown-server-$Version-${{ matrix.platform }}"
+          New-Item -ItemType Directory -Force -Path "build\server\$Pkg", "release-assets" | Out-Null
+          Copy-Item "target\${{ matrix.target }}\release\fluxdown-server.exe" "build\server\$Pkg\"
+          Compress-Archive -Path "build\server\$Pkg" -DestinationPath "release-assets\FluxDown-Server-$Version-${{ matrix.platform }}.zip"
+          Get-ChildItem release-assets
+
+      - name: Upload server binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-bin-${{ matrix.platform }}
+          path: release-assets/*
+
+  # ── 并行 Job 5c': NAS/软路由包（OpenWrt ipk + QNAP qpkg + 群晖 spk，复用 linux musl 静态产物）──
+  # ipk 纯脚本手打（packaging/openwrt/build_ipk.sh，无需 OpenWrt SDK）；
+  # qpkg 用官方 QDK qbuild（packaging/qnap/build_qpkg.sh）。
+  # 不跑 InstallToUbuntu.sh（其 apt 依赖列表含 ubuntu 24.04 已不存在的 `python` 包），手动装 QDK。
+  # spk 纯脚本手打（packaging/synology/build_spk.sh，做法同 SynoCommunity spksrc，无需群晖 toolkit）；
+  # DSM 6 / DSM 7 × x86_64 / armv8 共 4 包（DSM 7 强制套件用户运行，DSM 6 root）。
+  # 产物名带 server-bin- 前缀 → release-server 的 download pattern 自动收集附到 Server Release。
+  build-server-nas-packages:
+    name: Build Server (OpenWrt/QNAP/Synology packages)
+    needs: [changes, build-server-binaries]
+    if: needs.changes.outputs.server == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download linux server tarballs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: server-bin-linux-*
+          path: tarballs/
+          merge-multiple: true
+
+      - name: Extract server binaries
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          mkdir -p extracted
+          tar -C extracted -xzf "tarballs/FluxDown-Server-${VERSION}-linux-x64.tar.gz"
+          tar -C extracted -xzf "tarballs/FluxDown-Server-${VERSION}-linux-arm64.tar.gz"
+
+      - name: Install QDK and imagemagick
+        run: |
+          sudo apt-get update && sudo apt-get install -y imagemagick build-essential rsync
+          git clone --depth 1 https://github.com/qnap-dev/QDK.git /tmp/QDK
+          make -C /tmp/QDK/src
+          sudo cp /tmp/QDK/src/bin/qpkg_encrypt /bin/
+          sudo cp -rf /tmp/QDK/shared /usr/share/QDK
+          sudo mkdir -p /etc/config
+          sed -e '2d' /tmp/QDK/shared/qdk.conf | sudo tee /etc/config/qdk.conf > /dev/null
+          sudo sed -i '2iQDK_PATH_P=/usr/share' /etc/config/qdk.conf
+          echo "/usr/share/QDK/bin" >> "$GITHUB_PATH"
+
+      - name: Build OpenWrt ipk
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          X64="extracted/fluxdown-server-${VERSION}-linux-x64"
+          A64="extracted/fluxdown-server-${VERSION}-linux-arm64"
+          ./packaging/openwrt/build_ipk.sh server "$VERSION" "$X64/fluxdown-server" x86_64 release-assets
+          ./packaging/openwrt/build_ipk.sh server "$VERSION" "$A64/fluxdown-server" \
+            aarch64_generic,aarch64_cortex-a53,aarch64_cortex-a72,aarch64_cortex-a76 release-assets
+          ./packaging/openwrt/build_ipk.sh luci "$VERSION" release-assets
+
+      - name: Build QNAP qpkg
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          X64="extracted/fluxdown-server-${VERSION}-linux-x64"
+          A64="extracted/fluxdown-server-${VERSION}-linux-arm64"
+          ./packaging/qnap/build_qpkg.sh "$VERSION" x86_64 "$X64/fluxdown-server" \
+            "release-assets/FluxDown-Server-${VERSION}-qnap-x64.qpkg"
+          ./packaging/qnap/build_qpkg.sh "$VERSION" arm_64 "$A64/fluxdown-server" \
+            "release-assets/FluxDown-Server-${VERSION}-qnap-arm64.qpkg"
+
+      - name: Build Synology spk
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          X64="extracted/fluxdown-server-${VERSION}-linux-x64"
+          A64="extracted/fluxdown-server-${VERSION}-linux-arm64"
+          for dsm in dsm7 dsm6; do
+            ./packaging/synology/build_spk.sh "$VERSION" "$dsm" x86_64 "$X64/fluxdown-server" \
+              "release-assets/FluxDown-Server-${VERSION}-synology-${dsm}-x64.spk"
+            ./packaging/synology/build_spk.sh "$VERSION" "$dsm" armv8 "$A64/fluxdown-server" \
+              "release-assets/FluxDown-Server-${VERSION}-synology-${dsm}-arm64.spk"
+          done
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-bin-nas-packages
+          path: release-assets/*
+
+  # ── 并行 Job: 构建 CLI 二进制（fluxdown，6 平台）──
+  # 与 build-server-binaries 同套 runner/target 策略（全原生 runner 规避 C 依赖交叉编译）：
+  #   linux   → musl 静态链接（零 glibc 依赖）
+  #   windows → MSVC + Schannel（native-tls）
+  #   macos   → 各架构原生 runner 编译
+  # CLI 是单二进制（无 webroot），产物即 fluxdown(.exe)。
+  build-cli-binaries:
+    name: Build CLI (${{ matrix.platform }})
+    needs: [changes, verify-engine]
+    if: needs.changes.outputs.cli == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+          - platform: windows-x64
+            runner: windows-latest
+            target: x86_64-pc-windows-msvc
+          - platform: windows-arm64
+            runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+          - platform: macos-x64
+            runner: macos-latest
+            target: x86_64-apple-darwin
+          - platform: macos-arm64
+            runner: macos-latest
+            target: aarch64-apple-darwin
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # musl-gcc：ring 等 C 依赖静态编译所需
+      - name: Install musl toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cli-${{ matrix.platform }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cli-${{ matrix.platform }}-
+
+      - name: Build CLI binary
+        run: cargo build --release --locked -p fluxdown_cli --target ${{ matrix.target }}
+
+      - name: Package (tar.gz)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          PKG="fluxdown-cli-${VERSION}-${{ matrix.platform }}"
+          mkdir -p "build/cli/${PKG}" release-assets
+          cp "target/${{ matrix.target }}/release/fluxdown" "build/cli/${PKG}/"
+          tar -C build/cli -czf "release-assets/FluxDown-CLI-${VERSION}-${{ matrix.platform }}.tar.gz" "${PKG}"
+          ls -la release-assets/
+
+      # ── SignPath 签名: fluxdown.exe（打包前签名，zip 内即为已签名二进制）──
+      - name: Collect unsigned CLI executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build\signing\unsigned | Out-Null
+          Copy-Item "target\${{ matrix.target }}\release\fluxdown.exe" "build\signing\unsigned\"
+
+      - name: Upload unsigned CLI executable
+        if: runner.os == 'Windows'
+        id: upload-unsigned-cli
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-cli-exe-${{ matrix.platform }}
+          path: build/signing/unsigned/*.exe
+
+      - name: Sign CLI executable (SignPath)
+        if: runner.os == 'Windows'
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ env.SIGNPATH_SIGNING_POLICY }}
+          artifact-configuration-slug: ${{ env.SIGNPATH_ARTIFACT_CONFIG }}
+          github-artifact-id: ${{ steps.upload-unsigned-cli.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          output-artifact-directory: build/signing/signed
+
+      - name: Replace CLI executable with signed version
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Copy-Item "build\signing\signed\fluxdown.exe" "target\${{ matrix.target }}\release\fluxdown.exe" -Force
+
+      - name: Package (zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $Version = "${{ steps.version.outputs.VERSION }}"
+          $Pkg = "fluxdown-cli-$Version-${{ matrix.platform }}"
+          New-Item -ItemType Directory -Force -Path "build\cli\$Pkg", "release-assets" | Out-Null
+          Copy-Item "target\${{ matrix.target }}\release\fluxdown.exe" "build\cli\$Pkg\"
+          Compress-Archive -Path "build\cli\$Pkg" -DestinationPath "release-assets\FluxDown-CLI-$Version-${{ matrix.platform }}.zip"
+          Get-ChildItem release-assets
+
+      - name: Upload CLI binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-bin-${{ matrix.platform }}
+          path: release-assets/*
+
+  # ── 并行 Job 5c: Docker 镜像（linux/amd64 + linux/arm64，推 ghcr.io）──
+  # linux 二进制 tarball 已由 build-server-binaries（musl 静态链接）产出，此处只推镜像。
+  # Rust 编译在 Dockerfile 内按 TARGETARCH 交叉编译（不走 QEMU）；QEMU 仅用于 arm64 运行时层的 apt。
+  build-server-docker:
+    name: Build Server (Docker)
+    runs-on: ubuntu-latest
+    needs: [changes, verify-engine]
+    if: needs.changes.outputs.server == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU (arm64 runtime layer)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 镜像名要求全小写，metadata-action 自动归一化
+      - name: Docker image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/fluxdown-server
+          tags: |
+            type=raw,value=${{ steps.version.outputs.VERSION }}
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/server.Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            FLUXDOWN_SERVER_VERSION=${{ steps.version.outputs.VERSION }}
+            FLUXDOWN_ANALYTICS_APP_KEY=${{ secrets.ANALYTICS_APP_KEY }}
+            VITE_FLUXCLOUD_BASE_URL=${{ secrets.FLUXCLOUD_BASE_URL }}
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,scope=server,mode=max
+
+  # ── Release Job 1: 桌面客户端（使用推送的 v* tag，保持 GitHub latest release 语义）──
+  release-app:
+    name: Release Desktop App
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-linux, build-macos]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      # AI 撰写面向用户的双语 release notes（素材 = git-cliff + commit 正文 + 变更统计）
+      # 实现见 .github/actions/release-notes/action.yml
+      - name: Generate release notes
+        uses: ./.github/actions/release-notes
+        with:
+          component: 桌面客户端（Windows / macOS / Linux）
+          fallback-title: Release ${{ github.ref_name }}
+          claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+      # ── 下载桌面客户端构建产物 ──
+      - name: Download all Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: windows-*
+          path: release-assets/
+          merge-multiple: true
+
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: linux-*
+          path: release-assets/
+          merge-multiple: true
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: macos-*
+          path: release-assets/
+          merge-multiple: true
+
+      # 生成校验和（供用户校验）
+      - name: Generate SHA256 checksums
+        working-directory: release-assets
+        run: sha256sum * > SHA256SUMS.txt
+
+      - name: List release assets
+        run: ls -la release-assets/
+
+      # ── 创建客户端 Release 并上传所有文件 ──
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: false
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: ${{ !contains(github.ref_name, '-') }}
+
+  # ── Release Job 2: 浏览器扩展（独立 tag extension-v*，不抢占 latest）──
+  release-extension:
+    name: Release Browser Extension
+    runs-on: ubuntu-latest
+    needs: build-extension
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        uses: ./.github/actions/release-notes
+        with:
+          component: 浏览器扩展（Chrome / Firefox / Edge）
+          fallback-title: Browser Extension Release v${{ steps.version.outputs.VERSION }}
+          paths: fluxDown/**
+          claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+      - name: Download browser extensions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: browser-extension-*
+          path: release-assets/
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -la release-assets/
+
+      # make_latest=false：避免组件 release 成为 GitHub /releases/latest，
+      # 否则会打破客户端自动更新和官网下载页的最新版本判断
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: extension-v${{ steps.version.outputs.VERSION }}
+          name: FluxDown Extension v${{ steps.version.outputs.VERSION }}
+          files: release-assets/*
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: false
+          draft: false
+          make_latest: "false"
+
+  # ── Release Job 3: Headless 服务器（独立 tag server-v*，不抢占 latest）──
+  release-server:
+    name: Release Server
+    runs-on: ubuntu-latest
+    needs: [build-server-docker, build-server-binaries, build-server-nas-packages]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        uses: ./.github/actions/release-notes
+        with:
+          component: Headless 服务器（含 Web 控制台）
+          fallback-title: Server Release v${{ steps.version.outputs.VERSION }}
+          paths: native/server/** web/** native/engine/** native/api/** docker/** packaging/**
+          claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+      # 附加下载方式说明（直接下载二进制 + Docker）
+      - name: Append download & Docker usage to release notes
+        shell: bash
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          cat >> RELEASE_NOTES.md <<EOF
+
+          ---
+
+          ## 📦 直接下载运行（免 Docker）
+
+          | 平台 | 资产 |
+          |---|---|
+          | Windows x64 / ARM64 | \`FluxDown-Server-${VERSION}-windows-{x64,arm64}.zip\` |
+          | macOS Intel / Apple Silicon | \`FluxDown-Server-${VERSION}-macos-{x64,arm64}.tar.gz\` |
+          | Linux x64 / ARM64（musl 静态链接，任意发行版可用） | \`FluxDown-Server-${VERSION}-linux-{x64,arm64}.tar.gz\` |
+          | OpenWrt 软路由（x86_64 / aarch64 各子架构） | \`fluxdown-server_${VERSION}_<arch>.ipk\` + \`luci-app-fluxdown_${VERSION}_all.ipk\` |
+          | QNAP NAS（QTS x86_64 / ARM64） | \`FluxDown-Server-${VERSION}-qnap-{x64,arm64}.qpkg\` |
+          | 群晖 NAS（DSM 7 / DSM 6，x86_64 / ARM64） | \`FluxDown-Server-${VERSION}-synology-{dsm7,dsm6}-{x64,arm64}.spk\` |
+
+          解压后直接运行 \`fluxdown-server\`（Windows 为 \`fluxdown-server.exe\`），浏览器访问 \`http://127.0.0.1:17800\`。
+          **单文件分发**：Web 控制台已编译进二进制，包内只有可执行文件本身，无需附带任何静态资源目录。
+          首次启动请在浏览器里完成「初始化 FluxDown Server」向导设置访问密钥（无人值守部署可用 \`FLUXDOWN_TOKEN\` 预置）。文件校验见 \`SHA256SUMS.txt\`。
+
+          **OpenWrt**：\`opkg install fluxdown-server_*.ipk luci-app-fluxdown_*.ipk\`，LuCI「服务 → FluxDown」页管理，Web 界面在 \`http://路由器IP:17800\`。二进制含完整 Web UI（约 30MB），需 overlay 空间充足的软路由设备。
+          **QNAP**：App Center → 手动安装 \`.qpkg\`（需在设置中允许安装未经验证的应用），装完点应用图标直达 Web 界面。
+          **群晖**：套件中心 → 手动安装 \`.spk\`（需在「设置 → 信任来源」允许任何发行者）。DSM 7.x 装 \`dsm7\` 包（以套件专属用户运行），DSM 6.x 装 \`dsm6\` 包；Intel/AMD 机型选 x64，ARM 机型（rtd1296/rtd1619b 等）选 arm64。装完在套件中心点「打开」直达 Web 界面（端口 17800）。
+
+          ## 🐳 Docker（linux/amd64 · linux/arm64）
+
+          \`\`\`bash
+          docker pull ghcr.io/${{ github.repository_owner }}/fluxdown-server:${VERSION}
+          docker run -d -p 17800:17800 -v fluxdown-data:/data \\
+            ghcr.io/${{ github.repository_owner }}/fluxdown-server:${VERSION}
+          \`\`\`
+
+          Compose 部署见仓库 \`docker/docker-compose.yml\`。首次打开 Web 界面时按向导设置访问密钥，或用 \`-e FLUXDOWN_TOKEN=...\` 预置。
+          EOF
+
+      - name: Download server artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: server-bin-*
+          path: release-assets/
+          merge-multiple: true
+
+      - name: Generate SHA256 checksums
+        working-directory: release-assets
+        run: sha256sum * > SHA256SUMS.txt
+
+      - name: List release assets
+        run: ls -la release-assets/
+
+      # make_latest=false：避免组件 release 成为 GitHub /releases/latest，
+      # 否则会打破客户端自动更新和官网下载页的最新版本判断
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: server-v${{ steps.version.outputs.VERSION }}
+          name: FluxDown Server v${{ steps.version.outputs.VERSION }}
+          files: release-assets/*
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: false
+          draft: false
+          make_latest: "false"
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
+  # ── Release Job: CLI（独立 tag cli-v*，不抢占 latest）──
+  release-cli:
+    name: Release CLI
+    runs-on: ubuntu-latest
+    needs: build-cli-binaries
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        uses: ./.github/actions/release-notes
+        with:
+          component: 命令行工具 CLI
+          fallback-title: CLI Release v${{ steps.version.outputs.VERSION }}
+          paths: native/cli/** native/api/** native/engine/**
+          claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+      # 附加下载 & 安装说明
+      - name: Append download & install usage to release notes
+        shell: bash
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          cat >> RELEASE_NOTES.md <<EOF
+
+          ---
+
+          ## 📦 下载预编译二进制
+
+          | 平台 | 资产 |
+          |---|---|
+          | Windows x64 / ARM64 | \`FluxDown-CLI-${VERSION}-windows-{x64,arm64}.zip\` |
+          | macOS Intel / Apple Silicon | \`FluxDown-CLI-${VERSION}-macos-{x64,arm64}.tar.gz\` |
+          | Linux x64 / ARM64（musl 静态链接，任意发行版可用） | \`FluxDown-CLI-${VERSION}-linux-{x64,arm64}.tar.gz\` |
+
+          解压后得到 \`fluxdown\`（Windows 为 \`fluxdown.exe\`），放入 PATH 即可使用。文件校验见 \`SHA256SUMS.txt\`。
+
+          ## 🛠️ 从源码安装
+
+          \`\`\`bash
+          cargo install --git https://github.com/${{ github.repository }} fluxdown_cli
+          \`\`\`
+
+          ## 🚀 快速开始
+
+          \`\`\`bash
+          fluxdown ping                         # 探活（需 FluxDown App / server 运行中）
+          fluxdown add https://example.com/f.zip
+          fluxdown ls
+          \`\`\`
+
+          服务地址经 \`--url\` 或 \`FLUXDOWN_URL\`（默认 \`http://127.0.0.1:17800\`），
+          管理 token 经 \`--token\` 或 \`FLUXDOWN_TOKEN\`。
+          EOF
+
+      - name: Download CLI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cli-bin-*
+          path: release-assets/
+          merge-multiple: true
+
+      - name: Generate SHA256 checksums
+        working-directory: release-assets
+        run: sha256sum * > SHA256SUMS.txt
+
+      - name: List release assets
+        run: ls -la release-assets/
+
+      # make_latest=false：组件 release 不抢占 GitHub /releases/latest
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: cli-v${{ steps.version.outputs.VERSION }}
+          name: FluxDown CLI v${{ steps.version.outputs.VERSION }}
+          files: release-assets/*
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: false
+          draft: false
+          make_latest: "false"
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
+  # ── Release Job 4: 移动端（独立 tag mobile-v*，不抢占 latest）──
+  release-mobile:
+    name: Release Mobile
+    runs-on: ubuntu-latest
+    needs: build-android
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        uses: ./.github/actions/release-notes
+        with:
+          component: Android 移动端
+          fallback-title: Mobile Release v${{ steps.version.outputs.VERSION }}
+          paths: native/engine/** android/** lib/src/mobile/**
+          claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+      - name: Download Android APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: android-apk
+          path: release-assets/
+          merge-multiple: true
+
+      - name: Generate SHA256 checksums
+        working-directory: release-assets
+        run: sha256sum * > SHA256SUMS.txt
+
+      - name: List release assets
+        run: ls -la release-assets/
+
+      # make_latest=false：组件 release 不抢占 GitHub /releases/latest
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: mobile-v${{ steps.version.outputs.VERSION }}
+          name: FluxDown Mobile v${{ steps.version.outputs.VERSION }}
+          files: release-assets/*
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: false
+          draft: false
+          make_latest: "false"
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
+  # ── 最终 Job: 清理 GitHub Actions Artifact，仅保留当前 tag 这一组 ──
+  # 原因：Free 账号 artifact 配额仅 500MB，每次 release 会上传 ~400MB
+  # Release 资产已独立存储在 GitHub Release，artifact 只是 CI 中间产物可安全清理
+  # always()：无论哪些组件 release 被跳过/失败都执行清理，失败不阻断（continue-on-error）
+  cleanup-artifacts:
+    name: Cleanup CI Artifacts
+    runs-on: ubuntu-latest
+    needs: [release-app, release-extension, release-server, release-mobile, release-cli]
+    if: ${{ always() && !cancelled() }}
+
+    steps:
+      - name: Cleanup GitHub Actions artifacts (keep current tag + in-flight runs)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CURRENT_TAG="${GITHUB_REF#refs/tags/}"
+          echo "🧹 Artifact cleanup: keeping artifacts from tag ${CURRENT_TAG} and any still-running workflow runs"
+
+          # 收集所有未完成（queued/in_progress）run 的 id：并行的其他 tag 发布
+          # 仍在使用自己的 artifact，绝不能删（曾导致 v0.2.4-rc.1 的 Windows
+          # installer 被并行的 v0.2.3 cleanup 提前删除，Release 缺 x64 安装包）
+          ACTIVE_RUN_IDS=$(gh api --paginate \
+            "repos/${{ github.repository }}/actions/runs?status=in_progress" \
+            -q '.workflow_runs[].id'; gh api --paginate \
+            "repos/${{ github.repository }}/actions/runs?status=queued" \
+            -q '.workflow_runs[].id')
+          ACTIVE_JSON=$(printf '%s\n' $ACTIVE_RUN_IDS | jq -cs 'map(tonumber)')
+          echo "Active run ids: ${ACTIVE_JSON}"
+
+          # 列出所有 artifact：跳过当前 tag 的、跳过属于未完成 run 的，删除其余
+          # workflow_run.head_branch 在 tag 推送时等于 tag 名（v0.1.43 这样）
+          DELETE_IDS=$(gh api --paginate \
+            repos/${{ github.repository }}/actions/artifacts \
+            -q ".artifacts[] | select(.workflow_run.head_branch != \"${CURRENT_TAG}\") | select(.workflow_run.id as \$rid | (${ACTIVE_JSON} | index(\$rid)) == null) | .id")
+
+          if [ -z "$DELETE_IDS" ]; then
+            echo "✅ No old artifacts to delete"
+            exit 0
+          fi
+
+          DELETE_COUNT=$(echo "$DELETE_IDS" | wc -l)
+          echo "Will delete ${DELETE_COUNT} old artifact(s)"
+
+          # 串行删除避免触发 GitHub TLS 限流（之前并发 8 大量 timeout）
+          FAIL=0
+          for id in $DELETE_IDS; do
+            if gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/${id} 2>/dev/null; then
+              echo "  🗑️  Deleted artifact ${id}"
+            else
+              echo "  ⚠️  Failed to delete artifact ${id}"
+              FAIL=$((FAIL+1))
+            fi
+          done
+
+          echo "✅ Artifact cleanup complete. Deleted $((DELETE_COUNT-FAIL))/${DELETE_COUNT}"
+          if [ "$FAIL" -gt 0 ]; then
+            echo "⚠️  ${FAIL} deletion(s) failed (will be retried next release)"
+          fi
+
+  # ── 最终 Job: 通知国内镜像同步（mirror.qwld.cn）──
+  # 任一组件 release 成功后触发 githubProxy 拉取最新正式版/预览版资产。
+  # 镜像自身有兜底轮询，本步失败仅延迟镜像更新，不阻断发布（continue-on-error）。
+  # 需要仓库 secrets：MIRROR_SYNC_SECRET（与镜像端 FDPROXY_SECRET 一致）；
+  # 可选 MIRROR_SYNC_URL 覆盖默认地址。
+  notify-mirror:
+    name: Notify Download Mirror
+    runs-on: ubuntu-latest
+    needs: [release-app, release-extension, release-server, release-mobile, release-cli]
+    if: ${{ always() && !cancelled() && contains(needs.*.result, 'success') }}
+
+    steps:
+      - name: Trigger mirror sync
+        continue-on-error: true
+        env:
+          MIRROR_SYNC_URL: ${{ secrets.MIRROR_SYNC_URL || 'https://mirror.qwld.cn/sync' }}
+          MIRROR_SYNC_SECRET: ${{ secrets.MIRROR_SYNC_SECRET }}
+        run: |
+          if [ -z "$MIRROR_SYNC_SECRET" ]; then
+            echo "⚠️  MIRROR_SYNC_SECRET not configured, skipping mirror notification"
+            exit 0
+          fi
+          # 最多重试 3 次，每次 15s 超时；镜像端 202 表示已排队同步
+          for i in 1 2 3; do
+            if curl -fsS -m 15 -X POST \
+              -H "Authorization: Bearer ${MIRROR_SYNC_SECRET}" \
+              "$MIRROR_SYNC_URL"; then
+              echo "✅ Mirror sync triggered"
+              exit 0
+            fi
+            echo "⚠️  Attempt $i failed, retrying in 10s..."
+            sleep 10
+          done
+          echo "⚠️  Mirror unreachable after 3 attempts (mirror poll will catch up)"

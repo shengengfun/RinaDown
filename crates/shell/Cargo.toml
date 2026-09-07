@@ -1,0 +1,14 @@
+[package]
+name = "fluxdown_ui_shell"
+version = "0.1.0"
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fluxdown_ui_components = { path = "../components" }
+fluxdown_ui_i18n = { path = "../i18n" }
+fluxdown_ui_theme = { path = "../theme" }
+gpui.workspace = true
+gpui-component.workspace = true

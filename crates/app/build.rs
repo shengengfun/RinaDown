@@ -1,0 +1,32 @@
+//! 为 GPUI 桌面客户端嵌入 Windows 程序资源。
+
+const WINDOWS_APP_ICON: &str = "../../windows/runner/resources/app_icon.ico";
+
+fn main() -> std::io::Result<()> {
+    println!("cargo:rerun-if-changed={WINDOWS_APP_ICON}");
+
+    #[cfg(windows)]
+    embed_windows_resources()?;
+
+    Ok(())
+}
+
+/// 资源 ID 1 是 Windows Explorer 与 GPUI Windows 后端共同读取的默认图标。
+///
+/// 后续运行时图标切换应覆盖窗口、任务栏和快捷方式引用；这里的默认资源始终
+/// 保留，供未选择动态图标、重置图标及进程未运行时回退使用。
+#[cfg(windows)]
+fn embed_windows_resources() -> std::io::Result<()> {
+    let mut resources = winresource::WindowsResource::new();
+    resources.set_icon(WINDOWS_APP_ICON);
+    resources.set("CompanyName", "FluxDown");
+    resources.set("ProductName", "FluxDown");
+    resources.set("FileDescription", "FluxDown");
+    resources.set("InternalName", "com.fluxdown.app");
+    resources.set("OriginalFilename", "fluxdown-desktop.exe");
+    resources.set(
+        "LegalCopyright",
+        "Copyright (C) 2026 FluxDown. All rights reserved.",
+    );
+    resources.compile()
+}

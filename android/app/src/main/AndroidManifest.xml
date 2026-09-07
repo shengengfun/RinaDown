@@ -1,0 +1,171 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- 下载引擎网络访问 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- 写公共下载目录：API 30+ 所有文件访问；API ≤29 传统存储权限 -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
+    <!-- 前台服务：后台持续下载（切换应用不中断），任务栏常驻通知 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <!-- API 33+ 通知权限（前台服务通知/下载完成通知） -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- 保持 CPU/WiFi 唤醒，防止后台下载被系统休眠中断 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- 请求忽略电池优化，提升后台存活率（用户可拒绝） -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <!-- 应用内更新：唤起系统安装器安装下载的 APK（Android 8+ 需用户授权"安装未知应用"） -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <application
+        android:label="FluxDown"
+        android:name="${applicationName}"
+        android:requestLegacyExternalStorage="true"
+        android:icon="@mipmap/ic_launcher">
+        <!-- 稳定的公开类名：桌面启动转到内部主界面；浏览器显式发来的下载
+             intent 转到透明外部入口。此 Activity 不创建 FlutterEngine。 -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:theme="@style/RouterTheme">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <!-- 真正的 Flutter 主界面，仅由 MainActivity 在应用内启动。 -->
+        <activity
+            android:name=".FluxdownMainActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity=""
+            android:theme="@style/MainTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. -->
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/MainTheme"
+              />
+        </activity>
+        <!-- 外部下载唤起入口：透明主题（ExternalTheme）+ 独立任务栈，在来源应用
+             上方只显示新建下载弹窗。与 FluxdownMainActivity 共享同一 FlutterEngine。 -->
+        <activity
+            android:name=".ExternalDownloadActivity"
+            android:exported="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:theme="@style/ExternalTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/ExternalTheme"
+              />
+            <!-- 接收分享的文本/链接（浏览器"分享"→ FluxDown 快速新建下载）。
+                 浏览器能否把 FluxDown 列入外部下载器还取决于浏览器端适配；
+                 此 SEND filter 只提供接收能力。mimeType 用 */*，避免漏检。 -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <action android:name="android.intent.action.SEND_MULTIPLE"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="*/*"/>
+            </intent-filter>
+            <!-- 点击 magnet 链接唤起新建下载 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="magnet"/>
+            </intent-filter>
+            <!-- 自定义协议 fluxdown:// 唤起新建下载（与浏览器插件联动）。
+                格式：fluxdown://download?url=<encoded-url>&filename=<name>
+                浏览器插件的 enableFluxdownProtocol 开关开启后，拦截下载时
+                重定向到此协议 URL，系统（含 Android Edge/Chrome）自动唤起 FluxDown。 -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="fluxdown"
+                    android:host="download"/>
+            </intent-filter>
+        </activity>
+        <!-- http(s) 下载处理入口（Firefox 会按此匹配）：任意 MIME 的 http/https
+             直链唤起 FluxDown 新建下载。 -->
+        <activity-alias
+            android:name="com.fluxdown.app.ExternalDownloadManager"
+            android:enabled="true"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:targetActivity="com.fluxdown.app.ExternalDownloadActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity-alias>
+        <!-- 通用 http/https 直链匹配（View Handlers 兜底）：任意 scheme 直链唤起
+             下载，不仅限于带二进制 MIME 的。 -->
+        <activity-alias
+            android:name="com.fluxdown.app.ExternalBrowserCompatActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:targetActivity="com.fluxdown.app.ExternalDownloadActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+            </intent-filter>
+        </activity-alias>
+        <!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+        <!-- flutter_foreground_task 前台服务（插件固定类名） -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
+        <!-- 应用内更新：把 cache 目录下的 APK 经 content:// 暴露给系统安装器 -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
+    </application>
+    <!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+    </queries>
+</manifest>

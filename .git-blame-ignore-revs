@@ -1,0 +1,6 @@
+# 大规模纯格式提交,blame 时应跳过。
+# 启用:git config blame.ignoreRevsFile .git-blame-ignore-revs
+# (GitHub 网页端 blame 自动识别本文件)
+
+# chore: renormalize 存量 CRLF 文件为 LF
+e08c3f492f63abd5fb8ab32ae53b0e4071e188b0

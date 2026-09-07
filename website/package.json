@@ -1,0 +1,45 @@
+{
+  "name": "website",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro check && astro build",
+    "check": "astro check",
+    "preview": "astro preview",
+    "astro": "astro",
+    "docs:hash": "node scripts/docs-hash.mjs",
+    "docs:lint": "node scripts/docs-lint.mjs",
+    "indexnow": "node scripts/indexnow-ping.mjs"
+  },
+  "dependencies": {
+    "@astrojs/node": "^9.2.1",
+    "@astrojs/react": "^4.4.2",
+    "@astrojs/sitemap": "^3.7.0",
+    "@icons-pack/react-simple-icons": "^13.11.2",
+    "@octokit/graphql": "^9.0.3",
+    "@primer/react": "^38.18.0",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/react": "^19.2.13",
+    "@types/react-dom": "^19.2.3",
+    "astro": "^5.17.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.33.0",
+    "lucide-react": "^0.563.0",
+    "mini-svg-data-uri": "^1.4.4",
+    "nodemailer": "^8.0.1",
+    "qrcode.react": "^4.2.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "styled-components": "^6.3.12",
+    "tailwind-merge": "^3.4.0",
+    "tailwindcss": "^4.1.18"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@types/nodemailer": "^7.0.10",
+    "typescript": "^5.9.0"
+  }
+}

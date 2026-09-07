@@ -1,0 +1,45 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.zerx-lab/fluxdown",
+  "title": "FluxDown",
+  "description": "Control the FluxDown download manager: add, list, pause, resume and remove downloads, browse named queues, and manage RSS subscriptions.",
+  "websiteUrl": "https://fluxdown.zerx.dev",
+  "repository": {
+    "url": "https://github.com/zerx-lab/FluxDown",
+    "source": "github"
+  },
+  "version": "0.1.54",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:17800/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer <admin token>. Enable the MCP endpoint in FluxDown settings (local_server_mcp_enabled) and copy the admin token; on the headless server it is printed once in the container log at first launch.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "tool": "manual",
+      "tools": [
+        "download_add",
+        "download_list",
+        "download_get",
+        "download_pause",
+        "download_resume",
+        "download_pause_all",
+        "download_resume_all",
+        "download_remove",
+        "queue_list",
+        "rss_list",
+        "rss_add",
+        "rss_remove"
+      ]
+    }
+  }
+}

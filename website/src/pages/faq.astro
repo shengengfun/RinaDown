@@ -1,0 +1,41 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { FloatingNavbar } from "../components/ui/floating-navbar";
+import FaqSection from "../components/FaqSection";
+import Footer from "../components/Footer";
+import CommunityFloat from "../components/CommunityFloat";
+import { en } from "../lib/locales";
+
+// Build FAQPage JSON-LD at SSG time from English locale
+const faqItems = Array.from({ length: 9 }, (_, i) => ({
+  "@type": "Question" as const,
+  name: en[`faq.items.${i}.q` as keyof typeof en],
+  acceptedAnswer: {
+    "@type": "Answer" as const,
+    text: en[`faq.items.${i}.a` as keyof typeof en],
+  },
+}));
+
+const faqNode = {
+  "@type": "FAQPage",
+  mainEntity: faqItems,
+};
+---
+
+<Layout
+  title="FluxDown FAQ — Free IDM Alternative, Pricing, Platforms & Extension"
+  description="Frequently asked questions about FluxDown, the free open-source IDM alternative. Learn about features, pricing, supported platforms, the browser extension, and more."
+  jsonLdNodes={[faqNode]}
+>
+  <FloatingNavbar client:load />
+  <main class="pt-24 relative">
+    <!-- Background ambiance -->
+    <div class="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+      <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-brand-sky/[0.03] blur-[120px] rounded-full"></div>
+      <div class="absolute bottom-1/4 right-0 w-[400px] h-[400px] bg-brand-cyan/[0.02] blur-[100px] rounded-full"></div>
+    </div>
+    <FaqSection client:load />
+  </main>
+  <Footer client:load />
+  <CommunityFloat client:load />
+</Layout>

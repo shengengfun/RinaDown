@@ -1,0 +1,10 @@
+{
+  "extensionName": {
+    "message": "FluxDown",
+    "description": "The name of the extension"
+  },
+  "extensionDescription": {
+    "message": "\u62e6\u622a\u6d4f\u89c8\u5668\u4e0b\u8f7d\uff0c\u53d1\u9001\u5230 FluxDown \u684c\u9762\u5e94\u7528\u8fdb\u884c\u9ad8\u901f\u4e0b\u8f7d",
+    "description": "The description of the extension"
+  }
+}

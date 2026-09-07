@@ -1,0 +1,20 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { FloatingNavbar } from "../components/ui/floating-navbar";
+import AnnouncementBar from "../components/AnnouncementBar";
+import TelegramGroupPage from "../components/TelegramGroupPage";
+import Footer from "../components/Footer";
+---
+
+<Layout title="Telegram Group - FluxDown" description="Join the FluxDown Telegram community group for global users." noindex={true}>
+  <AnnouncementBar client:load />
+  <FloatingNavbar client:load />
+  <main class="relative">
+    <div class="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+      <div class="absolute top-0 left-1/3 w-[500px] h-[300px] bg-[#26A5E4]/[0.04] blur-[120px] rounded-full"></div>
+      <div class="absolute bottom-0 right-1/4 w-[400px] h-[300px] bg-brand-cyan/[0.03] blur-[100px] rounded-full"></div>
+    </div>
+    <TelegramGroupPage client:load />
+  </main>
+  <Footer client:load />
+</Layout>

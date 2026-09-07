@@ -1,0 +1,1393 @@
+//! 下载 actor —— 单任务事件循环独占 `Engine`（`manager` 写方法 `&mut self`），
+//! 所有写操作经 [`ActorCmd`] + oneshot 回执串行执行。
+//!
+//! 结构照抄 `hub/src/actors/download_actor.rs`，去掉 rinf 信号 /
+//! Native Messaging / 更新器 / 文件关联等桌面 App 专属分支。
+
+use std::collections::HashMap;
+use std::time::Duration;
+
+use base64::Engine as _;
+use fluxdown_api::service::ApiError;
+use fluxdown_engine::Engine;
+use fluxdown_engine::bt_downloader::{BtConfig, BtMseMode};
+use fluxdown_engine::db::Db;
+use fluxdown_engine::download_manager::{
+    CreateGroupSpec, NewTaskSpec, ResolveOutcome, ResolvePreviewOutcome, TaskDone,
+};
+use fluxdown_engine::log_info;
+use fluxdown_engine::proxy_config::ProxyConfig;
+use fluxdown_engine::rss::RssValidateOutcome;
+use fluxdown_engine::rss::model::RssSourceInfo;
+use fluxdown_protocol::daemon::CreateTaskRequest;
+use tokio::sync::{mpsc, oneshot};
+use tokio::time::MissedTickBehavior;
+
+use crate::config::default_save_dir;
+
+/// actor 写命令。每个变体携带 oneshot 回执：actor 完成后发送结果，
+/// HTTP 层同步等待；接收端掉线（请求中止）时 `send` 失败直接忽略。
+pub enum ActorCmd {
+    /// 直接创建任务，回执新任务 ID；`Err` 区分「种子 base64 非法」
+    /// （`BadRequest`）与「DB 插入失败」（`Internal`）。
+    /// `req` 装箱：`CreateTaskRequest` 远大于其余变体。
+    CreateTask {
+        req: Box<CreateTaskRequest>,
+        /// 文件大小提示（aria2/接管入口透传；REST 创建为 0）。
+        hint_file_size: i64,
+        /// 无人值守创建（接管入口 + config `silent_skip_selection` 开启时
+        /// true）：跳过 BT 文件/HLS·DASH 画质/插件变体的 WS 选择往返，直接
+        /// 按默认开始。REST/aria2 创建恒 false（Web 弹窗仍有人在场）。
+        unattended: bool,
+        ack: oneshot::Sender<Result<String, ApiError>>,
+    },
+    PauseTask {
+        task_id: String,
+        ack: oneshot::Sender<()>,
+    },
+    ContinueTask {
+        task_id: String,
+        ack: oneshot::Sender<()>,
+    },
+    /// 重命名任务文件。错误为引擎稳定错误码字符串（`invalid-name` /
+    /// `task-active` / `bt-unsupported` / `not-found` / `target-exists`）
+    /// 或 IO/DB 原文。
+    RenameTask {
+        task_id: String,
+        file_name: String,
+        ack: oneshot::Sender<Result<(), String>>,
+    },
+    DeleteTask {
+        task_id: String,
+        delete_files: bool,
+        ack: oneshot::Sender<()>,
+    },
+    PauseAll {
+        ack: oneshot::Sender<()>,
+    },
+    ContinueAll {
+        ack: oneshot::Sender<()>,
+    },
+    /// 配置键已写入 DB，按键名 live-apply 到引擎（镜像桌面 SaveConfig 分支）。
+    ApplyConfig {
+        keys: Vec<String>,
+        ack: oneshot::Sender<()>,
+    },
+    /// GET /api/v1/config 前置：把内存中的 CDN 遥测样本同步落盘到 config 表
+    /// `cdn_pending_reports`（对齐 hub 的 RequestConfig 处理点），Web 面板
+    /// 众包上报才能读到本轮任务的全部样本。
+    FlushCdnReports {
+        ack: oneshot::Sender<()>,
+    },
+    CreateQueue {
+        name: String,
+        speed_limit_kbps: i64,
+        upload_limit_kbps: i64,
+        max_concurrent: i32,
+        default_save_dir: String,
+        default_segments: i32,
+        default_user_agent: String,
+        ack: oneshot::Sender<()>,
+    },
+    UpdateQueue {
+        queue_id: String,
+        name: String,
+        speed_limit_kbps: i64,
+        upload_limit_kbps: i64,
+        max_concurrent: i32,
+        default_save_dir: String,
+        default_segments: i32,
+        default_user_agent: String,
+        ack: oneshot::Sender<()>,
+    },
+    DeleteQueue {
+        queue_id: String,
+        ack: oneshot::Sender<()>,
+    },
+    MoveToQueue {
+        task_id: String,
+        queue_id: String,
+        ack: oneshot::Sender<()>,
+    },
+    /// 启动队列：置运行态并按队列内顺序恢复其中所有待下载任务。
+    StartQueue {
+        queue_id: String,
+        ack: oneshot::Sender<()>,
+    },
+    /// 停止队列：置停止态并暂停其中所有排队/活跃任务。
+    StopQueue {
+        queue_id: String,
+        ack: oneshot::Sender<()>,
+    },
+    /// 更新队列的每日定时计划。
+    SetQueueSchedule {
+        queue_id: String,
+        enabled: bool,
+        start_time: String,
+        stop_time: String,
+        days: i32,
+        ack: oneshot::Sender<()>,
+    },
+    /// 持久化队列内任务顺序（完整新顺序，1..N）。
+    ReorderQueue {
+        queue_id: String,
+        task_ids: Vec<String>,
+        ack: oneshot::Sender<()>,
+    },
+    /// Boost 优先下载（空 task_id = 取消 Boost）。
+    Boost {
+        task_id: String,
+        ack: oneshot::Sender<()>,
+    },
+    /// 立即重扫已完成任务的产物文件是否仍在磁盘上（文件跟踪）。headless 没有
+    /// 窗口聚焦事件，定时器最长 300s 才轮到一次；Web 前端在页面获得焦点时经
+    /// `POST /api/v1/tasks/rescan` 打这条命令，语义与桌面 `RescanFiles` 一致。
+    /// 扫描是 detached 的（`spawn_file_scan` 立即返回），ack 只表示已受理。
+    RescanFiles {
+        ack: oneshot::Sender<()>,
+    },
+    /// 设置单任务做种限制覆盖（-2 = 跟随全局，-1 = 不限制，>=0 = 自定义，
+    /// 0 视同不限制；分享率为千分比）。`upload_limit_bps` 为任务级做种
+    /// 上传限速（B/s，0 = 不限），在下一次 torrent add 时烘焙生效。
+    SetTaskSeedLimits {
+        task_id: String,
+        ratio_limit_milli: i64,
+        post_ratio_limit_milli: i64,
+        seed_time_limit_minutes: i64,
+        inactive_time_limit_minutes: i64,
+        upload_limit_bps: i64,
+        ack: oneshot::Sender<()>,
+    },
+    TestProxy {
+        proxy_type: String,
+        host: String,
+        port: String,
+        username: String,
+        password: String,
+        ack: oneshot::Sender<Result<i64, String>>,
+    },
+    /// 建组：wire→engine 转换（`CreateGroupRequest` → `CreateGroupSpec`，含
+    /// `save_dir` 空值兜底）已在 `ServerApiHost::create_task_group` 完成。
+    /// `spec` 装箱理由同 `ActorCmd::CreateTask`。
+    CreateGroup {
+        spec: Box<CreateGroupSpec>,
+        ack: oneshot::Sender<Result<String, ApiError>>,
+    },
+    /// 暂停组内全部成员。
+    GroupPause {
+        group_id: String,
+        ack: oneshot::Sender<()>,
+    },
+    /// 恢复组内全部成员。
+    GroupContinue {
+        group_id: String,
+        ack: oneshot::Sender<()>,
+    },
+    /// 删除整组（批量删成员）。
+    GroupDelete {
+        group_id: String,
+        delete_files: bool,
+        ack: oneshot::Sender<()>,
+    },
+    /// 前置预解析：actor 内 `spawn_resolve_preview` off-actor 完成后由转发
+    /// 任务回执，绝不在 actor 内 await 解析结果（最长 30s 会冻结事件循环）。
+    ResolvePreview {
+        url: String,
+        cookies: String,
+        referrer: String,
+        user_agent: String,
+        extra_headers: HashMap<String, String>,
+        ack: oneshot::Sender<ResolvePreviewOutcome>,
+    },
+    /// 新建 RSS 订阅，回执新订阅 ID；`None` = url 为空被引擎拒绝。
+    /// `source` 装箱理由同 [`ActorCmd::CreateTask`]：`RssSourceInfo` 二十余
+    /// 个字段，远大于其余变体。
+    RssCreate {
+        source: Box<RssSourceInfo>,
+        ack: oneshot::Sender<Option<String>>,
+    },
+    /// 更新订阅的用户可编辑字段；`false` = 订阅不存在。
+    RssUpdate {
+        source: Box<RssSourceInfo>,
+        ack: oneshot::Sender<bool>,
+    },
+    /// 删除订阅（级联条目，已建任务保留）；`false` = 订阅不存在。
+    RssDelete {
+        source_id: String,
+        ack: oneshot::Sender<bool>,
+    },
+    /// 立即抓取一个订阅；`false` = 订阅不存在或已在抓取中。
+    RssRefresh {
+        source_id: String,
+        ack: oneshot::Sender<bool>,
+    },
+    /// 条目手动操作：`download`（绕过规则强制下载）/ `ignore` / `readAll`。
+    RssItemAction {
+        source_id: String,
+        guid: String,
+        action: String,
+        ack: oneshot::Sender<()>,
+    },
+    /// feed 只读验证（新建订阅向导）：与 [`ActorCmd::ResolvePreview`] 同款
+    /// off-actor 范式，网络抓取绝不在 actor 内 await。回执装箱——
+    /// `RssValidateOutcome` 带整份条目预览。
+    RssValidate {
+        url: String,
+        cookies: String,
+        user_agent: String,
+        proxy_url: String,
+        ack: oneshot::Sender<Box<RssValidateOutcome>>,
+    },
+    /// 投递日志快照（内存环形缓冲，只能问引擎要，DB 里没有）。
+    WebhookDeliveries {
+        ack: oneshot::Sender<Vec<fluxdown_engine::webhook::WebhookDelivery>>,
+    },
+    /// 清空投递日志。
+    WebhookClear {
+        ack: oneshot::Sender<()>,
+    },
+    /// 「模拟一次 task.completed」，按已保存端点的订阅规则投递。
+    /// 回执是投出去的端点数：0 = 没有端点订阅该事件，前端该直说。
+    WebhookSimulate {
+        ack: oneshot::Sender<usize>,
+    },
+    /// 草稿端点单次测试投递。与 [`ActorCmd::RssValidate`] 同款 off-actor
+    /// 范式：actor 只交出 dispatcher 句柄，10s 网络往返在 spawn 里等。
+    WebhookTest {
+        endpoint_json: String,
+        ack: oneshot::Sender<Box<fluxdown_engine::webhook::WebhookDelivery>>,
+    },
+}
+
+/// actor 主循环。持有 `Engine` 直至进程退出。
+pub async fn run_actor(
+    mut engine: Engine,
+    mut cmd_rx: mpsc::Receiver<ActorCmd>,
+    mut done_rx: mpsc::Receiver<TaskDone>,
+    mut retry_rx: mpsc::Receiver<String>,
+    mut resolve_rx: mpsc::UnboundedReceiver<ResolveOutcome>,
+    mut plugin_retry_rx: mpsc::UnboundedReceiver<(String, u64)>,
+    mut missing_cleanup_rx: mpsc::Receiver<Vec<String>>,
+) {
+    // 启动预热：加载队列缓存（每队列限速/并发生效）+ 广播全量任务快照。
+    engine.manager.load_queues().await;
+    engine.manager.load_and_send_all_tasks().await;
+
+    // 文件跟踪：headless 无窗口聚焦事件，用低频定时器周期性重扫已完成任务
+    // 文件是否仍在。声明在 loop 外并消费首个立即就绪的 tick（启动扫描已由
+    // load_and_send_all_tasks 覆盖）；MissedTickBehavior::Delay 防休眠唤醒后
+    // 积压 tick 造成扫描风暴。
+    let mut rescan_timer = tokio::time::interval(Duration::from_secs(300));
+    rescan_timer.set_missed_tick_behavior(MissedTickBehavior::Delay);
+    rescan_timer.tick().await;
+
+    // 队列定时调度 tick：引擎侧做边沿检测（每边沿每天至多一次 + 当日补
+    // 触发），此处只提供节拍。
+    let mut queue_schedule_tick = tokio::time::interval(Duration::from_secs(20));
+    queue_schedule_tick.set_missed_tick_behavior(MissedTickBehavior::Delay);
+    // Seeding evaluation timer: check ratio/time limits and stop seeders
+    // that have exceeded the configured thresholds at the shared interval.
+    let mut seeding_interval =
+        tokio::time::interval(fluxdown_engine::bt_seeding::SEEDING_EVAL_INTERVAL);
+    seeding_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+    // RSS 轮询节拍：与 `queue_schedule_tick` 同款——宿主只提供节拍，到期
+    // 判定与抓取派发都在引擎内，`tick_rss_sources` 立即返回不阻塞。
+    let mut rss_poll_tick = tokio::time::interval(Duration::from_secs(60));
+    rss_poll_tick.set_missed_tick_behavior(MissedTickBehavior::Delay);
+
+    // RSS off-actor 回流通道：抓取/验证在 `RssManager` 自己 spawn 的任务里
+    // 完成，结果经这里回到 actor 串行落库建任务。`take_event_rx` 只可能在
+    // 此处首取（返回 `Some`），但仍用 `Option` + 惰性分支避免对不变式做无
+    // 凭据的假设（与 hub `download_actor.rs` 同款）。
+    let mut rss_rx = engine.manager.rss.take_event_rx();
+
+    loop {
+        tokio::select! {
+            Some(cmd) = cmd_rx.recv() => {
+                handle_cmd(cmd, &mut engine).await;
+            }
+            Some(done) = done_rx.recv() => {
+                engine.manager.on_task_done(&done).await;
+            }
+            Some(task_id) = retry_rx.recv() => {
+                // 仅在任务仍处于 error 状态时自动恢复（用户可能已手动干预）。
+                if engine.manager.is_task_in_error(&task_id).await {
+                    log_info!("[server-actor] auto-retry: resuming task {}", task_id);
+                    engine.manager.resume_task_auto(&task_id).await;
+                }
+            }
+            Some(ids) = missing_cleanup_rx.recv() => {
+                // config `file_missing_action == "delete"`：文件跟踪扫描发现
+                // 产物已不在磁盘上，只删任务记录（delete_files=false，无文件
+                // 可删）。收尾与 `ActorCmd::DeleteTask` 一致：重发全量快照，
+                // WsHub 据此判定并发出 aria2 onDownloadStop。
+                log_info!("[server-actor] auto-deleting {} task(s) whose files vanished", ids.len());
+                engine.manager.delete_tasks_batch(&ids, false).await;
+                engine.manager.load_and_send_all_tasks().await;
+            }
+            Some(out) = resolve_rx.recv() => {
+                engine.manager.on_resolve_ready(out).await;
+            }
+            Some((task_id, delay_ms)) = plugin_retry_rx.recv() => {
+                engine.manager.plugin_request_retry(&task_id, delay_ms).await;
+            }
+            _ = rescan_timer.tick() => {
+                engine.manager.spawn_file_scan();
+            }
+            _ = queue_schedule_tick.tick() => {
+                engine.manager.tick_queue_schedules().await;
+            }
+            _ = rss_poll_tick.tick() => {
+                engine.manager.tick_rss_sources();
+            }
+            Some(ev) = async {
+                match rss_rx.as_mut() {
+                    Some(rx) => rx.recv().await,
+                    None => std::future::pending().await,
+                }
+            } => {
+                engine.manager.on_rss_event(ev).await;
+            }
+            // --- Seeding evaluation timer ---
+            _ = seeding_interval.tick() => {
+                engine.manager.tick_seeding_evaluation().await;
+            }
+            else => {
+                log_info!("[server-actor] all channels closed, exiting");
+                break;
+            }
+        }
+    }
+}
+
+async fn handle_cmd(cmd: ActorCmd, engine: &mut Engine) {
+    match cmd {
+        ActorCmd::CreateTask {
+            req,
+            hint_file_size,
+            unattended,
+            ack,
+        } => {
+            let req = *req;
+            // aria2 addTorrent 兼容：torrent_b64 非空则 base64 解码为种子
+            // 字节；解码失败是客户端请求错误（区别于下方的 DB 插入失败），
+            // 立即回执 BadRequest 并返回，不再继续创建任务。
+            let torrent_bytes = match decode_torrent_b64(req.torrent_b64.as_deref()) {
+                Ok(bytes) => bytes,
+                Err(message) => {
+                    let _ = ack.send(Err(ApiError::BadRequest(message)));
+                    return;
+                }
+            };
+            // 空 save_dir → 全局默认目录（config 表）→ 平台默认下载目录。
+            let mut save_dir = req.save_dir;
+            if save_dir.trim().is_empty() {
+                save_dir = engine
+                    .db
+                    .get_config("default_save_dir")
+                    .await
+                    .ok()
+                    .flatten()
+                    .unwrap_or_default();
+            }
+            if save_dir.trim().is_empty() {
+                save_dir = default_save_dir();
+            }
+            log_info!("[server-actor] create task: url={}", req.url);
+            let task_id = engine
+                .manager
+                .create_task(NewTaskSpec {
+                    url: req.url,
+                    save_dir,
+                    file_name: req.file_name,
+                    segments: req.segments,
+                    cookies: req.cookies,
+                    referrer: req.referrer,
+                    hint_file_size,
+                    torrent_file_bytes: torrent_bytes,
+                    proxy_url: req.proxy_url,
+                    user_agent: req.user_agent,
+                    queue_id: req.queue_id,
+                    checksum: req.checksum,
+                    ignore_tls_errors: req.ignore_tls_errors,
+                    extra_headers: req.headers.unwrap_or_default(),
+                    method: req.method,
+                    body: req
+                        .body
+                        .map(fluxdown_engine_protocol::request_body_to_engine),
+                    audio_url: req.audio_url,
+                    start_paused: req.start_paused,
+                    http_user: req.http_user,
+                    http_password: req.http_password,
+                    save_site_auth: req.save_site_auth,
+                    unattended_selection: unattended,
+                    ..Default::default()
+                })
+                .await;
+            // 立即广播 tasksSnapshot，确保客户端在首个 taskProgress 之前
+            // 已拿到正确的 queue_id。
+            engine.manager.load_and_send_all_tasks().await;
+            let _ = ack.send(
+                task_id.ok_or_else(|| ApiError::Internal("failed to persist task".to_string())),
+            );
+        }
+        ActorCmd::PauseTask { task_id, ack } => {
+            engine.manager.pause_task(&task_id).await;
+            let _ = ack.send(());
+        }
+        ActorCmd::ContinueTask { task_id, ack } => {
+            engine.manager.resume_task(&task_id).await;
+            let _ = ack.send(());
+        }
+        ActorCmd::RenameTask {
+            task_id,
+            file_name,
+            ack,
+        } => {
+            let _ = ack.send(engine.manager.rename_task(&task_id, &file_name).await);
+        }
+        ActorCmd::SetTaskSeedLimits {
+            task_id,
+            ratio_limit_milli,
+            post_ratio_limit_milli,
+            seed_time_limit_minutes,
+            inactive_time_limit_minutes,
+            upload_limit_bps,
+            ack,
+        } => {
+            engine
+                .manager
+                .set_task_seed_limits(
+                    &task_id,
+                    ratio_limit_milli,
+                    post_ratio_limit_milli,
+                    seed_time_limit_minutes,
+                    inactive_time_limit_minutes,
+                    upload_limit_bps,
+                )
+                .await;
+            let _ = ack.send(());
+        }
+        ActorCmd::DeleteTask {
+            task_id,
+            delete_files,
+            ack,
+        } => {
+            engine.manager.delete_task(&task_id, delete_files).await;
+            // 删除没有专属快照事件——主动重发全量快照，让其他 WS 客户端的
+            // 任务列表同步移除该任务；WsHub 也正是靠这次重发的快照（而非
+            // 本处再单独广播）来判定并发出 aria2 onDownloadStop 通知，
+            // 时序说明见 `ws_hub.rs` 模块顶部“删除路径的 Stop 时序”。
+            engine.manager.load_and_send_all_tasks().await;
+            let _ = ack.send(());
+        }
+        ActorCmd::PauseAll { ack } => {
+            // pending(0) / downloading(1) / preparing(5) 均可暂停。
+            let ids = task_ids_by_status(&engine.db, &[0, 1, 5]).await;
+            engine.manager.batch_pause(&ids).await;
+            let _ = ack.send(());
+        }
+        ActorCmd::ContinueAll { ack } => {
+            // 仅恢复 paused(2) 且所在队列运行中的任务；停止队列（含「稍后
+            // 下载」栈）由「启动队列」显式恢复。error(4) 留给单任务 continue。
+            engine.manager.resume_all_eligible().await;
+            let _ = ack.send(());
+        }
+        ActorCmd::ApplyConfig { keys, ack } => {
+            apply_config(engine, &keys).await;
+            let _ = ack.send(());
+        }
+        ActorCmd::FlushCdnReports { ack } => {
+            engine.manager.flush_cdn_pending_reports().await;
+            let _ = ack.send(());
+        }
+        ActorCmd::CreateQueue {
+            name,
+            speed_limit_kbps,
+            upload_limit_kbps,
+            max_concurrent,
+            default_save_dir,
+            default_segments,
+            default_user_agent,
+            ack,
+        } => {
+            engine
+                .manager
+                .create_queue(
+                    name,
+                    speed_limit_kbps,
+                    upload_limit_kbps,
+                    max_concurrent,
+                    default_save_dir,
+                    default_segments,
+                    default_user_agent,
+                )
+                .await;
+            let _ = ack.send(());
+        }
+        ActorCmd::UpdateQueue {
+            queue_id,
+            name,
+            speed_limit_kbps,
+            upload_limit_kbps,
+            max_concurrent,
+            default_save_dir,
+            default_segments,
+            default_user_agent,
+            ack,
+        } => {
+            engine
+                .manager
+                .update_queue(
+                    queue_id,
+                    name,
+                    speed_limit_kbps,
+                    upload_limit_kbps,
+                    max_concurrent,
+                    default_save_dir,
+                    default_segments,
+                    default_user_agent,
+                )
+                .await;
+            let _ = ack.send(());
+        }
+        ActorCmd::DeleteQueue { queue_id, ack } => {
+            engine.manager.delete_queue(queue_id).await;
+            let _ = ack.send(());
+        }
+        ActorCmd::MoveToQueue {
+            task_id,
+            queue_id,
+            ack,
+        } => {
+            engine.manager.move_task_to_queue(task_id, queue_id).await;
+            let _ = ack.send(());
+        }
+        ActorCmd::StartQueue { queue_id, ack } => {
+            engine.manager.start_queue(queue_id).await;
+            let _ = ack.send(());
+        }
+        ActorCmd::StopQueue { queue_id, ack } => {
+            engine.manager.stop_queue(queue_id).await;
+            let _ = ack.send(());
+        }
+        ActorCmd::SetQueueSchedule {
+            queue_id,
+            enabled,
+            start_time,
+            stop_time,
+            days,
+            ack,
+        } => {
+            engine
+                .manager
+                .set_queue_schedule(queue_id, enabled, start_time, stop_time, days)
+                .await;
+            let _ = ack.send(());
+        }
+        ActorCmd::ReorderQueue {
+            queue_id,
+            task_ids,
+            ack,
+        } => {
+            engine.manager.reorder_queue_tasks(queue_id, task_ids).await;
+            let _ = ack.send(());
+        }
+        ActorCmd::Boost { task_id, ack } => {
+            engine.manager.set_priority_task(task_id).await;
+            let _ = ack.send(());
+        }
+        ActorCmd::RescanFiles { ack } => {
+            engine.manager.spawn_file_scan();
+            let _ = ack.send(());
+        }
+        ActorCmd::TestProxy {
+            proxy_type,
+            host,
+            port,
+            username,
+            password,
+            ack,
+        } => {
+            let result = engine
+                .test_proxy_connection(&proxy_type, &host, &port, &username, &password)
+                .await
+                .map_err(|e| e.to_string());
+            let _ = ack.send(result);
+        }
+        ActorCmd::CreateGroup { spec, ack } => {
+            let group_id = engine.manager.create_task_group(*spec).await;
+            let _ = ack.send(
+                group_id.ok_or_else(|| ApiError::Internal("failed to persist group".to_string())),
+            );
+        }
+        ActorCmd::GroupPause { group_id, ack } => {
+            engine.manager.pause_group(&group_id).await;
+            let _ = ack.send(());
+        }
+        ActorCmd::GroupContinue { group_id, ack } => {
+            engine.manager.resume_group(&group_id).await;
+            let _ = ack.send(());
+        }
+        ActorCmd::GroupDelete {
+            group_id,
+            delete_files,
+            ack,
+        } => {
+            engine.manager.delete_group(&group_id, delete_files).await;
+            // 删除没有专属快照事件——主动重发全量快照，WsHub 靠快照对比判定
+            // 并广播每个消失成员的 aria2 onDownloadStop 通知（与单任务
+            // `ActorCmd::DeleteTask` 同款时序，见本文件该分支注释）。
+            engine.manager.load_and_send_all_tasks().await;
+            let _ = ack.send(());
+        }
+        ActorCmd::ResolvePreview {
+            url,
+            cookies,
+            referrer,
+            user_agent,
+            extra_headers,
+            ack,
+        } => {
+            // 绝不在 actor 内 await 解析结果——插件解析最长 30s 会冻结事件
+            // 循环；转发任务 off-actor 等待后再回执。
+            let rx = engine.manager.spawn_resolve_preview(
+                url,
+                cookies,
+                referrer,
+                user_agent,
+                extra_headers,
+            );
+            tokio::spawn(async move {
+                let outcome = rx.await.unwrap_or(ResolvePreviewOutcome {
+                    name: String::new(),
+                    items: Vec::new(),
+                    error: "resolve preview worker dropped".to_string(),
+                });
+                let _ = ack.send(outcome);
+            });
+        }
+        ActorCmd::RssCreate { source, ack } => {
+            let source_id = engine.manager.create_rss_source(*source).await;
+            let _ = ack.send(source_id);
+        }
+        ActorCmd::RssUpdate { source, ack } => {
+            let ok = engine.manager.rss.update_source(*source).await;
+            let _ = ack.send(ok);
+        }
+        ActorCmd::RssDelete { source_id, ack } => {
+            let ok = engine.manager.rss.delete_source(&source_id).await;
+            let _ = ack.send(ok);
+        }
+        ActorCmd::RssRefresh { source_id, ack } => {
+            // 同步派发：抓取本身在 off-actor worker 里跑，结果经 `rss_rx` 回流。
+            let ok = engine.manager.refresh_rss_source(&source_id);
+            let _ = ack.send(ok);
+        }
+        ActorCmd::RssItemAction {
+            source_id,
+            guid,
+            action,
+            ack,
+        } => {
+            match action.as_str() {
+                "download" => engine.manager.download_rss_item(&source_id, &guid).await,
+                "ignore" => engine.manager.rss.ignore_item(&source_id, &guid).await,
+                "readAll" => engine.manager.rss.mark_all_read(&source_id).await,
+                // wire 契约只有上面三种；未知值当无操作，不报错也不落库。
+                _ => {}
+            }
+            let _ = ack.send(());
+        }
+        ActorCmd::RssValidate {
+            url,
+            cookies,
+            user_agent,
+            proxy_url,
+            ack,
+        } => {
+            // 与 `ResolvePreview` 同款：future 必须在 actor 之外 await，
+            // 一次 feed 抓取足以冻结整个事件循环。
+            let fut = engine
+                .manager
+                .rss_validate_future(url, cookies, user_agent, proxy_url);
+            tokio::spawn(async move {
+                let _ = ack.send(Box::new(fut.await));
+            });
+        }
+        ActorCmd::WebhookDeliveries { ack } => {
+            let _ = ack.send(engine.webhook_deliveries());
+        }
+        ActorCmd::WebhookClear { ack } => {
+            engine.clear_webhook_deliveries().await;
+            let _ = ack.send(());
+        }
+        ActorCmd::WebhookSimulate { ack } => {
+            let _ = ack.send(engine.simulate_webhook_event());
+        }
+        ActorCmd::WebhookTest { endpoint_json, ack } => {
+            // 与 `RssValidate` 同款：10s 网络往返绝不在 actor 内 await。
+            let dispatcher = engine.manager.webhook();
+            tokio::spawn(async move {
+                let spec: fluxdown_engine::webhook::EndpointSpec =
+                    serde_json::from_str(&endpoint_json).unwrap_or_default();
+                let _ = ack.send(Box::new(dispatcher.test_endpoint(spec).await));
+            });
+        }
+    }
+}
+
+/// 解析 aria2 `addTorrent` 兼容字段：`None`/空串 → 空 `Vec`（非种子任务，
+/// 沿用 `url` 正常下载）；非空则按标准 base64 解码为种子文件字节，
+/// 解码失败返回可直接展示给客户端的错误信息。
+fn decode_torrent_b64(torrent_b64: Option<&str>) -> Result<Vec<u8>, String> {
+    match torrent_b64 {
+        Some(b64) if !b64.is_empty() => base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .map_err(|e| format!("invalid torrent_b64: {e}")),
+        _ => Ok(Vec::new()),
+    }
+}
+
+/// 把已持久化的配置键 live-apply 到引擎（镜像桌面 `SaveConfig` 分支的
+/// 键 → setter 映射；`local_server_*` 是服务器自身配置，重启生效，跳过）。
+async fn apply_config(engine: &mut Engine, keys: &[String]) {
+    let all = engine.db.get_all_config().await.unwrap_or_default();
+    // 代理/BT 全组重载各执行至多一次；ED2K 后台刷新同批至多触发一次。
+    let mut proxy_applied = false;
+    let mut bt_applied = false;
+    let mut ed2k_sub_refreshed = false;
+    let mut ed2k_nodes_refreshed = false;
+    for key in keys {
+        match key.as_str() {
+            "max_concurrent_tasks" => {
+                if let Some(v) = all.get(key).and_then(|v| v.parse::<usize>().ok()) {
+                    log_info!("[server-actor] max_concurrent -> {}", v);
+                    engine.manager.set_max_concurrent(v).await;
+                }
+            }
+            "speed_limit_bytes" => {
+                if let Some(v) = all.get(key).and_then(|v| v.parse::<u64>().ok()) {
+                    log_info!("[server-actor] speed_limit -> {} B/s", v);
+                    engine.manager.set_speed_limit(v);
+                }
+            }
+            "upload_limit_bytes" => {
+                if let Some(v) = all.get(key).and_then(|v| v.parse::<u64>().ok()) {
+                    log_info!("[server-actor] upload_limit -> {} B/s", v);
+                    engine.manager.set_upload_speed_limit(v);
+                }
+            }
+            "default_save_dir" => {
+                if let Some(v) = all.get(key) {
+                    log_info!("[server-actor] default_save_dir -> {}", v);
+                    engine.manager.set_default_save_dir(v.clone());
+                }
+            }
+            "default_segments" => {
+                if let Some(v) = all.get(key).and_then(|v| v.parse::<i32>().ok()) {
+                    engine.manager.set_default_segments(v);
+                }
+            }
+            "auto_max_connections" => {
+                if let Some(v) = all.get(key).and_then(|v| v.parse::<i32>().ok()) {
+                    engine.manager.set_auto_max_connections(v);
+                }
+            }
+            "cdn_multi_enabled" => {
+                if let Some(v) = all.get(key) {
+                    engine
+                        .manager
+                        .set_cdn_multi_enabled(v == "1" || v == "true");
+                }
+            }
+            "cdn_max_nodes" => {
+                if let Some(v) = all.get(key).and_then(|v| v.parse::<i32>().ok()) {
+                    engine.manager.set_cdn_max_nodes(v.clamp(0, 8));
+                }
+            }
+            "cdn_resolver_endpoints" => {
+                if let Some(v) = all.get(key) {
+                    engine.manager.set_cdn_resolver_endpoints(v);
+                }
+            }
+            "cdn_hints_base" => {
+                if let Some(v) = all.get(key) {
+                    engine.manager.set_cdn_hints_base(v);
+                }
+            }
+            "cdn_ecs_subnets" => {
+                if let Some(v) = all.get(key) {
+                    engine.manager.set_cdn_ecs_subnets(v);
+                }
+            }
+            "cdn_pending_reports" => {
+                // Dart 上报成功后写空串清空；引擎自己写入的非空值不回调（避免自触发）。
+                if let Some(v) = all.get(key)
+                    && v.is_empty()
+                {
+                    engine.manager.clear_cdn_pending_reports();
+                }
+            }
+            "use_server_time" => {
+                if let Some(v) = all.get(key) {
+                    engine.manager.set_use_server_time(v == "true");
+                }
+            }
+            "file_exists_behavior" => {
+                if let Some(v) = all.get(key) {
+                    engine.manager.set_file_exists_overwrite(v == "overwrite");
+                }
+            }
+            "file_missing_action" => {
+                if let Some(v) = all.get(key) {
+                    engine.manager.set_missing_file_auto_delete(v == "delete");
+                }
+            }
+            k if k == fluxdown_engine::webhook::CONFIG_KEY_ENDPOINTS => {
+                if let Some(v) = all.get(key) {
+                    engine.manager.set_webhook_endpoints(v);
+                }
+            }
+            "domain_conn_caps" => {
+                // 空值 = Web 设置页「清除已学习的服务器策略」
+                if all.get(key).is_some_and(|v| v.is_empty()) {
+                    engine.manager.clear_domain_conn_caps();
+                }
+            }
+            "global_user_agent" => {
+                if let Some(v) = all.get(key)
+                    && let Err(e) = engine.manager.set_user_agent(v.clone())
+                {
+                    log_info!("[server-actor] failed to apply user_agent: {}", e);
+                }
+            }
+            "max_auto_retries" => {
+                if let Some(v) = all.get(key).and_then(|v| v.parse::<i32>().ok()) {
+                    engine.manager.set_max_auto_retries(v);
+                }
+            }
+            "auto_retry_delay_secs" => {
+                if let Some(v) = all.get(key).and_then(|v| v.parse::<u64>().ok()) {
+                    engine.manager.set_auto_retry_delay_secs(v);
+                }
+            }
+            "proxy_mode" | "proxy_type" | "proxy_host" | "proxy_port" | "proxy_username"
+            | "proxy_password" | "proxy_no_list"
+                if !proxy_applied =>
+            {
+                proxy_applied = true;
+                log_info!("[server-actor] proxy config changed, rebuilding client");
+                let new_proxy = ProxyConfig::from_config_map(&all);
+                if let Err(e) = engine.manager.set_proxy_config(new_proxy) {
+                    log_info!("[server-actor] failed to apply proxy config: {}", e);
+                }
+            }
+            "bt_enable_dht"
+            | "bt_enable_upnp"
+            | "bt_port_start"
+            | "bt_port_end"
+            | "bt_custom_trackers"
+            | "bt_tracker_sub_enabled"
+            | "bt_tracker_sub_urls"
+            | "bt_tracker_sub_cache"
+            | "bt_mse_mode"
+                if !bt_applied =>
+            {
+                bt_applied = true;
+                log_info!("[server-actor] BT session config changed, invalidating session");
+                engine.manager.set_bt_config(bt_config_from_map(&all));
+                engine.manager.invalidate_bt_session().await;
+            }
+            "bt_seed_ratio_limit"
+            | "bt_seed_post_ratio_limit"
+            | "bt_seed_time_limit_minutes"
+            | "bt_seed_inactive_time_limit_minutes"
+            | "bt_seed_limit_operator"
+            | "bt_seed_then_action"
+            | "bt_seed_max_active"
+                if !bt_applied =>
+            {
+                bt_applied = true;
+                log_info!("[server-actor] BT seeding config changed, live-applied");
+                engine.manager.set_bt_config(bt_config_from_map(&all));
+            }
+            // ED2K 服务器订阅键：地址变化 / 重新启用 → 后台立即刷新一次。
+            // 服务器列表在每次下载 find-sources 时现读，无需失效任何会话。
+            k @ ("ed2k_server_sub_urls" | "ed2k_server_sub_enabled") => {
+                let trigger =
+                    k == "ed2k_server_sub_urls" || all.get(key).is_some_and(|v| v == "true");
+                if trigger && !ed2k_sub_refreshed {
+                    ed2k_sub_refreshed = true;
+                    log_info!("[server-actor] ED2K server sub config changed, refreshing");
+                    let db = engine.db.clone();
+                    tokio::spawn(async move {
+                        refresh_ed2k_server_sub(&db).await;
+                    });
+                }
+            }
+            // Kad nodes.dat：URL 变化 / Kad 重新启用 → 后台立即刷新一次。
+            k @ ("ed2k_nodes_dat_url" | "ed2k_enable_kad") => {
+                let trigger =
+                    k == "ed2k_nodes_dat_url" || all.get(key).is_some_and(|v| v == "true");
+                if trigger && !ed2k_nodes_refreshed {
+                    ed2k_nodes_refreshed = true;
+                    log_info!("[server-actor] ED2K Kad config changed, refreshing nodes.dat");
+                    spawn_ed2k_nodes_dat_refresh(engine.db.clone());
+                }
+            }
+            "log_max_size_mb" => {
+                if let Some(mb) = all.get(key).and_then(|v| v.parse::<u64>().ok()) {
+                    log_info!("[server-actor] log_max_size_mb -> {}", mb);
+                    fluxdown_engine::logger::set_max_total_bytes(mb * 1024 * 1024);
+                }
+            }
+            // 服务器自身配置（token/端口/子开关）重启生效；其余键无运行时动作。
+            _ => {}
+        }
+    }
+}
+
+/// 按状态码过滤任务 ID（全局暂停/恢复用）。
+async fn task_ids_by_status(db: &Db, statuses: &[i32]) -> Vec<String> {
+    match db.load_all_tasks().await {
+        Ok(tasks) => tasks
+            .into_iter()
+            .filter(|t| statuses.contains(&t.status))
+            .map(|t| t.task_id)
+            .collect(),
+        Err(e) => {
+            log_info!("[server-actor] load_all_tasks error: {}", e);
+            Vec::new()
+        }
+    }
+}
+
+/// 从 config 键值对构建 [`BtConfig`]（复制自 `download_actor.rs` 的私有
+/// helper；订阅关闭时排除缓存的订阅 tracker）。
+pub fn bt_config_from_map(cfg: &HashMap<String, String>) -> BtConfig {
+    let sub_enabled = cfg
+        .get("bt_tracker_sub_enabled")
+        .map(|v| v == "true")
+        .unwrap_or(true);
+    BtConfig {
+        enable_dht: cfg
+            .get("bt_enable_dht")
+            .map(|v| v == "true")
+            .unwrap_or(true),
+        enable_upnp: cfg
+            .get("bt_enable_upnp")
+            .map(|v| v == "true")
+            .unwrap_or(true),
+        port_start: cfg
+            .get("bt_port_start")
+            .and_then(|v| v.parse::<u16>().ok())
+            .unwrap_or(6881),
+        port_end: cfg
+            .get("bt_port_end")
+            .and_then(|v| v.parse::<u16>().ok())
+            .unwrap_or(6891),
+        custom_trackers: cfg.get("bt_custom_trackers").cloned().unwrap_or_default(),
+        subscription_trackers: if sub_enabled {
+            cfg.get("bt_tracker_sub_cache").cloned().unwrap_or_default()
+        } else {
+            String::new()
+        },
+        seed_ratio_limit: cfg
+            .get("bt_seed_ratio_limit")
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(0.0),
+        seed_post_ratio_limit: cfg
+            .get("bt_seed_post_ratio_limit")
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(0.0),
+        seed_time_limit_minutes: cfg
+            .get("bt_seed_time_limit_minutes")
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(0),
+        seed_inactive_time_limit_minutes: cfg
+            .get("bt_seed_inactive_time_limit_minutes")
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(0),
+        seed_limit_operator: cfg
+            .get("bt_seed_limit_operator")
+            .map(|v| {
+                if v.eq_ignore_ascii_case("and") {
+                    fluxdown_engine::bt_seeding::SeedingLimitOperator::And
+                } else {
+                    fluxdown_engine::bt_seeding::SeedingLimitOperator::Or
+                }
+            })
+            .unwrap_or(fluxdown_engine::bt_seeding::SeedingLimitOperator::Or),
+        seed_then_action: cfg
+            .get("bt_seed_then_action")
+            .cloned()
+            .unwrap_or_else(|| "stop".to_string()),
+        seed_max_active: cfg
+            .get("bt_seed_max_active")
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(0),
+        mse_mode: cfg
+            .get("bt_mse_mode")
+            .map(String::as_str)
+            .map(BtMseMode::from)
+            .unwrap_or_default(),
+    }
+}
+
+/// 拉取全部 Tracker 订阅源、去重后写回 `bt_tracker_sub_cache` /
+/// `bt_tracker_sub_updated_at` 配置，再经 actor 重载 [`BtConfig`] 并失效当前
+/// BT 会话（下个 BT 任务即用上最新合并列表）。返回抓取结果供 HTTP 层回执。
+///
+/// 网络拉取在**调用方任务**内执行（不占用 actor 事件循环）；全部源失败时
+/// 不改动缓存，保留上次成功的列表。
+pub async fn refresh_tracker_sub(
+    db: &Db,
+    cmd_tx: &mpsc::Sender<ActorCmd>,
+) -> fluxdown_engine::tracker_subscription::FetchOutcome {
+    let cfg = db.get_all_config().await.unwrap_or_default();
+    let urls = cfg
+        .get("bt_tracker_sub_urls")
+        .cloned()
+        .unwrap_or_else(fluxdown_engine::tracker_subscription::default_subscription_urls);
+    let outcome = fluxdown_engine::tracker_subscription::fetch_subscriptions(&urls).await;
+    if outcome.is_success() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        if let Err(e) = db
+            .set_config("bt_tracker_sub_cache", &outcome.trackers.join("\n"))
+            .await
+        {
+            log_info!("[server-actor] failed to save tracker sub cache: {}", e);
+        }
+        if let Err(e) = db
+            .set_config("bt_tracker_sub_updated_at", &now.to_string())
+            .await
+        {
+            log_info!("[server-actor] failed to save tracker sub timestamp: {}", e);
+        }
+        // 经 actor 重载 BtConfig + 失效会话（apply_config 匹配 bt_tracker_sub_cache）。
+        let (ack, rx) = oneshot::channel();
+        if cmd_tx
+            .send(ActorCmd::ApplyConfig {
+                keys: vec!["bt_tracker_sub_cache".to_string()],
+                ack,
+            })
+            .await
+            .is_ok()
+        {
+            let _ = rx.await;
+        }
+    }
+    outcome
+}
+
+/// Kad nodes.dat 刷新间隔（秒）：24 小时（镜像桌面 `ED2K_NODES_DAT_REFRESH_SECS`）。
+pub const ED2K_NODES_DAT_REFRESH_SECS: i64 = 24 * 60 * 60;
+
+/// 启动时 ED2K 服务器订阅的处置方案（由 [`ed2k_server_sub_startup_plan`] 求出）。
+///
+/// 判定只此一处：`main` 启动块直接消费本结构，不重复内联条件。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Ed2kSubStartupPlan {
+    /// 缓存格式版本落后 → 先清空 `ed2k_server_sub_cache`（旧版缓存全为死主机）。
+    /// 与订阅开关无关：过期格式的缓存任何情况下都不该再被读到。
+    pub invalidate_cache: bool,
+    /// 需要后台拉取一次订阅（订阅启用，且版本落后或缓存超过刷新周期）。
+    pub refresh: bool,
+    /// 库中读到的缓存格式版本（缺省/非法 = 0），供日志使用。
+    pub cache_version: i64,
+    /// 库中读到的缓存更新时间（Unix 秒，缺省/非法 = 0），供日志使用。
+    pub updated_at: i64,
+}
+
+/// 依据配置快照与当前 Unix 秒判断启动时是否需要刷新 ED2K 服务器订阅。
+///
+/// 纯函数（无 IO），语义对齐桌面 `download_actor` 的启动自刷新块。
+#[must_use]
+pub fn ed2k_server_sub_startup_plan(cfg: &HashMap<String, String>, now: i64) -> Ed2kSubStartupPlan {
+    let sub_enabled = cfg
+        .get("ed2k_server_sub_enabled")
+        .map(|v| v == "true")
+        .unwrap_or(true);
+    let updated_at = cfg
+        .get("ed2k_server_sub_updated_at")
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(0);
+    let cache_version = cfg
+        .get("ed2k_server_sub_cache_version")
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(0);
+    let version_stale =
+        cache_version < fluxdown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION;
+    let stale_by_age = now.saturating_sub(updated_at)
+        > fluxdown_engine::ed2k::server_subscription::REFRESH_INTERVAL_SECS;
+    Ed2kSubStartupPlan {
+        invalidate_cache: version_stale,
+        refresh: sub_enabled && (version_stale || stale_by_age),
+        cache_version,
+        updated_at,
+    }
+}
+
+/// 拉取全部 ED2K `server.met` 订阅源、去重后写回 `ed2k_server_sub_cache` /
+/// `ed2k_server_sub_updated_at` / `ed2k_server_sub_cache_version` 配置。
+/// 返回抓取结果供 HTTP 层回执。
+///
+/// 与 BT Tracker 不同：ED2K 服务器列表在每次下载的 find-sources 步骤现读，
+/// 没有需要失效的共享会话，因此不经 actor（不发 `ApplyConfig`）。
+/// 全部源失败时不改动缓存，保留上次成功的列表。
+pub async fn refresh_ed2k_server_sub(
+    db: &Db,
+) -> fluxdown_engine::ed2k::server_subscription::ServerFetchOutcome {
+    let cfg = db.get_all_config().await.unwrap_or_default();
+    let urls = cfg
+        .get("ed2k_server_sub_urls")
+        .cloned()
+        .unwrap_or_else(fluxdown_engine::ed2k::server_subscription::default_server_met_urls);
+    let outcome =
+        fluxdown_engine::ed2k::server_subscription::fetch_server_subscriptions(&urls).await;
+    if outcome.is_success() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        if let Err(e) = db
+            .set_config("ed2k_server_sub_cache", &outcome.servers.join(","))
+            .await
+        {
+            log_info!("[server-actor] failed to save ed2k server sub cache: {}", e);
+        }
+        if let Err(e) = db
+            .set_config("ed2k_server_sub_updated_at", &now.to_string())
+            .await
+        {
+            log_info!(
+                "[server-actor] failed to save ed2k server sub timestamp: {}",
+                e
+            );
+        }
+        if let Err(e) = db
+            .set_config(
+                "ed2k_server_sub_cache_version",
+                &fluxdown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION.to_string(),
+            )
+            .await
+        {
+            log_info!(
+                "[server-actor] failed to save ed2k server sub cache version: {}",
+                e
+            );
+        }
+    }
+    outcome
+}
+
+/// 后台下载配置的 `nodes.dat` 并 base64 缓存进 config 表供 Kad 引导。
+///
+/// 纯二进制块、无前端可见状态，故无回执通道：失败只记日志并容忍
+/// （Kad 保持不活跃直到下一次刷新）。URL 为空直接返回。
+pub fn spawn_ed2k_nodes_dat_refresh(db: Db) {
+    tokio::spawn(async move {
+        let cfg = db.get_all_config().await.unwrap_or_default();
+        let url = cfg.get("ed2k_nodes_dat_url").cloned().unwrap_or_default();
+        if url.is_empty() {
+            return;
+        }
+        match fluxdown_engine::ed2k::kad::fetch_nodes_dat(&url).await {
+            Ok(bytes) => {
+                let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0);
+                if let Err(e) = db.set_config("ed2k_nodes_dat_cache", &encoded).await {
+                    log_info!("[server-actor] failed to save ed2k nodes.dat cache: {}", e);
+                }
+                if let Err(e) = db
+                    .set_config("ed2k_nodes_dat_updated_at", &now.to_string())
+                    .await
+                {
+                    log_info!(
+                        "[server-actor] failed to save ed2k nodes.dat timestamp: {}",
+                        e
+                    );
+                }
+                log_info!(
+                    "[server-actor] ed2k nodes.dat refreshed ({} bytes)",
+                    bytes.len()
+                );
+            }
+            Err(e) => log_info!("[server-actor] ed2k nodes.dat refresh failed: {}", e),
+        }
+    });
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod tests {
+    use super::*;
+
+    fn cfg_map(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn bt_config_from_map_routes_each_key_to_its_own_field() {
+        let cfg = cfg_map(&[
+            ("bt_enable_dht", "false"),
+            ("bt_enable_upnp", "false"),
+            ("bt_port_start", "6900"),
+            ("bt_port_end", "6950"),
+            ("bt_custom_trackers", "udp://tracker.example:80/announce"),
+            ("bt_tracker_sub_enabled", "true"),
+            ("bt_tracker_sub_cache", "udp://sub.example:80/announce"),
+            ("bt_mse_mode", "forced"),
+        ]);
+
+        let bt = bt_config_from_map(&cfg);
+
+        assert!(!bt.enable_dht, "bt_enable_dht=false must disable DHT");
+        assert!(!bt.enable_upnp, "bt_enable_upnp=false must disable UPnP");
+        assert_eq!(bt.port_start, 6900);
+        assert_eq!(bt.port_end, 6950);
+        assert_eq!(bt.custom_trackers, "udp://tracker.example:80/announce");
+        assert_eq!(bt.subscription_trackers, "udp://sub.example:80/announce");
+        assert_eq!(bt.mse_mode, BtMseMode::Forced);
+    }
+
+    #[test]
+    fn bt_config_from_map_clears_subscription_trackers_when_subscription_disabled() {
+        // The cached subscription tracker list must never leak through once
+        // the subscription feature itself is turned off, even though the
+        // cache key is still present in the config map (e.g. the user
+        // disabled the feature but the last-fetched list was never purged).
+        let cfg = cfg_map(&[
+            ("bt_tracker_sub_enabled", "false"),
+            (
+                "bt_tracker_sub_cache",
+                "udp://stale-tracker.example:80/announce",
+            ),
+        ]);
+
+        let bt = bt_config_from_map(&cfg);
+
+        assert!(
+            bt.subscription_trackers.is_empty(),
+            "disabled subscription must yield empty subscription_trackers regardless of cache contents"
+        );
+    }
+
+    #[test]
+    fn bt_config_from_map_treats_non_true_strings_as_false() {
+        // The boolean keys are parsed via an exact `v == "true"` match, not
+        // a general truthy parse -- values like "1" or "True" must NOT be
+        // treated as enabled.
+        let cfg = cfg_map(&[("bt_enable_dht", "1"), ("bt_enable_upnp", "True")]);
+
+        let bt = bt_config_from_map(&cfg);
+
+        assert!(!bt.enable_dht);
+        assert!(!bt.enable_upnp);
+    }
+
+    #[test]
+    fn bt_config_from_map_defaults_all_seeding_limits_to_disabled() {
+        // 缺省（键不存在）时所有做种限制均为“不限制”：0 值在求值端表示
+        // 该维度不参与判定，任务完成后无限做种。
+        let bt = bt_config_from_map(&HashMap::new());
+
+        assert_eq!(bt.seed_ratio_limit, 0.0);
+        assert_eq!(bt.seed_post_ratio_limit, 0.0);
+        assert_eq!(bt.seed_time_limit_minutes, 0);
+        assert_eq!(bt.seed_inactive_time_limit_minutes, 0);
+        assert_eq!(bt.seed_max_active, 0);
+    }
+
+    #[test]
+    fn bt_config_from_map_parses_seed_max_active_and_falls_back_to_zero_on_garbage() {
+        let bt = bt_config_from_map(&cfg_map(&[("bt_seed_max_active", "3")]));
+        assert_eq!(bt.seed_max_active, 3);
+
+        // 非法值等同缺省：0 = 不限制同时做种数。
+        let bt = bt_config_from_map(&cfg_map(&[("bt_seed_max_active", "-1")]));
+        assert_eq!(bt.seed_max_active, 0);
+    }
+
+    #[test]
+    fn decode_torrent_b64_returns_empty_vec_for_none_or_empty_string() {
+        assert_eq!(decode_torrent_b64(None), Ok(Vec::new()));
+        assert_eq!(decode_torrent_b64(Some("")), Ok(Vec::new()));
+    }
+
+    #[test]
+    fn decode_torrent_b64_decodes_valid_standard_base64() {
+        let b64 = base64::engine::general_purpose::STANDARD.encode(b"torrent-bytes");
+        assert_eq!(
+            decode_torrent_b64(Some(&b64)),
+            Ok(b"torrent-bytes".to_vec())
+        );
+    }
+
+    #[test]
+    fn decode_torrent_b64_rejects_invalid_base64_with_readable_message() {
+        let err = decode_torrent_b64(Some("not valid base64!!!"))
+            .expect_err("garbage input must fail to decode");
+        assert!(
+            err.contains("invalid torrent_b64"),
+            "error message should explain the cause: {err}"
+        );
+    }
+
+    #[test]
+    fn ed2k_server_sub_startup_plan_covers_version_staleness_freshness_and_opt_out() {
+        const CUR: i64 = fluxdown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION;
+        const INTERVAL: i64 = fluxdown_engine::ed2k::server_subscription::REFRESH_INTERVAL_SECS;
+        let now = 1_800_000_000_i64;
+
+        // 缓存格式版本落后：即使时间戳刚刚更新过，也必须清空缓存并重取
+        // （旧格式解析器写入的 ip:port 字节序被反转，全为死主机）。
+        let plan = ed2k_server_sub_startup_plan(
+            &cfg_map(&[
+                ("ed2k_server_sub_enabled", "true"),
+                ("ed2k_server_sub_updated_at", &now.to_string()),
+                ("ed2k_server_sub_cache_version", &(CUR - 1).to_string()),
+            ]),
+            now,
+        );
+        assert!(plan.invalidate_cache, "落后版本的缓存必须清空");
+        assert!(plan.refresh, "落后版本必须无视时间戳强制重取");
+
+        // 版本一致且缓存新鲜：不刷新、不清缓存。
+        let plan = ed2k_server_sub_startup_plan(
+            &cfg_map(&[
+                ("ed2k_server_sub_enabled", "true"),
+                (
+                    "ed2k_server_sub_updated_at",
+                    &(now - INTERVAL / 2).to_string(),
+                ),
+                ("ed2k_server_sub_cache_version", &CUR.to_string()),
+            ]),
+            now,
+        );
+        assert!(!plan.invalidate_cache);
+        assert!(!plan.refresh, "未超过刷新周期不应发起网络请求");
+
+        // 订阅关闭：即使缓存早已过期也不刷新（用户显式关掉了订阅）。
+        let plan = ed2k_server_sub_startup_plan(
+            &cfg_map(&[
+                ("ed2k_server_sub_enabled", "false"),
+                ("ed2k_server_sub_updated_at", "0"),
+                ("ed2k_server_sub_cache_version", &CUR.to_string()),
+            ]),
+            now,
+        );
+        assert!(!plan.refresh, "订阅关闭时不得发起启动刷新");
+    }
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FileProvider 暴露根：
+     - cache-path：应用内更新，Rust updater 将 APK 下载到 /data/data/<pkg>/cache，
+       经 content:// 交给系统安装器。
+     - external-files-path：默认下载目录 getExternalFilesDir("Download")，
+       "打开文件" 经 content:// 交给系统关联应用。
+     - external-path：SAF 选择的主外部存储目录（/storage/emulated/0/...）。
+     - files-path：应用内部 files 目录（兜底）。 -->
+<paths>
+    <cache-path name="update" path="." />
+    <external-files-path name="app_external" path="." />
+    <external-path name="external" path="." />
+    <files-path name="app_files" path="." />
+</paths>

@@ -1,0 +1,37 @@
+[package]
+name = "fluxdown_daemon"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "fluxdownd"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait = "0.1.89"
+axum = { version = "0.8.9", features = ["ws"] }
+base64 = "0.22"
+fluxdown_engine = { version = "0.1.0", path = "../engine", default-features = false }
+fluxdown_engine_protocol = { version = "0.1.0", path = "../engine-protocol", default-features = false }
+fluxdown_protocol = { path = "../protocol" }
+fs2 = "0.4.3"
+futures-util = "0.3.32"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "sync", "signal", "net", "io-util", "fs", "time"] }
+tokio-util = { version = "0.7.18", features = ["io"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
+uuid = { version = "1.23.4", features = ["v4"] }
+
+[features]
+# fluxdownd 只作为桌面/headless 下载核心分发：插件与受管组件默认开启；
+# 移动端不打包 daemon，需要裁剪时用 --no-default-features。
+default = ["plugins", "components"]
+plugins = ["fluxdown_engine/plugins", "fluxdown_engine_protocol/plugins"]
+components = ["fluxdown_engine/components", "fluxdown_engine_protocol/components"]

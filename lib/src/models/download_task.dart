@@ -1,0 +1,1103 @@
+import 'dart:io';
+import 'dart:math';
+
+import '../bindings/bindings.dart';
+import '../i18n/locale_provider.dart';
+
+/// 任务状态 — 与 Rust 端状态码对应
+/// 0=pending, 1=downloading, 2=paused, 3=completed, 4=error, 5=preparing
+/// resuming 为纯 Dart 端状态，点击继续后立即切换，Rust 返回 status=1 后自动过渡到 downloading
+/// canceled 同样是纯 Dart 端状态——只由云端远程任务镜像（RemoteTaskStatus.
+/// canceled）产生，本地下载引擎不会、也不应该产生它，故不出现在上面的状态码表里。
+enum TaskStatus {
+  pending,
+  downloading,
+  paused,
+  completed,
+  error,
+  resuming,
+  preparing,
+  // 加在末尾：避免影响任何隐含依赖枚举 index 的对应关系。
+  canceled,
+}
+
+/// BT 做种状态 — 与 Rust 端 `SeedingStopReason::as_i32` 对应
+/// 0=none, 1=active seeding, 2=ratio reached,
+/// 3=time reached, 4=user stopped, 5=task deleted, 6=session released,
+/// 7=inactive time reached, 8=queued (等待做种槽位)
+enum SeedingStatus {
+  none,
+  seeding,
+  ratioReached,
+  timeReached,
+  userStopped,
+  deleted,
+  sessionReleased,
+  inactiveReached,
+  // 加在末尾：避免影响任何隐含依赖枚举 index 的对应关系。
+  queued,
+}
+
+/// 文件名未确认时的展示占位：用任务 URL 顶替「未知文件」，让用户在
+/// probe / BT 元数据取回前也能分辨任务（Web SPA 早已是 fileName || url，
+/// 此处对齐）。超长 URL（尤其 magnet 带一串 tracker）截断加省略号——
+/// 该值还会流入重命名预填与删除确认文案，不能无限长。
+/// URL 为空时（理论不可达）回退 i18n 占位符。
+String placeholderTaskName(String url) {
+  if (url.isEmpty) return currentS.unknownFile;
+  const max = 64;
+  if (url.length <= max) return url;
+  return '${url.substring(0, max)}…';
+}
+
+/// Convert a Rust seeding status code to the Dart enum.
+///
+/// Mirrors [taskStatusFromInt] and must stay in sync with
+/// `SeedingStopReason::as_i32` in `native/engine/src/bt_seeding.rs`.
+SeedingStatus seedingStatusFromInt(int value) {
+  return switch (value) {
+    0 => SeedingStatus.none,
+    1 => SeedingStatus.seeding,
+    2 => SeedingStatus.ratioReached,
+    3 => SeedingStatus.timeReached,
+    4 => SeedingStatus.userStopped,
+    5 => SeedingStatus.deleted,
+    6 => SeedingStatus.sessionReleased,
+    7 => SeedingStatus.inactiveReached,
+    8 => SeedingStatus.queued,
+    _ => SeedingStatus.none,
+  };
+}
+
+/// 文件类型分类 — 由扩展名推断
+enum FileCategory {
+  all,
+  video,
+  audio,
+  document,
+  image,
+  program,
+  archive,
+  other;
+
+  String get label {
+    final s = currentS;
+    return switch (this) {
+      FileCategory.all => s.categoryAll,
+      FileCategory.video => s.categoryVideo,
+      FileCategory.audio => s.categoryAudio,
+      FileCategory.document => s.categoryDocument,
+      FileCategory.image => s.categoryImage,
+      FileCategory.program => s.categoryProgram,
+      FileCategory.archive => s.categoryArchive,
+      FileCategory.other => s.categoryOther,
+    };
+  }
+
+  static const _videoExts = {
+    'mp4',
+    'mkv',
+    'avi',
+    'mov',
+    'wmv',
+    'flv',
+    'webm',
+    'ts',
+    'm4v',
+    'rmvb',
+    'rm',
+    '3gp',
+    'vob',
+    'mpg',
+    'mpeg',
+  };
+  static const _audioExts = {
+    'mp3',
+    'flac',
+    'wav',
+    'aac',
+    'ogg',
+    'wma',
+    'm4a',
+    'opus',
+    'ape',
+    'aiff',
+  };
+  static const _docExts = {
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'txt',
+    'csv',
+    'rtf',
+    'epub',
+    'mobi',
+    'md',
+    'odt',
+    'ods',
+    'odp',
+  };
+  static const _imageExts = {
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'bmp',
+    'webp',
+    'svg',
+    'ico',
+    'tiff',
+    'tif',
+    'psd',
+    'raw',
+    'heic',
+    'avif',
+  };
+  static const _programExts = {
+    'exe',
+    'msi',
+    'msix',
+    'appx',
+    'apk',
+    'dmg',
+    'pkg',
+    'deb',
+    'rpm',
+    'appimage',
+    'snap',
+    'flatpak',
+  };
+  static const _archiveExts = {
+    'zip',
+    'rar',
+    '7z',
+    'tar',
+    'gz',
+    'bz2',
+    'xz',
+    'zst',
+    'iso',
+    'cab',
+    'lz',
+    'lzma',
+  };
+
+  /// 根据文件扩展名推断分类
+  static FileCategory fromExtension(String ext) {
+    final e = ext.toLowerCase();
+    if (_videoExts.contains(e)) return FileCategory.video;
+    if (_audioExts.contains(e)) return FileCategory.audio;
+    if (_docExts.contains(e)) return FileCategory.document;
+    if (_imageExts.contains(e)) return FileCategory.image;
+    if (_programExts.contains(e)) return FileCategory.program;
+    if (_archiveExts.contains(e)) return FileCategory.archive;
+    return FileCategory.other;
+  }
+}
+
+// 无 canceled 分支：Rust 侧没有对应状态码，canceled 只由
+// RemoteTaskService._mapStatus 从远程任务镜像直接构造，不经过本函数。
+TaskStatus taskStatusFromInt(int value) {
+  return switch (value) {
+    0 => TaskStatus.pending,
+    1 => TaskStatus.downloading,
+    2 => TaskStatus.paused,
+    3 => TaskStatus.completed,
+    4 => TaskStatus.error,
+    5 => TaskStatus.preparing,
+    _ => TaskStatus.error,
+  };
+}
+
+/// Per-segment progress data for IDM-style visualization
+class SegmentData {
+  final int index;
+  final int startByte;
+  final int endByte;
+  final int downloadedBytes;
+
+  const SegmentData({
+    required this.index,
+    required this.startByte,
+    required this.endByte,
+    required this.downloadedBytes,
+  });
+
+  /// Segment size in bytes
+  int get size => endByte - startByte + 1;
+
+  /// Progress [0.0, 1.0]
+  double get progress =>
+      size > 0 ? (downloadedBytes / size).clamp(0.0, 1.0) : 0;
+}
+
+/// Record of a dynamic segment split event from the coordinator.
+/// Used to trigger split animations in the detail panel.
+class SplitEventData {
+  final int parentIndex;
+  final int parentNewEnd;
+  final int childIndex;
+  final int childStart;
+  final int childEnd;
+  final bool isProactive;
+  final int totalSegments;
+
+  /// 事件接收时刻（本地时间），供详情面板日志 Tab 展示时间戳。
+  /// 未显式传入时默认当前时刻——构造点（controller `_onSplitEvent`）
+  /// 自然带上真实接收时间，无需逐处修改调用点。
+  final DateTime receivedAt;
+
+  SplitEventData({
+    required this.parentIndex,
+    required this.parentNewEnd,
+    required this.childIndex,
+    required this.childStart,
+    required this.childEnd,
+    required this.isProactive,
+    required this.totalSegments,
+    DateTime? receivedAt,
+  }) : receivedAt = receivedAt ?? DateTime.now();
+}
+
+/// 多 CDN 并发下载的节点级活动事件（来自 Rust `TaskCdnEvent` 信号，
+/// 本次会话内存记录，不持久化）。供详情面板日志 Tab 展示。
+class CdnEventData {
+  /// "pool" | "kick" | "breaker" | "fallback" | "leases" | "summary"
+  final String kind;
+
+  /// 钉定目标 host。
+  final String host;
+
+  /// pool/leases/summary 的节点清单（ip/来源/字节数/吞吐/并发段数）；其余事件为空。
+  final List<CdnNodeDetail> nodes;
+
+  /// kick：被踢节点 IP；其余为空串。
+  final String ip;
+
+  /// kick："validator"|"fail"|"build"；fallback："few"|"error"。
+  final String reason;
+
+  /// pool/fallback：去重候选 IP 总数；kick(fail)：连续失败次数。
+  final int candidates;
+
+  /// pool/fallback：connect 预筛存活数。
+  final int alive;
+
+  /// pool：本次生效的钉定节点数上限。
+  final int cap;
+
+  /// pool：上限是否为自动档推导。
+  final bool autoCap;
+
+  /// 事件接收时刻（本地时间），供日志 Tab 展示时间戳。
+  final DateTime receivedAt;
+
+  CdnEventData({
+    required this.kind,
+    required this.host,
+    required this.nodes,
+    required this.ip,
+    required this.reason,
+    required this.candidates,
+    required this.alive,
+    required this.cap,
+    required this.autoCap,
+    DateTime? receivedAt,
+  }) : receivedAt = receivedAt ?? DateTime.now();
+}
+
+/// Auto 代理链路定论事件（来自 Rust `TaskRouteChanged` 信号，本次会话
+/// 内存记录，不持久化）。供详情面板日志 Tab 展示；基线 `direct` 不记录。
+class RouteEventData {
+  /// wire 标签（direct:sampled / direct:pinned / direct:failover /
+  /// proxy:cached / proxy:sampled / proxy:failover），文案经 `S.taskRouteLabel` 本地化。
+  final String route;
+
+  /// 事件接收时刻（本地时间），供日志 Tab 展示时间戳。
+  final DateTime receivedAt;
+
+  RouteEventData({required this.route, DateTime? receivedAt})
+    : receivedAt = receivedAt ?? DateTime.now();
+}
+
+class DownloadTask {
+  final String id;
+  final String url;
+  final String fileName;
+  final String saveDir;
+  final TaskStatus status;
+  final int downloadedBytes;
+  final int totalBytes;
+  final int speed; // bytes per second
+  final String errorMessage;
+  final bool isSelected;
+  final DateTime createdAt;
+
+  /// 任务结束时间（下载真正完成的时刻，不含插件 hook 后处理耗时）。
+  /// null = 尚未完成；仅在 status 为 completed 时有展示意义。
+  final DateTime? completedAt;
+
+  /// Per-segment progress data (null if no segment info received yet)
+  final List<SegmentData>? segments;
+
+  /// Recent split events (for animation). Kept for a short window then cleared.
+  final List<SplitEventData> recentSplits;
+
+  /// 多 CDN 节点级事件（本次会话记录，任务完成后仍保留供日志查看；
+  /// controller 侧封顶条数防无界增长）。
+  final List<CdnEventData> cdnEvents;
+
+  /// Auto 代理链路定论事件（本次会话记录，任务完成后仍保留供日志查看）。
+  final List<RouteEventData> routeEvents;
+
+  /// 在 pending_queue 中的排队位置（1-based）。-1 = 不在队列中。
+  final int queuePosition;
+
+  /// 所属命名队列 ID（空字符串 = 默认队列）。
+  final String queueId;
+
+  /// 队列内启动顺序（越小越先启动）。0 = 未显式排序（按创建时间先来先启动）。
+  final int queueOrder;
+
+  /// 文件名是否已由 Rust 引擎或 DB 确认（非占位符）。
+  ///
+  /// 设为 true 的时机：
+  ///   - [fromTaskInfo]：DB 中有非空文件名
+  ///   - [applyProgress]：收到 Rust 下载引擎发来的非空 file_name
+  ///
+  /// 用途：阻止后台 meta_prober 的 [TaskMetaProbed] 信号覆盖用户已设置的
+  /// 自定义文件名。只要此字段为 true，probe 结果中的文件名将被忽略。
+  final bool fileNameConfirmed;
+
+  /// 文件跟踪：completed 任务的目标文件在磁盘上是否已丢失（被删除/移动）。
+  /// 由引擎扫描后经 FileMissingChanged / AllTasks 下发，仅对 completed 有意义。
+  final bool fileMissing;
+
+  /// 配置的分段（线程）数。0 = 自动（引擎动态计算）。
+  /// 来自 DB 的 tasks.segments 列（经 AllTasks 快照下发），供详情面板
+  /// 展示与「创建后改线程数」编辑。与运行时实际分片数 [segments] 不同。
+  final int configuredSegments;
+
+  /// 当前任务是否显式接受无效 HTTPS 证书。
+  final bool ignoreTlsErrors;
+
+  /// 任务哈希校验值（用户创建时可选填写，供高级 Tab 展示；空 = 未设置）。
+  final String checksum;
+
+  /// 任务独立代理（空 = 跟随全局代理设置）。
+  final String proxyUrl;
+
+  /// Source page URL captured by the browser extension (empty = none).
+  final String referrer;
+
+  /// 已上传字节数（BT 做种）。仅对 BT 任务有意义，默认 0。
+  final int uploadedBytes;
+
+  /// 下载完成时已上传字节数（BT 做种后分享率基准）。仅对 BT 任务有意义，默认 0。
+  final int uploadedAtCompletion;
+
+  /// BT 做种状态。
+  final SeedingStatus seedingStatus;
+
+  /// 做种状态/停止原因的辅助说明。
+  final String seedingMessage;
+
+  /// 累计做种秒数（引擎权威值，来自 DB tasks.seeding_time_secs；排队/暂停
+  /// 不计入）。下载期 ProgressUpdate 帧恒为 0，仅在做种/排队帧上被采纳。
+  final int seedingTimeSecs;
+
+  /// [seedingTimeSecs] 的采样时刻。活跃做种时 [liveSeedingTime] 以此为锚点
+  /// 叠加本地流逝时间做秒级插值；null = 尚未从引擎取得过做种时长。
+  final DateTime? seedingTimeAnchor;
+
+  /// 实时上传速率（字节/秒）。仅 BT 做种时非零。
+  final int uploadSpeedBps;
+
+  /// 所属任务组 ID（空字符串 = 不属于任何组）。TaskProgress 信号不携带
+  /// group_id（先到时暂空——组归属不像队列存在「归属未知」占位哨兵需求，
+  /// 组建/裂变操作后引擎必发 AllTasks 全量快照，随即被真实值覆盖，见
+  /// `applyProgress`/`_onProgress` 「new task from progress」分支）。
+  final String groupId;
+
+  /// 由哪条 RSS 订阅自动创建（'' = 非 RSS 来源）。任务详情「来源」行据此显示
+  /// 订阅 chip 并支持点回条目流（设计文档 P5 / qB#19276）。
+  final String rssSourceId;
+
+  /// 展示用原始来源链接（'' = 用 [url]）。`.torrent` 文件任务的 [url] 是
+  /// `torrent-file://local` 哨兵，复制出去毫无意义；RSS 自动建的任务在这里
+  /// 存 enclosure 直链。读取一律走 [shareUrl]，不要直接用本字段。
+  final String originUrl;
+
+  /// 「复制链接 / 分享」应当使用的地址：有真实来源就用它，否则回退 [url]。
+  String get shareUrl => originUrl.isNotEmpty ? originUrl : url;
+
+  /// 归属设备标识（'' = 本机；非空 = 远程设备 deviceId）。跨设备任务混排 + 设备筛选用。
+  final String deviceId;
+
+  /// 是否为远程设备上执行的任务（经 FluxCloud 回流的只读视图，非本地引擎任务）。
+  final bool isRemote;
+
+  /// Auto 代理模式下引擎选择的链路标签（wire 值如 `direct` /
+  /// `direct:failover` / `proxy:failover`；空 = 非 Auto 模式）。
+  final String autoRoute;
+
+  /// 任务级做种限制覆盖（三态哨兵：-2=跟随全局设置、-1=不限制、>=0=自定义，
+  /// 其中 0 等效不限制）。分享率为千分比（1500 = 1.5）。
+  final int seedRatioLimitMilli;
+
+  /// 做种后分享率限制覆盖（千分比，哨兵语义同 [seedRatioLimitMilli]）。
+  final int seedPostRatioLimitMilli;
+
+  /// 做种时长限制覆盖（分钟，哨兵语义同 [seedRatioLimitMilli]）。
+  final int seedTimeLimitMinutes;
+
+  /// 无活动做种时长限制覆盖（分钟，哨兵语义同 [seedRatioLimitMilli]）。
+  final int seedInactiveTimeLimitMinutes;
+
+  /// 任务级做种上传限速（B/s；0 = 无单任务限制）。add/重新挂载时烘焙进
+  /// 引擎，live 句柄不可热改。
+  final int seedUploadLimitBps;
+
+  // ── 站点分桶键（惰性缓存；见 view_prefs/list_entity 站点分组维度）──
+  String? _siteKeyCache;
+  String? _siteLabelCache;
+
+  DownloadTask({
+    required this.id,
+    required this.url,
+    required this.fileName,
+    required this.saveDir,
+    required this.status,
+    required this.downloadedBytes,
+    required this.totalBytes,
+    this.speed = 0,
+    this.errorMessage = '',
+    this.isSelected = false,
+    this.segments,
+    this.recentSplits = const [],
+    this.cdnEvents = const [],
+    this.routeEvents = const [],
+    this.queuePosition = -1,
+    this.queueId = '',
+    this.queueOrder = 0,
+    this.fileNameConfirmed = false,
+    this.fileMissing = false,
+    this.configuredSegments = 0,
+    this.ignoreTlsErrors = false,
+    this.referrer = '',
+    this.groupId = '',
+    this.rssSourceId = '',
+    this.originUrl = '',
+    this.checksum = '',
+    this.proxyUrl = '',
+    this.deviceId = '',
+    this.isRemote = false,
+    this.autoRoute = '',
+    this.completedAt,
+    this.uploadedBytes = 0,
+    this.uploadedAtCompletion = 0,
+    this.seedingStatus = SeedingStatus.none,
+    this.seedingMessage = '',
+    this.seedingTimeSecs = 0,
+    this.seedingTimeAnchor,
+    this.uploadSpeedBps = 0,
+    this.seedRatioLimitMilli = -2,
+    this.seedPostRatioLimitMilli = -2,
+    this.seedTimeLimitMinutes = -2,
+    this.seedInactiveTimeLimitMinutes = -2,
+    this.seedUploadLimitBps = 0,
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
+
+  /// 从 AllTasks 信号中的 TaskInfo 构建
+  factory DownloadTask.fromTaskInfo(TaskInfo info) {
+    final seconds = int.tryParse(info.createdAt) ?? 0;
+    final completedSeconds = int.tryParse(info.completedAt) ?? 0;
+    // DB 中有非空文件名，说明 Rust 已确认过（create_task 写入的用户名或
+    // 下载引擎 update_task_file_info 写入的实际名），标记为已确认。
+    final hasName = info.fileName.isNotEmpty;
+    return DownloadTask(
+      id: info.taskId,
+      url: info.url,
+      fileName: hasName ? info.fileName : placeholderTaskName(info.url),
+      saveDir: info.saveDir,
+      status: taskStatusFromInt(info.status),
+      downloadedBytes: info.downloadedBytes,
+      totalBytes: info.totalBytes,
+      errorMessage: info.errorMessage,
+      queueId: info.queueId,
+      queueOrder: info.queueOrder,
+      fileNameConfirmed: hasName,
+      fileMissing: info.fileMissing,
+      configuredSegments: info.segments,
+      ignoreTlsErrors: info.ignoreTlsErrors,
+      referrer: info.referrer,
+      uploadedBytes: info.uploadedBytes,
+      uploadedAtCompletion: info.uploadedAtCompletion,
+      seedingStatus: seedingStatusFromInt(info.seedingStatus),
+      seedingMessage: info.seedingMessage,
+      seedingTimeSecs: info.seedingTimeSecs,
+      seedingTimeAnchor: DateTime.now(),
+      groupId: info.groupId,
+      rssSourceId: info.rssSourceId,
+      originUrl: info.originUrl,
+      checksum: info.checksum,
+      proxyUrl: info.proxyUrl,
+      autoRoute: info.autoRoute,
+      seedRatioLimitMilli: info.seedRatioLimitMilli,
+      seedPostRatioLimitMilli: info.seedPostRatioLimitMilli,
+      seedTimeLimitMinutes: info.seedTimeLimitMinutes,
+      seedInactiveTimeLimitMinutes: info.seedInactiveTimeLimitMinutes,
+      seedUploadLimitBps: info.seedUploadLimitBps,
+      createdAt: seconds > 0
+          ? DateTime.fromMillisecondsSinceEpoch(seconds * 1000)
+          : DateTime.now(),
+      completedAt: completedSeconds > 0
+          ? DateTime.fromMillisecondsSinceEpoch(completedSeconds * 1000)
+          : null,
+    );
+  }
+
+  DownloadTask copyWith({
+    bool clearCompletedAt = false,
+    String? id,
+    String? url,
+    String? fileName,
+    String? saveDir,
+    TaskStatus? status,
+    int? downloadedBytes,
+    int? totalBytes,
+    int? speed,
+    String? errorMessage,
+    bool? isSelected,
+    List<SegmentData>? segments,
+    List<SplitEventData>? recentSplits,
+    List<CdnEventData>? cdnEvents,
+    List<RouteEventData>? routeEvents,
+    int? queuePosition,
+    String? queueId,
+    int? queueOrder,
+    bool? fileNameConfirmed,
+    bool? fileMissing,
+    int? configuredSegments,
+    bool? ignoreTlsErrors,
+    String? referrer,
+    int? uploadedBytes,
+    int? uploadedAtCompletion,
+    SeedingStatus? seedingStatus,
+    String? seedingMessage,
+    int? seedingTimeSecs,
+    DateTime? seedingTimeAnchor,
+    int? uploadSpeedBps,
+    String? groupId,
+    String? rssSourceId,
+    String? originUrl,
+    String? checksum,
+    String? proxyUrl,
+    String? autoRoute,
+    int? seedRatioLimitMilli,
+    int? seedPostRatioLimitMilli,
+    int? seedTimeLimitMinutes,
+    int? seedInactiveTimeLimitMinutes,
+    int? seedUploadLimitBps,
+    DateTime? createdAt,
+    DateTime? completedAt,
+  }) {
+    return DownloadTask(
+      id: id ?? this.id,
+      url: url ?? this.url,
+      fileName: fileName ?? this.fileName,
+      saveDir: saveDir ?? this.saveDir,
+      status: status ?? this.status,
+      downloadedBytes: downloadedBytes ?? this.downloadedBytes,
+      totalBytes: totalBytes ?? this.totalBytes,
+      speed: speed ?? this.speed,
+      errorMessage: errorMessage ?? this.errorMessage,
+      isSelected: isSelected ?? this.isSelected,
+      segments: segments ?? this.segments,
+      recentSplits: recentSplits ?? this.recentSplits,
+      cdnEvents: cdnEvents ?? this.cdnEvents,
+      routeEvents: routeEvents ?? this.routeEvents,
+      queuePosition: queuePosition ?? this.queuePosition,
+      queueId: queueId ?? this.queueId,
+      queueOrder: queueOrder ?? this.queueOrder,
+      fileNameConfirmed: fileNameConfirmed ?? this.fileNameConfirmed,
+      fileMissing: fileMissing ?? this.fileMissing,
+      configuredSegments: configuredSegments ?? this.configuredSegments,
+      ignoreTlsErrors: ignoreTlsErrors ?? this.ignoreTlsErrors,
+      referrer: referrer ?? this.referrer,
+      uploadedBytes: uploadedBytes ?? this.uploadedBytes,
+      uploadedAtCompletion: uploadedAtCompletion ?? this.uploadedAtCompletion,
+      seedingStatus: seedingStatus ?? this.seedingStatus,
+      seedingMessage: seedingMessage ?? this.seedingMessage,
+      seedingTimeSecs: seedingTimeSecs ?? this.seedingTimeSecs,
+      seedingTimeAnchor: seedingTimeAnchor ?? this.seedingTimeAnchor,
+      uploadSpeedBps: uploadSpeedBps ?? this.uploadSpeedBps,
+      groupId: groupId ?? this.groupId,
+      rssSourceId: rssSourceId ?? this.rssSourceId,
+      originUrl: originUrl ?? this.originUrl,
+      checksum: checksum ?? this.checksum,
+      proxyUrl: proxyUrl ?? this.proxyUrl,
+      autoRoute: autoRoute ?? this.autoRoute,
+      seedRatioLimitMilli: seedRatioLimitMilli ?? this.seedRatioLimitMilli,
+      seedPostRatioLimitMilli:
+          seedPostRatioLimitMilli ?? this.seedPostRatioLimitMilli,
+      seedTimeLimitMinutes: seedTimeLimitMinutes ?? this.seedTimeLimitMinutes,
+      seedInactiveTimeLimitMinutes:
+          seedInactiveTimeLimitMinutes ?? this.seedInactiveTimeLimitMinutes,
+      seedUploadLimitBps: seedUploadLimitBps ?? this.seedUploadLimitBps,
+      createdAt: createdAt ?? this.createdAt,
+      completedAt: clearCompletedAt ? null : (completedAt ?? this.completedAt),
+    );
+  }
+
+  /// 根据 TaskProgress 信号增量更新
+  DownloadTask applyProgress(TaskProgress p) {
+    final newStatus = taskStatusFromInt(p.status);
+    // Rust 端已通过固定窗口采样 + 单层 EMA 充分平滑，Dart 直接使用。
+    // 非下载状态强制归零，防止残留值；BT 任务的上传速度始终透传，供列表同时展示。
+    final int displaySpeed = newStatus == TaskStatus.downloading ? p.speed : 0;
+    final int displayUploadSpeed = isBt ? p.uploadSpeedBps : 0;
+
+    // 收到 Rust 下载引擎发来的非空文件名，视为已确认（用户输入或引擎解析）。
+    // 一旦确认，后续 TaskMetaProbed 不再覆盖此名字。
+    final nameFromProgress = p.fileName.isNotEmpty ? p.fileName : null;
+    final nowConfirmed = fileNameConfirmed || nameFromProgress != null;
+
+    // 结束时间：进入 completed 时若尚无记录则以当前时刻兜底（权威值来自
+    // DB 的 AllTasks 快照，此处保证会话内实时显示）；重新开始下载时清空。
+    final DateTime? nextCompletedAt = newStatus == TaskStatus.completed
+        ? (completedAt ?? DateTime.now())
+        : completedAt;
+    final bool clearCompleted =
+        newStatus == TaskStatus.pending ||
+        newStatus == TaskStatus.downloading ||
+        newStatus == TaskStatus.preparing ||
+        newStatus == TaskStatus.resuming;
+    final newSeedingStatus = seedingStatusFromInt(p.seedingStatus);
+    // 帧携带的累计做种秒数：仅在做种/排队帧上采纳（下载期帧恒为 0，
+    // 直接采纳会把已累计值清零），采纳时刷新采样锚点供实时插值。
+    final adoptSeedingTime =
+        newSeedingStatus == SeedingStatus.seeding ||
+        newSeedingStatus == SeedingStatus.queued;
+
+    return copyWith(
+      status: newStatus,
+      downloadedBytes: p.downloadedBytes,
+      totalBytes: p.totalBytes > 0 ? p.totalBytes : null,
+      speed: displaySpeed,
+      uploadSpeedBps: displayUploadSpeed,
+      uploadedBytes: p.uploadedBytes,
+      seedingStatus: newSeedingStatus,
+      seedingMessage: p.seedingMessage,
+      seedingTimeSecs: adoptSeedingTime ? p.seedingTimeSecs : null,
+      seedingTimeAnchor: adoptSeedingTime ? DateTime.now() : null,
+      fileName: nameFromProgress,
+      saveDir: p.saveDir.isNotEmpty ? p.saveDir : null,
+      errorMessage: p.errorMessage,
+      fileNameConfirmed: nowConfirmed,
+      completedAt: nextCompletedAt,
+      clearCompletedAt: clearCompleted,
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Computed properties
+  // ---------------------------------------------------------------------------
+
+  /// 下载进度 [0.0, 1.0]
+  double get progress {
+    // 已完成的任务强制返回 100%，避免未知大小文件完成后仍显示 0%
+    if (status == TaskStatus.completed) return 1.0;
+    if (totalBytes <= 0) return 0;
+    // 上限 0.999 而非 1.0：Rust 层 BT 下载在 finished=false 时已将 downloaded_bytes
+    // 限制为 total_bytes-1，但 (total_bytes-1)/total_bytes 经浮点运算后对大文件
+    // 仍会被 toStringAsFixed(1) 四舍五入为 "100.0%"，造成进度已到 100% 但状态仍
+    // 显示"下载中"的视觉误导。限制为 0.999 确保未完成任务最多显示 "99.9%"。
+    return (downloadedBytes / totalBytes).clamp(0.0, 0.999);
+  }
+
+  /// 是否为不确定进度（文件大小未知且处于活跃下载阶段）
+  bool get isIndeterminate =>
+      totalBytes <= 0 &&
+      (status == TaskStatus.downloading ||
+          status == TaskStatus.preparing ||
+          status == TaskStatus.resuming);
+
+  /// 文件扩展名（用于图标显示）
+  String get fileExtension {
+    final dot = fileName.lastIndexOf('.');
+    if (dot < 0 || dot == fileName.length - 1) return '?';
+    return fileName.substring(dot + 1).toLowerCase();
+  }
+
+  /// 文件类型分类
+  FileCategory get fileCategory => FileCategory.fromExtension(fileExtension);
+
+  /// 任务目标文件的完整路径（`saveDir` + 分隔符 + `fileName`）。
+  ///
+  /// 拼接时去重 `saveDir` 末尾可能存在的路径分隔符，避免产生重复分隔符；
+  /// `saveDir` 为空时退回裸文件名。作为文件路径拼接的单一事实来源，替代散落
+  /// 各处的手写 `'${saveDir}${sep}${fileName}'`。
+  String get filePath {
+    if (saveDir.isEmpty) return fileName;
+    final separator = Platform.pathSeparator;
+    final dir = saveDir.endsWith(separator)
+        ? saveDir.substring(0, saveDir.length - separator.length)
+        : saveDir;
+    return '$dir$separator$fileName';
+  }
+
+  /// 「打开所在文件夹」应传给原生层的路径。
+  ///
+  /// 已完成且文件存在时返回完整文件路径，便于文件管理器定位并选中文件；下载中、
+  /// 暂停、失败、排队、准备中、文件丢失等状态下最终文件可能尚未落盘，改为返回
+  /// 保存目录 [saveDir]，避免原生层将不存在的文件路径误判后打不开任何位置。
+  /// [saveDir] 为空时退回文件路径。
+  String get revealFolderPath {
+    if (status == TaskStatus.completed && !fileMissing) return filePath;
+    if (saveDir.isNotEmpty) return saveDir;
+    return filePath;
+  }
+
+  /// 格式化文件大小
+  String get sizeText {
+    if (totalBytes <= 0) return currentS.unknownSize;
+    return formatBytes(totalBytes);
+  }
+
+  /// 格式化已下载
+  String get downloadedText => formatBytes(downloadedBytes);
+
+  /// 格式化速度
+  String get speedText {
+    if (speed <= 0) return '—';
+    return '${formatBytes(speed)}/s';
+  }
+
+  /// 格式化上传速度
+  String get uploadSpeedText {
+    if (uploadSpeedBps <= 0) return '—';
+    return '${formatBytes(uploadSpeedBps)}/s';
+  }
+
+  /// 当前是否处于 BT 做种分类（活跃做种或排队等待做种槽位，
+  /// 二者都归入「做种」Tab 并可暂停）
+  bool get isSeeding =>
+      status == TaskStatus.completed &&
+      (seedingStatus == SeedingStatus.seeding ||
+          seedingStatus == SeedingStatus.queued);
+
+  /// 做种已停止（用户暂停或限制达标），可通过恢复重新开始做种。
+  /// deleted(5) 不算——任务行即将消失，无恢复意义。
+  bool get isSeedingStopped =>
+      status == TaskStatus.completed &&
+      const {
+        SeedingStatus.ratioReached,
+        SeedingStatus.timeReached,
+        SeedingStatus.userStopped,
+        SeedingStatus.sessionReleased,
+        SeedingStatus.inactiveReached,
+      }.contains(seedingStatus);
+
+  /// 分享率（uploaded / downloaded）
+  double get seedRatio =>
+      downloadedBytes <= 0 ? 0.0 : uploadedBytes / downloadedBytes;
+
+  /// 做种后分享率（(uploaded - uploadedAtCompletion) / downloaded）
+  double get postSeedRatio => downloadedBytes <= 0
+      ? 0.0
+      : (uploadedBytes - uploadedAtCompletion) / downloadedBytes;
+
+  /// 当前任务是否为 BT 任务
+  bool get isBt => protocolLabel == 'BT';
+
+  /// 实时做种时长：以引擎累计秒数为基底，活跃做种（非排队）时叠加自采样
+  /// 锚点以来的本地流逝时间；排队/停止态只显示累计值。
+  Duration get liveSeedingTime {
+    final base = Duration(seconds: seedingTimeSecs);
+    if (isSeeding &&
+        seedingStatus == SeedingStatus.seeding &&
+        seedingTimeAnchor != null) {
+      return base + DateTime.now().difference(seedingTimeAnchor!);
+    }
+    return base;
+  }
+
+  /// 协议类型标识
+  String get protocolLabel {
+    final lower = url.toLowerCase();
+    if (lower.startsWith('magnet:')) return 'BT';
+    if (lower.startsWith('torrent-file://')) return 'BT';
+    if (lower.startsWith('ftp://')) return 'FTP';
+    if (lower.startsWith('ed2k://')) return 'ED2K';
+    return 'HTTP';
+  }
+
+  /// 做种停止/状态原因的中文/英文文本。
+  String get seedingStatusText {
+    final s = currentS;
+    return switch (seedingStatus) {
+      SeedingStatus.none => s.seedingStatusNone,
+      SeedingStatus.seeding => s.seedingStatusSeeding,
+      SeedingStatus.ratioReached => s.seedingStatusRatioReached,
+      SeedingStatus.timeReached => s.seedingStatusTimeReached,
+      SeedingStatus.userStopped => s.seedingStatusUserStopped,
+      SeedingStatus.deleted => s.seedingStatusDeleted,
+      SeedingStatus.sessionReleased => s.seedingStatusSessionReleased,
+      SeedingStatus.inactiveReached => s.seedingStatusInactiveReached,
+      SeedingStatus.queued => s.seedingStatusQueued,
+    };
+  }
+
+  /// 站点分桶键（注册域聚合，磁力/BT 归一为 `bt`）。首次访问后缓存在本实例上。
+  String get siteKey => _siteKeyCache ??= extractSiteKey(url);
+
+  /// 站点展示 label（保留离用户最近的一级子域）。首次访问后缓存在本实例上。
+  String get siteLabel => _siteLabelCache ??= extractSiteLabel(url);
+
+  /// 副标题信息
+  String get subtitle {
+    final s = currentS;
+    final proto = protocolLabel;
+    if (isSeeding) {
+      return '$proto · $sizeText · ↑ $uploadSpeedText · ${s.seedRatio} ${seedRatio.toStringAsFixed(2)}';
+    }
+    switch (status) {
+      case TaskStatus.downloading:
+        return '$proto · $sizeText · $speedText';
+      case TaskStatus.paused:
+        return '$proto · $sizeText · ${s.subtitlePaused}';
+      case TaskStatus.completed:
+        return '$proto · $sizeText';
+      case TaskStatus.error:
+        return '$proto · $sizeText · ${errorMessage.isEmpty ? s.subtitleError : errorMessage}';
+      case TaskStatus.pending:
+        final queueStr = queuePosition > 0
+            ? ' · ${s.subtitleQueued(queuePosition)}'
+            : '';
+        if (totalBytes > 0) return '$proto · $sizeText$queueStr';
+        return '$proto · ${s.subtitlePending}$queueStr';
+      case TaskStatus.preparing:
+        // BT 初检（librqbit checking）阶段引擎持续上报 downloaded/total，
+        // totalBytes>0 即处于校验文件阶段，展示实际校验百分比；
+        // totalBytes==0（磁力元数据解析等）维持「准备中」。
+        if (totalBytes > 0) {
+          return '$proto · ${s.statusVerifying} · ${(progress * 100).toStringAsFixed(0)}%';
+        }
+        return '$proto · ${s.subtitlePreparing}';
+      case TaskStatus.canceled:
+        return '$proto · $sizeText · ${s.subtitleCanceled}';
+      case TaskStatus.resuming:
+        return '$proto · $sizeText · ${s.subtitleResuming}';
+    }
+  }
+
+  /// 带队列上下文的副标题：[queueStopped] = 所属队列处于停止态时，
+  /// paused 任务显示「等待队列启动」——区分「用户暂停」与「等队列启动」
+  /// 两种停着的原因（启动队列会按序恢复这类任务）。
+  String subtitleWith({bool queueStopped = false}) {
+    if (queueStopped && status == TaskStatus.paused) {
+      return '$protocolLabel · $sizeText · ${currentS.subtitleWaitingQueue}';
+    }
+    return subtitle;
+  }
+
+  /// 状态文本
+  String get statusText {
+    final s = currentS;
+    if (isSeeding) {
+      return seedingStatus == SeedingStatus.queued
+          ? s.seedingStatusQueued
+          : s.statusSeeding;
+    }
+    if (status == TaskStatus.completed && fileMissing) {
+      return s.statusFileMissing;
+    }
+    return switch (status) {
+      TaskStatus.pending => s.statusPending,
+      TaskStatus.downloading => s.statusDownloading,
+      TaskStatus.paused => s.statusPaused,
+      TaskStatus.completed => s.statusCompleted,
+      TaskStatus.error => s.statusError,
+      TaskStatus.preparing =>
+        totalBytes > 0 ? s.statusVerifying : s.statusPreparing,
+      TaskStatus.resuming => s.statusResuming,
+      TaskStatus.canceled => s.statusCanceled,
+    };
+  }
+
+  /// 剩余时间估算
+  String get etaText {
+    if (status != TaskStatus.downloading || speed <= 0 || totalBytes <= 0) {
+      return '—';
+    }
+    final remaining = totalBytes - downloadedBytes;
+    // 已下载超过或等于总大小，即将完成（等待写盘/校验）
+    if (remaining <= 0) return '—';
+    final seconds = remaining / speed;
+    // ETA 超过 24 小时视为不可靠，不显示
+    if (seconds > 86400) return '—';
+    final s = currentS;
+    if (seconds < 60) return s.etaSeconds(seconds.toInt());
+    if (seconds < 3600) return s.etaMinutes((seconds / 60).toInt());
+    return s.etaHours((seconds / 3600).toStringAsFixed(1));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Utility
+  // ---------------------------------------------------------------------------
+
+  static String formatBytes(int bytes) {
+    if (bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    final i = (log(bytes) / log(1024)).floor().clamp(0, units.length - 1);
+    final value = bytes / pow(1024, i);
+    return '${value.toStringAsFixed(value >= 100 ? 0 : 1)} ${units[i]}';
+  }
+}
+
+// =============================================================================
+// 站点分桶键提取（view_prefs 站点分组维度 / list_entity siteKey 聚合键）
+// =============================================================================
+
+/// 二级公共后缀表：域名以此结尾时，注册域取最后 3 段而非 2 段
+/// （如 `foo.com.cn` 是注册域，而非误判为 `com.cn`）。仅收录高频后缀，
+/// 非详尽 Public Suffix List——零外联纪律下的内置精简表。
+const Set<String> kTwoLevelPublicSuffixes = {
+  'com.cn', 'net.cn', 'org.cn', 'gov.cn', 'edu.cn',
+  'co.uk', 'org.uk', 'ac.uk', 'gov.uk',
+  'com.au', 'net.au', 'org.au',
+  'co.jp', 'ne.jp', 'or.jp',
+  'co.kr', 'ne.kr',
+  'com.hk', 'com.tw', 'com.sg', 'com.br',
+};
+
+/// 从 URL 识别的粗粒度协议 token（与 [DownloadTask.protocolLabel] 语义一致，
+/// 但不依赖 DownloadTask 实例，供纯函数式站点提取复用）。
+String _protocolToken(String url) {
+  final lower = url.toLowerCase();
+  if (lower.startsWith('magnet:') || lower.startsWith('torrent-file://')) {
+    return 'BT';
+  }
+  if (lower.startsWith('ftp://')) return 'FTP';
+  if (lower.startsWith('ed2k://')) return 'ED2K';
+  return 'HTTP';
+}
+
+/// 解析并规范化 host：小写化 + 去除 `www.` 前缀；解析失败/无 host 返回空串。
+String _normalizedHost(String url) {
+  final uri = Uri.tryParse(url);
+  var host = (uri?.host ?? '').toLowerCase();
+  if (host.startsWith('www.')) host = host.substring(4);
+  return host;
+}
+
+/// 由规范化 host 推导注册域（去子域聚合，如 `pan.baidu.com`→`baidu.com`；
+/// `foo.bar.com.cn`→`bar.com.cn`）。
+String _registrableDomain(String host) {
+  final labels = host.split('.');
+  if (labels.length <= 2) return host;
+  final lastTwo = '${labels[labels.length - 2]}.${labels[labels.length - 1]}';
+  if (kTwoLevelPublicSuffixes.contains(lastTwo) && labels.length >= 3) {
+    return labels.sublist(labels.length - 3).join('.');
+  }
+  return lastTwo;
+}
+
+/// 从 URL 提取站点分桶键（注册域聚合，去 `www.`；磁力/BT 协议归一为固定
+/// `bt`；host 解析失败的其它协议回退为协议 token 小写形式，保证分桶键
+/// 永不为空）。同一注册域下所有子域聚合进同一桶
+/// （`pan.baidu.com`/`www.baidu.com` 同归 `baidu.com`）。
+String extractSiteKey(String url) {
+  if (_protocolToken(url) == 'BT') return 'bt';
+  final host = _normalizedHost(url);
+  if (host.isEmpty) return _protocolToken(url).toLowerCase();
+  return _registrableDomain(host);
+}
+
+/// 从 URL 提取站点展示 label：与 [extractSiteKey] 共享同一分桶语义，但展示
+/// 更具体——保留离用户最近的一级子域（如 `pan.baidu.com`），更深的子域链
+/// 收敛掉；磁力/BT 显示为「BT · 磁力」（design-proto-spec §2 `siteLabel`
+/// 唯一特例）。
+String extractSiteLabel(String url) {
+  if (_protocolToken(url) == 'BT') return currentS.viewSiteBt;
+  final host = _normalizedHost(url);
+  if (host.isEmpty) return _protocolToken(url);
+  final registrable = _registrableDomain(host);
+  final hostLabels = host.split('.');
+  final registrableLabels = registrable.split('.');
+  if (hostLabels.length <= registrableLabels.length) return registrable;
+  final keepFrom = hostLabels.length - registrableLabels.length - 1;
+  return hostLabels.sublist(keepFrom).join('.');
+}
+
+// =============================================================================
+// 时间分组
+// =============================================================================
+
+/// 时间分组类型 — 按创建时间将任务分入不同组
+enum TimeGroup {
+  today,
+  yesterday,
+  thisWeek,
+  thisMonth,
+  older;
+
+  String get label {
+    final s = currentS;
+    return switch (this) {
+      TimeGroup.today => s.today,
+      TimeGroup.yesterday => s.yesterday,
+      TimeGroup.thisWeek => s.thisWeek,
+      TimeGroup.thisMonth => s.thisMonth,
+      TimeGroup.older => s.older,
+    };
+  }
+
+  /// 根据创建时间判断属于哪个分组
+  static TimeGroup fromDateTime(DateTime createdAt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final weekAgo = today.subtract(const Duration(days: 7));
+    final monthAgo = today.subtract(const Duration(days: 30));
+
+    if (!createdAt.isBefore(today)) return TimeGroup.today;
+    if (!createdAt.isBefore(yesterday)) return TimeGroup.yesterday;
+    if (!createdAt.isBefore(weekAgo)) return TimeGroup.thisWeek;
+    if (!createdAt.isBefore(monthAgo)) return TimeGroup.thisMonth;
+    return TimeGroup.older;
+  }
+}
+
+/// 任务分组数据
+class TaskGroup {
+  /// null 表示「活跃任务组」（正在下载 + 排队），不可折叠
+  final TimeGroup? group;
+  final List<DownloadTask> tasks;
+
+  const TaskGroup({this.group, required this.tasks});
+
+  /// 是否为活跃任务组（不按时间分组，不可折叠）
+  bool get isActiveGroup => group == null;
+}
+
+// =============================================================================
+// TaskStatus 扩展
+// =============================================================================
+
+extension TaskStatusExt on TaskStatus {
+  /// 是否为"活跃"状态（正在下载 / 准备 / 恢复中）
+  bool get isActive =>
+      this == TaskStatus.downloading ||
+      this == TaskStatus.preparing ||
+      this == TaskStatus.resuming;
+
+  /// 是否为"活跃或排队"状态（置顶显示）
+  bool get isActiveOrQueued => isActive || this == TaskStatus.pending;
+}

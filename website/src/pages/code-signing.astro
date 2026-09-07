@@ -1,0 +1,86 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { FloatingNavbar } from "../components/ui/floating-navbar";
+import Footer from "../components/Footer";
+---
+
+<Layout
+  title="Code Signing Policy - FluxDown"
+  description="FluxDown code signing policy. Free code signing provided by SignPath.io, certificate by SignPath Foundation."
+>
+  <FloatingNavbar client:load />
+  <main class="pt-24 relative">
+    <!-- Background ambiance -->
+    <div class="absolute inset-0 -z-10 overflow-hidden pointer-events-none">
+      <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-brand-sky/[0.03] blur-[120px] rounded-full"></div>
+      <div class="absolute bottom-1/4 right-0 w-[400px] h-[400px] bg-brand-cyan/[0.02] blur-[100px] rounded-full"></div>
+    </div>
+
+    <section class="relative py-20 sm:py-28 overflow-hidden bg-dark-bg">
+      <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 relative z-10">
+        <div class="text-center mb-12">
+          <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-dark-text">
+            Code Signing Policy
+          </h1>
+          <p class="mt-3 text-dark-text-muted text-sm">Last updated: July 10, 2026</p>
+        </div>
+
+        <div class="space-y-8 text-[15px] leading-relaxed text-dark-text-secondary">
+          <div>
+            <p>
+              This project signs and distributes release artifacts. Free code signing provided by
+              <a href="https://about.signpath.io" class="text-brand-sky hover:underline" rel="noopener" target="_blank">SignPath.io</a>,
+              certificate by
+              <a href="https://signpath.org" class="text-brand-sky hover:underline" rel="noopener" target="_blank">SignPath Foundation</a>.
+            </p>
+          </div>
+
+          <div>
+            <h2 class="text-xl font-semibold text-dark-text mb-3">What is signed</h2>
+            <ul class="list-disc pl-5 space-y-1.5">
+              <li>Windows installer packages and executables (<code>.exe</code>, <code>.msi</code>) published on <a href="https://github.com/zerx-lab/FluxDown/releases" class="text-brand-sky hover:underline" rel="noopener" target="_blank">GitHub Releases</a>.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h2 class="text-xl font-semibold text-dark-text mb-3">Build and signing process</h2>
+            <ul class="list-disc pl-5 space-y-1.5">
+              <li>All artifacts are built from the public repository <a href="https://github.com/zerx-lab/FluxDown" class="text-brand-sky hover:underline" rel="noopener" target="_blank">zerx-lab/FluxDown</a> using GitHub Actions CI.</li>
+              <li>Only CI-built artifacts are submitted to SignPath for signing.</li>
+              <li>The private key is held by SignPath on HSM. This project does not store or have access to the private key.</li>
+              <li>Every signing request requires explicit manual approval by the maintainer.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h2 class="text-xl font-semibold text-dark-text mb-3">Team roles</h2>
+            <ul class="list-disc pl-5 space-y-1.5">
+              <li><strong class="text-dark-text">Authors</strong> (commit access, can modify the repository without additional reviews): <a href="https://github.com/zerx-lab" class="text-brand-sky hover:underline" rel="noopener" target="_blank">zerx-lab</a></li>
+              <li><strong class="text-dark-text">Reviewers</strong> (all external pull requests are reviewed before merge): <a href="https://github.com/zerx-lab" class="text-brand-sky hover:underline" rel="noopener" target="_blank">zerx-lab</a></li>
+              <li><strong class="text-dark-text">Approvers</strong> (each signing request requires explicit approval): <a href="https://github.com/zerx-lab" class="text-brand-sky hover:underline" rel="noopener" target="_blank">zerx-lab</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h2 class="text-xl font-semibold text-dark-text mb-3">Other platforms</h2>
+            <ul class="list-disc pl-5 space-y-1.5">
+              <li>macOS: artifacts are currently unsigned; users should obtain artifacts only from the official GitHub Releases page. See <a href="/macos-gatekeeper/" class="text-brand-sky hover:underline">macOS Gatekeeper instructions</a>.</li>
+              <li>Linux: artifacts (AppImage / deb / Arch / portable) are currently not cryptographically signed; obtain them only from the official GitHub Releases page.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h2 class="text-xl font-semibold text-dark-text mb-3">Privacy policy</h2>
+            <p>
+              FluxDown does not transfer any information to other networked systems unless
+              specifically requested by the user or the person installing or operating it
+              (e.g. checking for updates on GitHub Releases). See the full
+              <a href="/privacy/" class="text-brand-sky hover:underline">Privacy Policy</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <Footer client:load />
+</Layout>

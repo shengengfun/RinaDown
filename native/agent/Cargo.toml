@@ -1,0 +1,43 @@
+[package]
+name = "fluxdown_agent"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[[bin]]
+name = "fluxdown-agent"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+async-trait = "0.1.89"
+axum = { version = "0.8.9", features = ["ws"] }
+base64 = "0.22"
+chacha20poly1305 = "0.10"
+directories = "6"
+ed25519-dalek = "3.0.0"
+fluxdown_api = { version = "0.1.0", path = "../api" }
+fluxdown_protocol = { path = "../protocol" }
+fs2 = "0.4.3"
+futures-util = "0.3.32"
+hkdf = "0.12"
+keepawake = "0.6"
+mdns-sd = "0.20.2"
+notify-rust = "4.11"
+rand = "0.9"
+reqwest = { version = "0.12", features = ["json", "stream"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "sync", "signal", "net", "io-util", "fs", "time", "process"] }
+tokio-tungstenite = "0.29"
+tokio-util = { version = "0.7.18", features = ["io"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
+uuid = { version = "1.23.4", features = ["v4", "serde"] }
+x25519-dalek = { version = "3", features = ["static_secrets", "zeroize"] }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"

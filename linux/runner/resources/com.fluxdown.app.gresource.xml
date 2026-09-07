@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/com/fluxdown/app">
+    <file alias="icons/hicolor/256x256/apps/com.fluxdown.app.png">assets/logo/fluxdown_logo.png</file>
+    <file alias="icons/hicolor/scalable/apps/com.fluxdown.app.svg">assets/logo/fluxdown_logo.svg</file>
+  </gresource>
+</gresources>

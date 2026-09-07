@@ -1,0 +1,34 @@
+name: fluxdown
+services:
+  website:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fluxdown-website:latest
+    container_name: fluxdown-website
+    restart: unless-stopped
+    ports:
+      - "4321:4321"
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=4321
+      # 从 .env 文件读取敏感配置（不提交到 Git）
+      - GITHUB_REPO=${GITHUB_REPO}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_WEBHOOK_SECRET=${GITHUB_WEBHOOK_SECRET}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT:-465}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - AFDIAN_USER_ID=${AFDIAN_USER_ID}
+      - AFDIAN_TOKEN=${AFDIAN_TOKEN}
+    env_file:
+      - .env
+    healthcheck:
+      # busybox wget 会先解析 localhost 到 ::1，而 node 只监听 IPv4，必须用 127.0.0.1
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4321/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

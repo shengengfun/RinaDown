@@ -1,0 +1,41 @@
+@import 'tailwindcss';
+@import './design.css';
+
+/* Tailwind v4 主题令牌 —— 与 design.css（移植自 design/web/styles.css）的
+   CSS 变量对齐，工具类里可写 bg-surface / text-text2 / border-line 等。 */
+@theme {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface2: var(--surface2);
+  --color-surface3: var(--surface3);
+  --color-line: var(--border);
+  --color-text: var(--text);
+  --color-text2: var(--text2);
+  --color-text3: var(--text3);
+  --color-accent: var(--accent);
+  --color-accent-weak: var(--accent-weak);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-track: var(--track);
+}
+
+/* MiSans（复用桌面端字体资源，assets/fonts → web/public/fonts） */
+@font-face {
+  font-family: 'MiSans';
+  src: url('/fonts/MiSans-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'MiSans';
+  src: url('/fonts/MiSans-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'MiSans';
+  src: url('/fonts/MiSans-Semibold.ttf') format('truetype');
+  font-weight: 600;
+  font-display: swap;
+}

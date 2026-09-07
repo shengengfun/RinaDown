@@ -1,0 +1,60 @@
+#!/bin/sh
+# FluxDown Server 群晖套件生命周期脚本（DSM 6 / DSM 7 通用）。
+# DSM 7 由套件专属用户运行（conf/privilege run-as package），var 目录归属该用户；
+# DSM 6 以 root 运行。数据/日志均落在 /var/packages/FluxDown/var。
+PKG_NAME="FluxDown"
+PKG_DIR="/var/packages/${PKG_NAME}"
+TARGET_DIR="${SYNOPKG_PKGDEST:-${PKG_DIR}/target}"
+VAR_DIR="${SYNOPKG_PKGVAR:-${PKG_DIR}/var}"
+PID_FILE="${VAR_DIR}/fluxdown-server.pid"
+LOG_FILE="${VAR_DIR}/fluxdown-server.log"
+
+is_running() {
+	[ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
+}
+
+start_server() {
+	mkdir -p "$VAR_DIR"
+	FLUXDOWN_DATA_DIR="$VAR_DIR" \
+	FLUXDOWN_BIND="0.0.0.0:17800" \
+		"$TARGET_DIR/bin/fluxdown-server" >> "$LOG_FILE" 2>&1 &
+	echo $! > "$PID_FILE"
+}
+
+stop_server() {
+	if [ -f "$PID_FILE" ]; then
+		kill "$(cat "$PID_FILE")" 2>/dev/null
+		# 最多等 10s 优雅退出
+		i=0
+		while is_running && [ "$i" -lt 10 ]; do
+			sleep 1
+			i=$((i + 1))
+		done
+		is_running && kill -9 "$(cat "$PID_FILE")" 2>/dev/null
+		rm -f "$PID_FILE"
+	fi
+}
+
+case "$1" in
+	start)
+		if is_running; then
+			exit 0
+		fi
+		start_server
+		exit 0
+		;;
+	stop)
+		stop_server
+		exit 0
+		;;
+	status)
+		if is_running; then
+			exit 0
+		else
+			exit 3
+		fi
+		;;
+	*)
+		exit 0
+		;;
+esac

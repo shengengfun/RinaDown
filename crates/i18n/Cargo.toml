@@ -1,0 +1,12 @@
+[package]
+name = "fluxdown_ui_i18n"
+version = "0.1.0"
+edition.workspace = true
+build = "build.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+serde_json.workspace = true
+thiserror.workspace = true

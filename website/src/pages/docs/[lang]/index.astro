@@ -1,0 +1,251 @@
+---
+/**
+ * 文档索引页(静态预渲染,en/zh 各一条路由)。
+ * 布局:2026 bento 风格 —— hero 渐变大标题 + 跨尺寸分区拼贴 + 社区共建条,
+ * 与营销站视觉语言(氛围光斑/玻璃层/brand-sky 强调色)保持一致。
+ */
+import { getCollection } from "astro:content";
+import Layout from "../../../layouts/Layout.astro";
+import { FloatingNavbar } from "../../../components/ui/floating-navbar";
+import Footer from "../../../components/Footer";
+import { buildDocsNav, type SectionId } from "../../../lib/docs-nav";
+import DocsSearch from "../../../components/docs/DocsSearch";
+
+export const prerender = true;
+
+export function getStaticPaths() {
+  return [{ params: { lang: "en" } }, { params: { lang: "zh" } }];
+}
+
+const lang = Astro.params.lang as "en" | "zh";
+const zh = lang === "zh";
+const all = await getCollection("docs");
+const { groups } = buildDocsNav(all, lang);
+
+const site = Astro.site ?? new URL("https://fluxdown.zerx.dev");
+const enUrl = new URL("/docs/en/", site).href;
+const zhUrl = new URL("/docs/zh/", site).href;
+const alternates = [
+  { lang: "en", href: enUrl },
+  { lang: "zh", href: zhUrl },
+  { lang: "x-default", href: enUrl },
+];
+
+const title = zh ? "文档 - FluxDown" : "Docs - FluxDown";
+const description = zh
+  ? "FluxDown 使用文档:安装、快速上手、下载协议、浏览器扩展、Headless 服务器与 API。"
+  : "FluxDown documentation: installation, quick start, download protocols, browser extension, headless server and API.";
+
+/* ── bento 拼贴配置:分区 → 跨度/描述/图标 ── */
+const REPO = "https://github.com/zerx-lab/fluxdown";
+
+const SECTION_META: Record<
+  SectionId,
+  { span: string; desc: { en: string; zh: string }; icon: string }
+> = {
+  "getting-started": {
+    span: "lg:col-span-1",
+    desc: { en: "Install FluxDown and start your first download in minutes.", zh: "几分钟内完成安装,开始第一个下载任务。" },
+    icon: `<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>`,
+  },
+  protocols: {
+    span: "lg:col-span-2",
+    desc: { en: "HTTP, BitTorrent, HLS/DASH, eD2K and FTP — each with a dedicated engine.", zh: "HTTP、BitTorrent、HLS/DASH、eD2K、FTP —— 每种协议都有专属引擎。" },
+    icon: `<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>`,
+  },
+  "browser-extension": {
+    span: "lg:col-span-1",
+    desc: { en: "Take over downloads from Chrome and Firefox seamlessly.", zh: "无缝接管 Chrome / Firefox 的下载任务。" },
+    icon: `<path d="M19.439 7.85c-.049.322.059.648.289.878l1.568 1.568c.47.47.706 1.087.706 1.704s-.235 1.233-.706 1.704l-1.611 1.611a.98.98 0 0 1-.837.276c-.47-.07-.802-.48-.968-.925a2.501 2.501 0 1 0-3.214 3.214c.446.166.855.497.925.968a.979.979 0 0 1-.276.837l-1.61 1.61a2.404 2.404 0 0 1-1.705.707 2.402 2.402 0 0 1-1.704-.706l-1.568-1.568a1.026 1.026 0 0 0-.877-.29c-.493.074-.84.504-1.02.968a2.5 2.5 0 1 1-3.237-3.237c.464-.18.894-.527.967-1.02a1.026 1.026 0 0 0-.289-.877l-1.568-1.568A2.402 2.402 0 0 1 1.998 12c0-.617.236-1.234.706-1.704L4.23 8.77c.24-.24.581-.353.917-.303.515.077.877.528 1.073 1.01a2.5 2.5 0 1 0 3.259-3.259c-.482-.196-.933-.558-1.01-1.073-.05-.336.062-.676.303-.917l1.525-1.525A2.402 2.402 0 0 1 12 1.998c.617 0 1.234.236 1.704.706l1.568 1.568c.23.23.556.338.877.29.493-.074.84-.504 1.02-.968a2.5 2.5 0 1 1 3.237 3.237c-.464.18-.894.527-.967 1.02z"/>`,
+  },
+  "headless-server": {
+    span: "lg:col-span-1",
+    desc: { en: "Run FluxDown headless with a Web UI, WebSocket and REST.", zh: "以 Headless 模式运行,自带 Web UI 与 WS/REST 控制。" },
+    icon: `<rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/>`,
+  },
+  api: {
+    span: "lg:col-span-1",
+    desc: { en: "Local HTTP API with aria2-compatible JSON-RPC.", zh: "本机 HTTP API,兼容 aria2 JSON-RPC。" },
+    icon: `<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>`,
+  },
+  plugins: {
+    span: "lg:col-span-1",
+    desc: { en: "Extend FluxDown with JavaScript plugins — URL resolvers and task hooks.", zh: "用 JavaScript 插件扩展 FluxDown —— 链接解析与任务钩子。" },
+    icon: `<path d="M15 7h1a2 2 0 0 1 2 2v1a2 2 0 0 0 2 2 2 2 0 0 1 0 4 2 2 0 0 0-2 2v1a2 2 0 0 1-2 2h-1a2 2 0 0 0-2-2 2 2 0 0 0-2 2H9a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2 2 2 0 0 1 0-4 2 2 0 0 0 2-2V9a2 2 0 0 1 2-2h1a2 2 0 0 0 2-2 2 2 0 0 1 2 2z"/>`,
+  },
+  contributing: {
+    span: "lg:col-span-1",
+    desc: { en: "These docs are community-driven — every page is editable.", zh: "文档由社区共建 —— 每一页都可以编辑。" },
+    icon: `<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>`,
+  },
+};
+---
+
+<Layout
+  title={title}
+  description={description}
+  canonicalUrl={zh ? zhUrl : enUrl}
+  lang={zh ? "zh-CN" : "en"}
+  ogLocale={zh ? "zh_CN" : "en_US"}
+  alternates={alternates}
+>
+  <FloatingNavbar client:load />
+  <main class="relative pt-32 pb-20">
+    <!-- 氛围光斑(与 faq/主页一致的背景层) -->
+    <div class="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
+      <div class="absolute left-1/2 top-0 h-[320px] w-[640px] -translate-x-1/2 rounded-full bg-brand-sky/[0.05] blur-[120px]"></div>
+      <div class="absolute right-0 top-1/3 h-[400px] w-[400px] rounded-full bg-brand-cyan/[0.03] blur-[100px]"></div>
+    </div>
+
+    <div class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      <!-- Hero -->
+      <div class="max-w-2xl">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-brand-sky">
+          {zh ? "文档中心" : "Documentation"}
+        </p>
+        <h1 class="mt-3 text-4xl font-bold tracking-tight text-dark-text sm:text-5xl">
+          {zh ? "了解 " : "Master "}
+          <span class="bg-gradient-to-r from-brand-sky to-brand-cyan bg-clip-text text-transparent">FluxDown</span>
+        </h1>
+        <p class="mt-4 text-base leading-relaxed text-dark-text-secondary sm:text-lg">
+          {
+            zh
+              ? "安装、使用与扩展这台 Rust 驱动的下载引擎 —— 从第一个任务到 Headless 部署。"
+              : "Install, use and extend the Rust-powered download engine — from your first task to headless deployments."
+          }
+        </p>
+        <div class="mt-7 flex flex-wrap items-center gap-3">
+          <a
+            href={`/docs/${lang}/getting-started/installation/`}
+            class="group inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-brand-sky to-brand-cyan px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand-sky/20 transition-transform hover:scale-[1.03] active:scale-[0.98]"
+          >
+            {zh ? "快速开始" : "Get started"}
+            <span class="transition-transform group-hover:translate-x-0.5">→</span>
+          </a>
+          <a
+            href={`${REPO}/tree/main/website/src/content/docs`}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 rounded-full border border-dark-border bg-dark-surface1/60 px-5 py-2.5 text-sm font-medium text-dark-text-secondary backdrop-blur-sm transition-colors hover:border-brand-sky/40 hover:text-dark-text"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55v-1.94c-3.2.7-3.87-1.54-3.87-1.54-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.75 2.69 1.25 3.34.95.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.73.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.04.77 2.1v3.12c0 .3.21.66.8.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>
+            {zh ? "在 GitHub 上贡献" : "Contribute on GitHub"}
+          </a>
+        </div>
+      </div>
+
+      <!-- 文档搜索(模糊 + 全文,⌘/Ctrl+K 亦可唤起) -->
+      <div class="mt-8 max-w-md">
+        <DocsSearch client:idle lang={lang} />
+      </div>
+
+      <!-- Bento 分区拼贴 -->
+      <div class="mt-14 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {
+          // contributing 分区由下方"社区共建条"承载,不进 bento,保持 1+2 / 1+1+1 平衡
+          groups.filter((g) => g.id !== "contributing").map((g) => {
+            const meta = SECTION_META[g.id];
+            return (
+              <section
+                class:list={[
+                  "group relative overflow-hidden rounded-3xl border border-dark-border bg-dark-surface1/70 p-6 backdrop-blur-sm",
+                  "transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-sky/35 hover:shadow-[0_0_32px_-12px] hover:shadow-brand-sky/25",
+                  meta.span,
+                ]}
+              >
+                <div class="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-brand-sky/[0.06] blur-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                <div class="flex items-center gap-3">
+                  <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand-sky/20 bg-brand-sky/10 text-brand-sky transition-transform duration-300 group-hover:scale-110">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      set:html={meta.icon}
+                    />
+                  </span>
+                  <h2 class="text-base font-semibold text-dark-text">{g.label}</h2>
+                </div>
+                <p class="mt-3 text-sm leading-relaxed text-dark-text-muted">
+                  {zh ? meta.desc.zh : meta.desc.en}
+                </p>
+                <ul
+                  class:list={[
+                    "mt-4 gap-x-4 gap-y-1",
+                    g.id === "protocols" ? "grid grid-cols-1 sm:grid-cols-2" : "space-y-1",
+                  ]}
+                >
+                  {g.items.map((item) => (
+                    <li>
+                      <a
+                        href={item.href}
+                        class="group/link flex items-center justify-between rounded-lg px-2.5 py-1.5 text-sm text-dark-text-secondary transition-colors hover:bg-dark-surface2 hover:text-brand-sky"
+                      >
+                        <span>
+                          {item.title}
+                          {item.fallback && (
+                            <span class="ml-1.5 rounded border border-dark-border px-1 align-middle text-[10px] text-dark-text-muted">
+                              EN
+                            </span>
+                          )}
+                        </span>
+                        <span class="translate-x-0 text-dark-text-muted opacity-0 transition-all duration-200 group-hover/link:translate-x-0.5 group-hover/link:opacity-100">
+                          →
+                        </span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            );
+          })
+        }
+      </div>
+
+      <!-- 社区共建条(玻璃层) -->
+      <div class="mt-10 flex flex-col items-start justify-between gap-4 rounded-3xl border border-dark-border bg-dark-surface1/50 p-6 backdrop-blur-sm sm:flex-row sm:items-center">
+        <div>
+          <h2 class="text-sm font-semibold text-dark-text">
+            {zh ? "发现问题、想补充内容,或想看到你的语言?" : "Spotted an issue, want to add something, or want FluxDown in your language?"}
+          </h2>
+          <p class="mt-1 text-sm text-dark-text-muted">
+            {
+              zh
+                ? "文档托管在公开仓库，每页底部都有“编辑此页”入口；应用与官网翻译请通过 GitHub Pull Request 贡献。"
+                : "Docs live in a public repository — every page has an “Edit this page” link. Contribute app and website translations through a GitHub pull request."
+            }
+          </p>
+        </div>
+        <div class="flex shrink-0 flex-wrap gap-3">
+          <a
+            href={`/docs/${lang}/contributing/translations/`}
+            class="rounded-full border border-brand-sky/30 bg-brand-sky/10 px-4 py-2 text-sm font-medium text-brand-sky transition-colors hover:bg-brand-sky/20"
+          >
+            {zh ? "参与翻译 →" : "Translate FluxDown →"}
+          </a>
+          <a
+            href={`/docs/${lang}/contributing/docs/`}
+            class="rounded-full border border-dark-border bg-dark-surface2/60 px-4 py-2 text-sm font-medium text-dark-text-secondary transition-colors hover:text-dark-text"
+          >
+            {zh ? "贡献指南 →" : "Contribution guide →"}
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+  <Footer client:load />
+
+  <!-- 语言切换(navbar 岛)在 docs 下改为路由跳转而非原地换文案(设计决策 B2) -->
+  <script is:inline define:vars={{ pageLang: lang }}>
+    window.addEventListener("locale-change", function (e) {
+      var target = e.detail && e.detail.locale;
+      if (target && target !== pageLang) {
+        location.href = "/docs/" + target + "/";
+      }
+    });
+  </script>
+</Layout>

@@ -1,0 +1,53 @@
+# This file is used for telling Rust-related tools
+# where various Rust crates are.
+# This also unifies `target` output folder and
+# various Rust configurations.
+
+[workspace]
+resolver = "3"
+members = ["native/*", "crates/*"]
+
+[workspace.package]
+edition = "2024"
+
+[workspace.dependencies]
+gpui = { version = "0.2.2", git = "https://github.com/zed-industries/zed" }
+gpui_platform = { git = "https://github.com/zed-industries/zed" }
+gpui-base = { git = "https://github.com/longbridge/gpui-component", rev = "334bbed2e8c47d606eb79ab05ddcebd60b823429" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "334bbed2e8c47d606eb79ab05ddcebd60b823429" }
+gpui-component-assets = { git = "https://github.com/longbridge/gpui-component", rev = "334bbed2e8c47d606eb79ab05ddcebd60b823429" }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1"
+thiserror = "2.0"
+winresource = "0.1.31"
+
+[workspace.lints.clippy]
+expect_used = "deny"
+unwrap_used = "deny"
+wildcard_imports = "deny"
+
+[patch.crates-io]
+librqbit = { git = "https://github.com/lingdiansr/rqbit", rev = "3860dbe08c0b11efc0d8499de128b5a18195c44d" }
+
+[profile.dev]
+codegen-units = 16
+debug = "limited"
+split-debuginfo = "unpacked"
+
+[profile.dev.package.gpui]
+opt-level = 3
+
+[profile.dev.package.gpui_platform]
+opt-level = 3
+
+[profile.release]
+# 移除全部符号（含符号表），最大化减小体积
+strip = true
+# 为体积优化代码生成（默认 opt-level=3 偏向速度，"z" 最激进压缩体积）
+opt-level = "z"
+# Full LTO：跨 crate 死代码消除/内联最彻底，二进制最小（编译更慢）
+lto = "fat"
+# 单一 codegen 单元，配合 LTO 进一步减小体积（牺牲并行编译速度）
+codegen-units = 1
+# 注意：不设 panic = "abort" —— engine 的 download_manager 依赖 catch_unwind
+# 恢复 task panic（见 AGENTS.md），abort 会让 panic 直接终止进程。

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 应用内反馈 / In-App Feedback
+    url: https://fluxdown.zerx.dev/feedback
+    about: 推荐！应用内（状态栏反馈按钮）或官网反馈页提交，自动附带系统信息与日志 / Recommended — submit from the app status bar or website; system info & logs attached automatically
+  - name: ❓ 常见问题 / FAQ
+    url: https://fluxdown.zerx.dev/faq
+    about: 提问前先看看常见问题 / Check the FAQ before opening an issue
+  - name: 🗳️ 社区投票 / Community Vote
+    url: https://fluxdown.zerx.dev/vote
+    about: 为想要的功能投票 / Vote for features you want

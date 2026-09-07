@@ -1,0 +1,188 @@
+---
+import "../styles/global.css";
+import { SITE_URL, OG_IMAGE_URL, OG_IMAGE_WIDTH, OG_IMAGE_HEIGHT, buildGraph } from "../lib/seo";
+import { setSSRLocale } from "../lib/i18n";
+
+interface Props {
+  title?: string;
+  description?: string;
+  canonicalUrl?: string;
+  lang?: string;
+  ogLocale?: string;
+  alternates?: { lang: string; href: string }[];
+  noindex?: boolean;
+  /** 页面级追加的 JSON-LD 节点(如 FAQPage / BreadcrumbList),并入全站 @graph。 */
+  jsonLdNodes?: Record<string, unknown>[];
+}
+
+const {
+  title = "FluxDown — Multi-Protocol Download Manager, Rebuilt in Rust",
+  description = "A multi-protocol download manager rebuilt in Rust — dynamic segmentation, deep browser integration, HTTP/FTP/BitTorrent/ED2K/HLS support. Free and open source.",
+  canonicalUrl,
+  lang = "en",
+  ogLocale = "en_US",
+  alternates,
+  noindex = false,
+  jsonLdNodes = [],
+} = Astro.props;
+
+// canonical 统一带尾斜杠(与 sitemap / Astro 默认输出一致),消除 /faq 与 /faq/ 的信号分裂。
+// 显式传入的 canonicalUrl 优先;否则由 pathname 规范化推导。
+const normalizedPath =
+  Astro.url.pathname === "/"
+    ? "/"
+    : Astro.url.pathname.replace(/\/$/, "") + "/";
+const resolvedCanonical =
+  canonicalUrl ?? (normalizedPath === "/" ? SITE_URL + "/" : `${SITE_URL}${normalizedPath}`);
+
+// lang 是否由调用方显式传入(区分默认值与显式指定,决定是否输出 data-fixed-lang)
+const isLangExplicit = Astro.props.lang !== undefined;
+const ogLocaleAlternate = ogLocale === "zh_CN" ? "en_US" : "zh_CN";
+
+// 固定语言页面:让 React islands 在 SSR 阶段直接以页面语言渲染
+// (谷歌以可见内容判定页面语言,SSR 必须直出目标语言,不能只换 meta)
+setSSRLocale(isLangExplicit ? (lang === "zh-CN" ? "zh" : lang) : "en");
+
+const ogImageUrl = OG_IMAGE_URL;
+---
+
+<!doctype html>
+<html lang={lang} class="fluxdown-loading" data-fixed-lang={isLangExplicit ? true : undefined}>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#0a0a0b" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#F8F9FA" media="(prefers-color-scheme: light)" />
+    <link rel="canonical" href={resolvedCanonical} />
+    {noindex && <meta name="robots" content="noindex" />}
+
+    <!--
+      Hreflang(i18n SEO):仅在页面确有语言变体时输出(由调用方传入 alternates)。
+      规范要求:双向互指 + 自引用 + 绝对 URL + x-default;无变体的页面不得虚标。
+      语言码遵循 Google 现行规范:ISO 639-1(+可选 ISO 3166-1),如 "zh" 而非 "zh-Hans"。
+    -->
+    {
+      alternates?.map((a) => (
+        <link rel="alternate" hreflang={a.lang} href={a.href} />
+      ))
+    }
+
+    <!-- Open Graph -->
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={resolvedCanonical} />
+    <meta property="og:site_name" content="FluxDown" />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:image:width" content={String(OG_IMAGE_WIDTH)} />
+    <meta property="og:image:height" content={String(OG_IMAGE_HEIGHT)} />
+    <meta property="og:image:alt" content="FluxDown — the download manager, rebuilt in Rust" />
+    <meta property="og:locale" content={ogLocale} />
+    <meta property="og:locale:alternate" content={ogLocaleAlternate} />
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageUrl} />
+    <meta name="twitter:image:alt" content="FluxDown — the download manager, rebuilt in Rust" />
+
+    <!-- JSON-LD: 全站实体图(Organization + WebSite + SoftwareApplication),页面级节点并入 -->
+    <script type="application/ld+json" set:html={JSON.stringify(buildGraph(jsonLdNodes))} />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>{title}</title>
+    <slot name="head" />
+
+    <!--
+      Critical: Prevent FOUC by applying theme + locale BEFORE first paint.
+      This script runs synchronously and blocks rendering to avoid any flash.
+    -->
+    <script is:inline>
+      (function() {
+        var html = document.documentElement;
+
+        // 1. Theme: apply saved preference or respect system preference
+        var savedTheme = null;
+        try { savedTheme = localStorage.getItem('fluxdown-theme'); } catch(e) {}
+        if (savedTheme === 'light') {
+          html.classList.add('light');
+        } else if (!savedTheme) {
+          // No saved preference: respect OS preference
+          if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+            html.classList.add('light');
+          }
+        }
+
+        // 2. Locale: apply saved locale to html lang attribute
+        // (显式固定语言的页面,如 docs,不参与该逻辑,避免覆盖服务端渲染的 lang)
+        if (!html.hasAttribute('data-fixed-lang')) {
+          var savedLocale = null;
+          try { savedLocale = localStorage.getItem('fluxdown-locale'); } catch(e) {}
+          if (savedLocale === 'zh') {
+            html.lang = 'zh-CN';
+          } else if (savedLocale === 'ja') {
+            html.lang = 'ja';
+          } else if (savedLocale === 'en') {
+            html.lang = 'en';
+          } else {
+            var langs = navigator.languages || [navigator.language];
+            for (var i = 0; i < langs.length; i++) {
+              if (langs[i].startsWith('zh')) { html.lang = 'zh-CN'; break; }
+              if (langs[i].startsWith('ja')) { html.lang = 'ja'; break; }
+              if (langs[i].startsWith('en')) { html.lang = 'en'; break; }
+            }
+          }
+        }
+
+        // 3. Remove loading class to reveal content (prevents FOUC)
+        html.classList.remove('fluxdown-loading');
+      })();
+    </script>
+  </head>
+  <body class="min-h-screen bg-dark-bg text-dark-text antialiased">
+    <slot />
+    <script is:inline>
+      // Theme persistence & toggle
+      (function() {
+        window.__toggleTheme = function() {
+          var html = document.documentElement;
+          html.classList.add('theme-transitioning');
+          html.classList.toggle('light');
+          var isLight = html.classList.contains('light');
+          localStorage.setItem('fluxdown-theme', isLight ? 'light' : 'dark');
+          window.dispatchEvent(new CustomEvent('theme-change', { detail: { light: isLight } }));
+          // Remove transition class after animation completes
+          setTimeout(function() { html.classList.remove('theme-transitioning'); }, 350);
+        };
+
+        window.__isLightTheme = function() {
+          return document.documentElement.classList.contains('light');
+        };
+      })();
+    </script>
+
+    <!--
+      LangBot 客服机器人组件(全站)。
+      走同域代理 /api/langbot-widget.js:上游脚本注入的 baseUrl 是 http://127.0.0.1:5300,
+      直连会让所有 API/WS/logo 请求打到访客本机。代理只重写地址,其余原样透传。
+    -->
+    <script is:inline defer data-title="FD助手" src="/api/langbot-widget.js"></script>
+  </body>
+</html>

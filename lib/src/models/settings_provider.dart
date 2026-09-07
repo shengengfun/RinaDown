@@ -1,0 +1,2263 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
+import 'package:launch_at_startup/launch_at_startup.dart';
+import 'package:rinf/rinf.dart';
+
+import '../bindings/bindings.dart';
+import '../services/log_service.dart';
+import 'custom_category.dart';
+import 'speed_unit.dart';
+import 'webhook_endpoint.dart';
+
+/// 下载引擎相关配置（持久化在 Rust SQLite 中）
+class SettingsProvider extends ChangeNotifier {
+  /// 全局单例引用，供 WindowListener 等无 context 场景读取设置
+  static SettingsProvider? globalInstance;
+
+  /// ed2k 协议 scheme 名（与 Rust `protocol_registry::ED2K.scheme` 对齐）。
+  static const String _ed2kScheme = 'ed2k';
+
+  /// magnet 协议 scheme 名（与 Rust `protocol_registry::MAGNET.scheme` 对齐）。
+  static const String _magnetScheme = 'magnet';
+
+  String _defaultSaveDir = _platformDefaultSaveDir();
+  int _defaultSegments = 0; // 0 = 自动（由 Rust segment_advisor 动态计算）
+  int _autoMaxConnections = 16; // 自动模式下智能调度的最大连接数上限
+  bool _cdnMultiEnabled = false; // 多 CDN 节点并发下载（实验性，P0）：同一文件多节点并发拉取
+  int _cdnMaxNodes = 0; // 单任务最多钉定的 CDN 节点数，0..=8；0 = 自动档
+  int _connPolicyCount = 0; // 已学习的域名连接上限记录数（未过期）
+  int _maxConcurrentTasks = 5;
+  int _speedLimitBytes = 0; // 0 = 无限制
+  int _uploadLimitBytes = 0; // 全局上传限速（B/s，仅 BT 上传含做种；0 = 无限制）
+  String _speedLimitUnit = kDefaultSpeedLimitUnit; // 限速输入/显示单位
+  int _maxAutoRetries = 3; // -1 = 无限, 0 = 关闭, 1..10 = 次数
+  int _autoRetryDelaySecs = 5; // 失败重试间隔（秒）
+  bool _autoResumeOnStart = false;
+  bool _closeToTray = true; // 默认关闭到托盘
+  bool _startMinimizedToTray = false; // 默认启动时显示主窗口
+  bool _autoStartup = false; // 默认不开机启动
+  bool _autoCheckUpdate = true; // 默认启动时自动检查更新
+  String _updateChannel = 'stable'; // 更新渠道：stable 稳定版 / frontier 预览版（含预发布）
+  bool _notifyOnComplete = true; // 默认任务完成时弹出通知
+  String _customBackgroundPath = ''; // 外观：自定义背景图片路径（空 = 无）
+  bool _silentDownloadEnabled = false; // 免打扰下载：外部请求不弹确认框直接下载
+  bool _silentSkipSelection = false; // 免打扰子开关：跳过 BT/HLS/变体二次选择弹窗
+  bool _useServerTime = false; // 完成文件的修改时间采用服务器 Last-Modified
+  bool _keepAwakeWhileDownloading = false; // 默认不阻止睡眠/息屏
+  bool _analyticsEnabled = true; // 匿名使用统计（每日活跃）；首装事件不受此开关控制
+  int _logMaxSizeMb = 10; // 日志总大小上限（MB），超出自动清理
+
+  /// Webhook 端点表（config 键 `webhook.endpoints`，JSON 数组）。
+  List<WebhookEndpoint> _webhookEndpoints = const [];
+
+  // 悬浮球设置
+  bool _floatingBallEnabled = false; // 默认关闭（与 closeToTray 保守默认一致）
+  double _floatingBallX = -1; // 绝对像素坐标；-1 哨兵 = 未设置（用默认停靠）
+  double _floatingBallY = -1;
+  bool _floatingBallActiveOnly = false; // 仅下载时显示，其余隐藏（默认关=常显）
+  bool _clipboardWatchEnabled = false; // 仅 Linux Wayland 降级分支展示
+
+  // 侧边栏区块显示设置
+  bool _showSidebarStatus = true; // 显示状态区块
+  bool _showSidebarQueues = true; // 显示队列区块
+  bool _showSidebarCategory = true; // 显示分类区块
+  bool _showSidebarRss = true; // 显示 RSS 订阅区块
+  bool _referralFeatureEnabled = false; // 推介有奖按需展示，默认隐藏避免侧边栏干扰
+
+  // 侧边栏设备协同区显示（三态渐进披露）：
+  // null=自动（有远程设备才显示）/ true=强制显示 / false=强制隐藏
+  bool? _showSidebarDevice;
+
+  // 标题栏工具按钮显示设置
+  bool _showTitlebarPauseAll = true; // 全部暂停按钮
+  bool _showTitlebarResumeAll = true; // 全部恢复按钮
+  bool _showTitlebarSettings = true; // 设置按钮
+  bool _showTitlebarTheme = true; // 主题切换按钮
+
+  // 侧边栏折叠状态（持久化）
+  bool _sidebarQueuesExpanded = true; // 队列区块展开
+  bool _sidebarCategoryExpanded = false; // 分类区块展开（默认折叠）
+  bool _sidebarRssExpanded = true; // RSS 区块展开
+  bool _sidebarDeviceExpanded = true; // 设备区块展开
+
+  // 自定义分类
+  List<CustomCategory> _customCategories = [];
+
+  // 文件关联
+  bool _torrentAssocPrompted = false; // 是否已弹窗提示过文件关联
+  bool _torrentAssociated = false; // .torrent 文件是否已关联到 FluxDown
+  // User explicitly turned association OFF (persisted). Needed because on
+  // Linux .deb installs the system-wide MIME registration is root-owned and
+  // cannot be removed, so the live query alone can never report false.
+  bool _torrentAssocUserDisabled = false;
+  // ed2k:// 链接关联（系统协议处理器；与 .torrent 文件关联同族但独立开关）。
+  bool _ed2kProtocolAssociated = false;
+  // 同 _torrentAssocUserDisabled：Linux 上只有 FluxDown 声明
+  // x-scheme-handler/ed2k 时，撤销用户级覆盖后 xdg-mime 仍会解析回 FluxDown，
+  // 光靠实时查询永远回不到 false。
+  bool _ed2kAssocUserDisabled = false;
+  // magnet: 链接关联（系统协议处理器）。默认开启：Rust 启动时非抢占式
+  // 自动注册（检测到其他客户端占有 magnet 时不抢，只有此开关手动打开才接管）。
+  bool _magnetProtocolAssociated = false;
+  // 同 _ed2kAssocUserDisabled：持久化用户手动关闭，防实时查询顶回 ON，
+  // 也是 Rust 启动自动注册的否决条件（magnet_assoc_user_disabled）。
+  bool _magnetAssocUserDisabled = false;
+
+  // 代理设置
+  String _proxyMode = 'none'; // none / system / manual / auto
+  String _proxyType = 'http'; // http / https / socks4 / socks5
+  String _proxyHost = '';
+  String _proxyPort = '';
+  String _proxyUsername = '';
+  String _proxyPassword = '';
+  String _proxyNoList = ''; // 逗号分隔的排除列表
+
+  /// 已保存的站点 HTTP Basic 凭据（JSON：{"host[:port]":{"user","pass"}}）。
+  /// 设备本地敏感数据，不进云同步目录；由引擎在建任务时写入/套用，
+  /// 设置页只做列出与删除。
+  String _siteAuthCredentials = '';
+
+  // 代理防抖支持
+  Timer? _proxyDebounceTimer;
+  final Set<String> _pendingProxyKeys = {};
+
+  // BT 设置
+  bool _btEnableDht = true; // DHT 分布式哈希表
+  bool _btEnableUpnp = true; // UPnP 端口映射
+  int _btPortStart = 6881; // 监听端口起始
+  int _btPortEnd = 6891; // 监听端口结束
+  String _btCustomTrackers = ''; // 用户自定义 Tracker 列表（换行分隔）
+
+  // BT 做种限制（Rust 端以 value > 0 表示启用；Dart 端保存开关状态与数值。
+  // 四项限制默认全部关闭，仅在用户显式勾选后生效）
+  bool _btSeedRatioEnabled = false; // 启用总分享率限制
+  double _btSeedRatioLimit = 0.0; // 总分享率限制值
+  bool _btSeedPostRatioEnabled = false; // 启用做种后分享率限制
+  double _btSeedPostRatioLimit = 0.0; // 做种后分享率限制值
+  bool _btSeedTimeEnabled = false; // 启用总做种时间限制
+  int _btSeedTimeLimitMinutes = 0; // 总做种时间限制（分钟）
+  String _btSeedTimeLimitUnit = 'minutes'; // 显示单位：'minutes'/'hours'/'days'
+  bool _btSeedInactiveTimeEnabled = false; // 启用不活跃做种时间限制
+  int _btSeedInactiveTimeLimitMinutes = 30; // 不活跃做种时间限制（分钟）
+  String _btSeedInactiveTimeLimitUnit = 'minutes'; // 显示单位
+  String _btSeedConditionsOperator = 'or'; // 条件组合方式：'and' / 'or'
+  String _btSeedThenAction =
+      'stop'; // 满足条件后动作：'stop' / 'delete' / 'delete_files'
+  int _btSeedMaxActive = 0; // 最大同时活动做种任务数（0=不限制，超出的完成任务排队等待）
+  bool _btAutoReseed = true; // 启动时自动继续做种（非用户手动停止的已完成任务）
+  bool _btSeedEnabled = true; // 完成后自动做种（关闭则 BT 任务完成即停止做种）
+
+  // 临时缓存：开关关闭时保留上次输入的数值，再次打开时恢复。
+  double _btSeedRatioLimitCached = 1.0;
+  double _btSeedPostRatioLimitCached = 1.0;
+  int _btSeedTimeLimitMinutesCached = 72 * 60;
+  int _btSeedInactiveTimeLimitMinutesCached = 30;
+
+  // BT Tracker 订阅（社区维护的 tracker 列表，Rust 端拉取后合并去重）
+  bool _btTrackerSubEnabled = true; // 启用 Tracker 订阅
+  String _btTrackerSubUrls = ''; // 订阅地址（换行分隔）
+  int _btTrackerSubCount = 0; // 订阅缓存中的 tracker 数量
+  int _btTrackerSubUpdatedAt = 0; // 上次订阅更新时间（Unix 秒，0=从未）
+  bool _btTrackerSubRefreshing = false; // 是否正在刷新订阅
+  String _btTrackerSubLastError = ''; // 上次刷新的错误信息（空=成功）
+
+  // ED2K 服务器（手填列表 + server.met 社区订阅，Rust 端拉取解析后合并去重）
+  String _ed2kServerList = ''; // 用户手填服务器（逗号分隔 host:port）
+  bool _ed2kServerSubEnabled = true; // 启用 server.met 订阅
+  String _ed2kServerSubUrls = ''; // 订阅地址（换行分隔）
+  int _ed2kServerSubCount = 0; // 订阅缓存中的服务器数量
+  int _ed2kServerSubUpdatedAt = 0; // 上次订阅更新时间（Unix 秒，0=从未）
+  bool _ed2kServerSubRefreshing = false; // 是否正在刷新订阅
+  String _ed2kServerSubLastError = ''; // 上次刷新的错误信息（空=成功）
+
+  // ED2K 客户端（Kad DHT / UPnP / 监听端口）
+  bool _ed2kEnableKad = true; // Kad DHT 去中心化找源
+  bool _ed2kEnableUpnp = true; // UPnP 端口映射争取 HighID
+  int _ed2kListenPort = 0; // TCP/UDP 监听端口（0=OS 选）
+
+  // 本地 API 服务（浏览器脚本接管 / aria2 RPC 兼容 / 管理 API）
+  bool _localServerEnabled = true;
+  int _localServerPort = 17800;
+  String _localServerToken = '';
+  bool _localServerTakeoverEnabled = true;
+  bool _localServerJsonrpcEnabled = true;
+  bool _localServerApiEnabled = false;
+  bool _localServerMcpEnabled = false;
+  bool _localServerLanEnabled = false;
+  bool _localServerCorsAllowAll = false;
+
+  // UA 设置
+  String _globalUserAgent = ''; // 空字符串 = 使用内置 Chrome UA
+
+  // 默认队列设置
+  String _defaultQueueId = ''; // 空字符串 = 默认队列
+
+  // 文件已存在时的处理方式（'rename' = 自动重命名，'overwrite' = 覆盖旧文件）
+  String _fileExistsBehavior = 'rename';
+
+  // 任务文件被删除/移动后的动作（'keep' = 保留任务记录，'delete' = 自动删除任务记录）
+  String _fileMissingAction = 'keep';
+
+  // 新建下载对话框上次选择的线程数（'' = 未记录，'auto' = 自动，数字串 = 固定）
+  String _lastDialogThreads = '';
+
+  // 下载位置自动使用上次保存的位置（开启后新建下载默认目录跟随上次下载的目录）
+  bool _rememberLastSaveDir = false;
+
+  // 上次下载确认时使用的保存目录（'' = 未记录）
+  String _lastSaveDir = '';
+
+  // 新建下载对话框上次选择的目标设备（'' = 本机/未记录，非空 = 远程 deviceId）
+  String _lastTargetDevice = '';
+
+  // 文件管理器自定义命令模板（空 = 用平台默认行为）
+  // {path} = 完整文件路径；{dir} = 目录路径；占位符在 Rust 端做 shell 转义
+  String _revealFileCmd = '';
+
+  /// 配置是否已从 Rust 端加载完成
+  bool _loaded = false;
+  final Completer<void> _loadedCompleter = Completer<void>();
+
+  /// 是否启用文件关联功能（查询/监听注册表状态）。测试或不展示文件关联
+  /// 设置的专用宿主可关闭；桌面主界面的共享实例保持启用。
+  final bool _enableFileAssoc;
+
+  StreamSubscription<RustSignalPack<ConfigLoaded>>? _configSub;
+  StreamSubscription<RustSignalPack<FileAssociationStatus>>? _fileAssocSub;
+  StreamSubscription<RustSignalPack<UrlProtocolStatus>>? _urlProtocolSub;
+  StreamSubscription<RustSignalPack<TrackerSubscriptionResult>>? _trackerSubSub;
+  StreamSubscription<RustSignalPack<Ed2kServerSubscriptionResult>>? _ed2kSubSub;
+
+  SettingsProvider({bool enableFileAssoc = true})
+    : _enableFileAssoc = enableFileAssoc {
+    logInfo(
+      'Settings',
+      'constructor, enableFileAssoc=$enableFileAssoc, setting globalInstance',
+    );
+    globalInstance = this;
+    _startListening();
+    _syncAutoStartupState();
+  }
+
+  @override
+  void dispose() {
+    logInfo('Settings', 'dispose');
+    _proxyDebounceTimer?.cancel();
+    _configSub?.cancel();
+    _fileAssocSub?.cancel();
+    _urlProtocolSub?.cancel();
+    _trackerSubSub?.cancel();
+    _ed2kSubSub?.cancel();
+    if (globalInstance == this) {
+      globalInstance = null;
+    }
+    super.dispose();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Getters
+  // ---------------------------------------------------------------------------
+
+  bool get loaded => _loaded;
+
+  /// Completes after the first full configuration snapshot has been applied.
+  Future<void> get whenLoaded => _loadedCompleter.future;
+  String get defaultSaveDir => _defaultSaveDir;
+  int get defaultSegments => _defaultSegments;
+  int get autoMaxConnections => _autoMaxConnections;
+  bool get cdnMultiEnabled => _cdnMultiEnabled;
+  int get cdnMaxNodes => _cdnMaxNodes;
+
+  /// 引擎已学习的域名连接上限记录数（未过期条目；随 ConfigLoaded 刷新）。
+  int get connPolicyCount => _connPolicyCount;
+  int get maxConcurrentTasks => _maxConcurrentTasks;
+  int get speedLimitBytes => _speedLimitBytes;
+  int get uploadLimitBytes => _uploadLimitBytes;
+  String get speedLimitUnit => _speedLimitUnit;
+  int get maxAutoRetries => _maxAutoRetries;
+  int get autoRetryDelaySecs => _autoRetryDelaySecs;
+  bool get autoResumeOnStart => _autoResumeOnStart;
+  bool get closeToTray => _closeToTray;
+  bool get startMinimizedToTray => _startMinimizedToTray;
+  bool get autoStartup => _autoStartup;
+  bool get autoCheckUpdate => _autoCheckUpdate;
+  String get updateChannel => _updateChannel;
+  bool get notifyOnComplete => _notifyOnComplete;
+  String get customBackgroundPath => _customBackgroundPath;
+  bool get silentDownloadEnabled => _silentDownloadEnabled;
+  bool get silentSkipSelection => _silentSkipSelection;
+  bool get useServerTime => _useServerTime;
+  bool get keepAwakeWhileDownloading => _keepAwakeWhileDownloading;
+  bool get analyticsEnabled => _analyticsEnabled;
+  int get logMaxSizeMb => _logMaxSizeMb;
+
+  /// Webhook 端点表（免费自托管推送）。
+  List<WebhookEndpoint> get webhookEndpoints => _webhookEndpoints;
+
+  // 悬浮球 Getters
+  bool get floatingBallEnabled => _floatingBallEnabled;
+  double get floatingBallX => _floatingBallX;
+  double get floatingBallY => _floatingBallY;
+  bool get floatingBallActiveOnly => _floatingBallActiveOnly;
+  bool get clipboardWatchEnabled => _clipboardWatchEnabled;
+
+  // 侧边栏显示 Getters
+  bool get showSidebarStatus => _showSidebarStatus;
+  bool get showSidebarQueues => _showSidebarQueues;
+  bool get showSidebarCategory => _showSidebarCategory;
+  bool get showSidebarRss => _showSidebarRss;
+  bool get referralFeatureEnabled => _referralFeatureEnabled;
+
+  /// 设备协同区显示覆盖（null=自动 / true=强制显示 / false=强制隐藏）。
+  bool? get showSidebarDeviceOverride => _showSidebarDevice;
+
+  /// 设备协同区最终是否显示：override 优先，未设置时跟随是否存在任意
+  /// 设备（云端远程设备或本地配对设备）。
+  bool showSidebarDeviceEffective(bool hasAnyDevice) =>
+      _showSidebarDevice ?? hasAnyDevice;
+
+  // 标题栏工具按钮 Getters
+  bool get showTitlebarPauseAll => _showTitlebarPauseAll;
+  bool get showTitlebarResumeAll => _showTitlebarResumeAll;
+  bool get showTitlebarSettings => _showTitlebarSettings;
+  bool get showTitlebarTheme => _showTitlebarTheme;
+
+  bool get sidebarQueuesExpanded => _sidebarQueuesExpanded;
+  bool get sidebarCategoryExpanded => _sidebarCategoryExpanded;
+  bool get sidebarRssExpanded => _sidebarRssExpanded;
+  bool get sidebarDeviceExpanded => _sidebarDeviceExpanded;
+
+  // 自定义分类 Getter
+  List<CustomCategory> get customCategories =>
+      List.unmodifiable(_customCategories);
+
+  /// 可见的分类（排序后），供侧边栏使用
+  List<CustomCategory> get visibleCategories =>
+      _customCategories.where((c) => c.visible).toList()
+        ..sort((a, b) => a.position.compareTo(b.position));
+
+  /// 按分类规则解析文件的保存目录：
+  /// 普通分类（按 position 排序）→ other 分类（无普通分类命中时）。
+  /// 无匹配时返回 ''，由调用方决定回退目录。
+  ///
+  /// [fileName] 为空或无扩展名时，回退用 [url] 路径末段派生的文件名参与匹配
+  /// （浏览器扩展右键下载常只带 URL、不带已解析文件名，需靠 URL 扩展名归类）。
+  ///
+  /// 快速下载对话框、独立小窗、免打扰静默路径与外部下载请求共用本解析器。
+  String resolveCategorySaveDir(String fileName, {String url = ''}) {
+    var name = fileName;
+    if ((name.isEmpty || !name.contains('.')) && url.isNotEmpty) {
+      final derived = _fileNameFromUrl(url);
+      if (derived.isNotEmpty) name = derived;
+    }
+    if (name.isEmpty) return '';
+    final categories = visibleCategories;
+    final normals = categories
+        .where((c) => c.builtinType != 'all' && c.builtinType != 'other')
+        .toList();
+    for (final cat in normals) {
+      if (cat.saveDir.isNotEmpty && cat.matches(name)) {
+        return cat.saveDir;
+      }
+    }
+    final otherCat = categories
+        .where((c) => c.builtinType == 'other')
+        .firstOrNull;
+    if (otherCat != null &&
+        otherCat.saveDir.isNotEmpty &&
+        !normals.any((c) => c.matches(name))) {
+      return otherCat.saveDir;
+    }
+    return '';
+  }
+
+  /// 从 URL 中提取文件名（取最后一段路径，须含 '.'），失败返回 ''。
+  static String _fileNameFromUrl(String url) {
+    try {
+      final uri = Uri.parse(url.trim());
+      final segments = uri.pathSegments;
+      if (segments.isNotEmpty) {
+        final last = Uri.decodeComponent(segments.last);
+        if (last.contains('.')) return last;
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  // 文件关联 Getters
+  bool get torrentAssocPrompted => _torrentAssocPrompted;
+  bool get torrentAssociated => _torrentAssociated;
+  bool get ed2kProtocolAssociated => _ed2kProtocolAssociated;
+  bool get magnetProtocolAssociated => _magnetProtocolAssociated;
+
+  // 代理设置 Getters
+  String get proxyMode => _proxyMode;
+  String get proxyType => _proxyType;
+  String get proxyHost => _proxyHost;
+  String get proxyPort => _proxyPort;
+  String get proxyUsername => _proxyUsername;
+  String get proxyPassword => _proxyPassword;
+  String get proxyNoList => _proxyNoList;
+  String get siteAuthCredentials => _siteAuthCredentials;
+
+  // BT 设置 Getters
+  bool get btEnableDht => _btEnableDht;
+  bool get btEnableUpnp => _btEnableUpnp;
+  int get btPortStart => _btPortStart;
+  int get btPortEnd => _btPortEnd;
+  String get btCustomTrackers => _btCustomTrackers;
+
+  // BT 做种限制 Getters
+  bool get btSeedRatioEnabled => _btSeedRatioEnabled;
+  double get btSeedRatioLimit => _btSeedRatioLimit;
+  bool get btSeedPostRatioEnabled => _btSeedPostRatioEnabled;
+  double get btSeedPostRatioLimit => _btSeedPostRatioLimit;
+  bool get btSeedTimeEnabled => _btSeedTimeEnabled;
+  int get btSeedTimeLimitMinutes => _btSeedTimeLimitMinutes;
+  String get btSeedTimeLimitUnit => _btSeedTimeLimitUnit;
+  bool get btSeedInactiveTimeEnabled => _btSeedInactiveTimeEnabled;
+  int get btSeedInactiveTimeLimitMinutes => _btSeedInactiveTimeLimitMinutes;
+  String get btSeedInactiveTimeLimitUnit => _btSeedInactiveTimeLimitUnit;
+  String get btSeedConditionsOperator => _btSeedConditionsOperator;
+  String get btSeedThenAction => _btSeedThenAction;
+  int get btSeedMaxActive => _btSeedMaxActive;
+  bool get btAutoReseed => _btAutoReseed;
+  bool get btSeedEnabled => _btSeedEnabled;
+
+  // BT Tracker 订阅 Getters
+  bool get btTrackerSubEnabled => _btTrackerSubEnabled;
+  String get btTrackerSubUrls => _btTrackerSubUrls;
+  int get btTrackerSubCount => _btTrackerSubCount;
+  int get btTrackerSubUpdatedAt => _btTrackerSubUpdatedAt;
+  bool get btTrackerSubRefreshing => _btTrackerSubRefreshing;
+  String get btTrackerSubLastError => _btTrackerSubLastError;
+
+  // ED2K 服务器 Getters
+  String get ed2kServerList => _ed2kServerList;
+  bool get ed2kServerSubEnabled => _ed2kServerSubEnabled;
+  String get ed2kServerSubUrls => _ed2kServerSubUrls;
+  int get ed2kServerSubCount => _ed2kServerSubCount;
+  int get ed2kServerSubUpdatedAt => _ed2kServerSubUpdatedAt;
+  bool get ed2kServerSubRefreshing => _ed2kServerSubRefreshing;
+  String get ed2kServerSubLastError => _ed2kServerSubLastError;
+
+  // ED2K 客户端 Getters
+  bool get ed2kEnableKad => _ed2kEnableKad;
+  bool get ed2kEnableUpnp => _ed2kEnableUpnp;
+  int get ed2kListenPort => _ed2kListenPort;
+
+  // 本地 API 服务 Getters
+  bool get localServerEnabled => _localServerEnabled;
+  int get localServerPort => _localServerPort;
+  String get localServerToken => _localServerToken;
+  bool get localServerTakeoverEnabled => _localServerTakeoverEnabled;
+  bool get localServerJsonrpcEnabled => _localServerJsonrpcEnabled;
+  bool get localServerApiEnabled => _localServerApiEnabled;
+  bool get localServerMcpEnabled => _localServerMcpEnabled;
+  bool get localServerLanEnabled => _localServerLanEnabled;
+  bool get localServerCorsAllowAll => _localServerCorsAllowAll;
+
+  // UA 设置 Getter
+  String get globalUserAgent => _globalUserAgent;
+
+  // 默认队列 Getter
+  String get defaultQueueId => _defaultQueueId;
+
+  // 文件已存在时处理方式 Getter
+  String get fileExistsBehavior => _fileExistsBehavior;
+
+  // 文件被删除/移动时的动作 Getter
+  String get fileMissingAction => _fileMissingAction;
+
+  // 新建下载对话框上次选择的线程数 Getter
+  String get lastDialogThreads => _lastDialogThreads;
+
+  // 记住上次保存位置 Getters
+  bool get rememberLastSaveDir => _rememberLastSaveDir;
+  String get lastSaveDir => _lastSaveDir;
+
+  /// 生效的默认保存目录：开关开启且已有记录时返回上次保存位置，否则返回固定默认目录
+  String get effectiveDefaultSaveDir =>
+      _rememberLastSaveDir && _lastSaveDir.isNotEmpty
+      ? _lastSaveDir
+      : _defaultSaveDir;
+
+  // 文件管理器命令 Getters
+  String get revealFileCmd => _revealFileCmd;
+
+  // ---------------------------------------------------------------------------
+  // Setters — 修改值 + 通知 Rust 持久化
+  // ---------------------------------------------------------------------------
+
+  void setDefaultSaveDir(String value) {
+    if (_defaultSaveDir == value) return;
+    _defaultSaveDir = value;
+    notifyListeners();
+    _saveToRust('default_save_dir', value);
+  }
+
+  void setDefaultSegments(int value) {
+    if (_defaultSegments == value) return;
+    _defaultSegments = value;
+    notifyListeners();
+    _saveToRust('default_segments', value.toString());
+  }
+
+  void setAutoMaxConnections(int value) {
+    if (_autoMaxConnections == value) return;
+    _autoMaxConnections = value;
+    notifyListeners();
+    _saveToRust('auto_max_connections', value.toString());
+  }
+
+  void setCdnMultiEnabled(bool value) {
+    if (_cdnMultiEnabled == value) return;
+    _cdnMultiEnabled = value;
+    notifyListeners();
+    _saveToRust('cdn_multi_enabled', value ? '1' : '0');
+  }
+
+  void setCdnMaxNodes(int value) {
+    final clamped = value.clamp(0, 8);
+    if (_cdnMaxNodes == clamped) return;
+    _cdnMaxNodes = clamped;
+    notifyListeners();
+    _saveToRust('cdn_max_nodes', clamped.toString());
+  }
+
+  /// 清除引擎学习的域名连接上限缓存（空值 = 清除指令，Rust 侧据此识别）。
+  void clearDomainConnCaps() {
+    _connPolicyCount = 0;
+    notifyListeners();
+    _saveToRust('domain_conn_caps', '');
+  }
+
+  /// 解析引擎持久化的域名连接上限数据，返回未过期的记录条数。
+  ///
+  /// 格式与 Rust 侧 serialize_conn_caps 对应：首行版本标记 `v1`，之后每行
+  /// `host<TAB>cap<TAB>unix_secs`。版本不匹配视为 0 条（引擎侧会整体丢弃）。
+  static int _parseConnPolicyCount(String raw) {
+    final lines = raw.split('\n');
+    if (lines.isEmpty || lines.first.trim() != 'v1') return 0;
+    final nowSecs = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    const ttlSecs = 24 * 3600;
+    var count = 0;
+    for (final line in lines.skip(1)) {
+      final parts = line.split('\t');
+      if (parts.length != 3) continue;
+      final cap = int.tryParse(parts[1]);
+      final ts = int.tryParse(parts[2]);
+      if (parts[0].isEmpty || cap == null || cap < 1 || ts == null) continue;
+      if (nowSecs - ts < ttlSecs) count++;
+    }
+    return count;
+  }
+
+  /// 记住新建下载对话框中用户选择的线程数（'auto' 或数字字符串）
+  void setLastDialogThreads(String value) {
+    if (_lastDialogThreads == value) return;
+    _lastDialogThreads = value;
+    notifyListeners();
+    _saveToRust('last_dialog_threads', value);
+  }
+
+  void setRememberLastSaveDir(bool value) {
+    if (_rememberLastSaveDir == value) return;
+    _rememberLastSaveDir = value;
+    notifyListeners();
+    _saveToRust('remember_last_save_dir', value.toString());
+  }
+
+  /// 记录下载确认时使用的保存目录（无条件记录，开关开启后立即生效）
+  void recordLastSaveDir(String dir) {
+    if (dir.isEmpty || _lastSaveDir == dir) return;
+    _lastSaveDir = dir;
+    if (_rememberLastSaveDir) notifyListeners();
+    _saveToRust('last_save_dir', dir);
+  }
+
+  /// 新建下载对话框上次选择的目标设备（'' = 本机）。
+  String get lastTargetDevice => _lastTargetDevice;
+
+  /// 记录上次「下载到」选择的目标设备（'' = 本机）。
+  void setLastTargetDevice(String deviceId) {
+    if (_lastTargetDevice == deviceId) return;
+    _lastTargetDevice = deviceId;
+    notifyListeners();
+    _saveToRust('last_target_device', deviceId);
+  }
+
+  void setMaxConcurrentTasks(int value) {
+    if (_maxConcurrentTasks == value) return;
+    _maxConcurrentTasks = value;
+    notifyListeners();
+    _saveToRust('max_concurrent_tasks', value.toString());
+  }
+
+  void setSpeedLimitBytes(int value) {
+    if (_speedLimitBytes == value) return;
+    _speedLimitBytes = value;
+    notifyListeners();
+    _saveToRust('speed_limit_bytes', value.toString());
+  }
+
+  /// 设置外观自定义背景图片路径（空 = 清除）。UI 层负责据此渲染壁纸。
+  void setCustomBackgroundPath(String value) {
+    final v = value.trim();
+    if (_customBackgroundPath == v) return;
+    _customBackgroundPath = v;
+    notifyListeners();
+    _saveToRust('ui_background_image', v);
+  }
+
+  void setUploadLimitBytes(int value) {
+    if (_uploadLimitBytes == value) return;
+    _uploadLimitBytes = value;
+    notifyListeners();
+    _saveToRust('upload_limit_bytes', value.toString());
+  }
+
+  /// 设置限速单位（kbps / KB/s / MB/s / mbps；非法值回退 KB/s）。
+  void setSpeedLimitUnit(String value) {
+    final normalized = kSpeedLimitUnits.contains(value)
+        ? value
+        : kDefaultSpeedLimitUnit;
+    if (_speedLimitUnit == normalized) return;
+    _speedLimitUnit = normalized;
+    notifyListeners();
+    _saveToRust('speed_limit_unit', normalized);
+  }
+
+  void setMaxAutoRetries(int value) {
+    if (_maxAutoRetries == value) return;
+    _maxAutoRetries = value;
+    notifyListeners();
+    _saveToRust('max_auto_retries', value.toString());
+  }
+
+  void setAutoRetryDelaySecs(int value) {
+    if (_autoRetryDelaySecs == value) return;
+    _autoRetryDelaySecs = value;
+    notifyListeners();
+    _saveToRust('auto_retry_delay_secs', value.toString());
+  }
+
+  void setAutoResumeOnStart(bool value) {
+    if (_autoResumeOnStart == value) return;
+    _autoResumeOnStart = value;
+    notifyListeners();
+    _saveToRust('auto_resume_on_start', value.toString());
+  }
+
+  void setCloseToTray(bool value) {
+    if (_closeToTray == value) return;
+    _closeToTray = value;
+    notifyListeners();
+    _saveToRust('close_to_tray', value.toString());
+  }
+
+  void setAnalyticsEnabled(bool value) {
+    if (_analyticsEnabled == value) return;
+    _analyticsEnabled = value;
+    notifyListeners();
+    _saveToRust('analytics_enabled', value.toString());
+  }
+
+  void setStartMinimizedToTray(bool value) {
+    if (_startMinimizedToTray == value) return;
+    _startMinimizedToTray = value;
+    notifyListeners();
+    _saveToRust('start_minimized_to_tray', value.toString());
+  }
+
+  void setAutoCheckUpdate(bool value) {
+    if (_autoCheckUpdate == value) return;
+    _autoCheckUpdate = value;
+    notifyListeners();
+    _saveToRust('auto_check_update', value.toString());
+  }
+
+  /// 设置更新渠道（'stable' 稳定版 / 'frontier' 预览版）。
+  void setUpdateChannel(String value) {
+    if (_updateChannel == value) return;
+    _updateChannel = value;
+    notifyListeners();
+    _saveToRust('update_channel', value);
+  }
+
+  void setFloatingBallEnabled(bool value) {
+    if (_floatingBallEnabled == value) return;
+    _floatingBallEnabled = value;
+    notifyListeners();
+    _saveToRust('floating_ball_enabled', value.toString());
+  }
+
+  void setFloatingBallActiveOnly(bool value) {
+    if (_floatingBallActiveOnly == value) return;
+    _floatingBallActiveOnly = value;
+    notifyListeners();
+    _saveToRust('floating_ball_active_only', value.toString());
+  }
+
+  /// 保存悬浮球坐标（绝对像素）。拖动结束时调用，不触发 UI 重建。
+  void setFloatingBallPosition(double x, double y) {
+    if (_floatingBallX == x && _floatingBallY == y) return;
+    _floatingBallX = x;
+    _floatingBallY = y;
+    _saveToRust('floating_ball_x', x.toString());
+    _saveToRust('floating_ball_y', y.toString());
+  }
+
+  void setClipboardWatchEnabled(bool value) {
+    if (_clipboardWatchEnabled == value) return;
+    _clipboardWatchEnabled = value;
+    notifyListeners();
+    _saveToRust('clipboard_watch_enabled', value.toString());
+  }
+
+  void setNotifyOnComplete(bool value) {
+    if (_notifyOnComplete == value) return;
+    _notifyOnComplete = value;
+    notifyListeners();
+    _saveToRust('notify_on_complete', value.toString());
+  }
+
+  /// 覆盖整张端点表并落库。引擎侧 `apply_config_key` 命中
+  /// `webhook.endpoints` 后热重载内存镜像，无需重启。
+  void setWebhookEndpoints(List<WebhookEndpoint> endpoints) {
+    _webhookEndpoints = List.unmodifiable(endpoints);
+    notifyListeners();
+    _saveToRust('webhook.endpoints', WebhookEndpoint.encodeList(endpoints));
+  }
+
+  /// 新增或按 id 覆盖一个端点。
+  void upsertWebhookEndpoint(WebhookEndpoint endpoint) {
+    final next = List<WebhookEndpoint>.from(_webhookEndpoints);
+    final index = next.indexWhere((e) => e.id == endpoint.id);
+    if (index >= 0) {
+      next[index] = endpoint;
+    } else {
+      next.add(endpoint);
+    }
+    setWebhookEndpoints(next);
+  }
+
+  void removeWebhookEndpoint(String id) {
+    setWebhookEndpoints(
+      _webhookEndpoints.where((e) => e.id != id).toList(growable: false),
+    );
+  }
+
+  void setSilentDownloadEnabled(bool value) {
+    if (_silentDownloadEnabled == value) return;
+    _silentDownloadEnabled = value;
+    notifyListeners();
+    _saveToRust('silent_download_enabled', value.toString());
+  }
+
+  void setSilentSkipSelection(bool value) {
+    if (_silentSkipSelection == value) return;
+    _silentSkipSelection = value;
+    notifyListeners();
+    _saveToRust('silent_skip_selection', value.toString());
+  }
+
+  void setUseServerTime(bool value) {
+    if (_useServerTime == value) return;
+    _useServerTime = value;
+    notifyListeners();
+    _saveToRust('use_server_time', value.toString());
+  }
+
+  void setKeepAwakeWhileDownloading(bool value) {
+    if (_keepAwakeWhileDownloading == value) return;
+    _keepAwakeWhileDownloading = value;
+    notifyListeners();
+    _saveToRust('keep_awake_while_downloading', value.toString());
+  }
+
+  void setLogMaxSizeMb(int value) {
+    if (_logMaxSizeMb == value || value < 1) return;
+    _logMaxSizeMb = value;
+    notifyListeners();
+    // Rust 端收到后同步更新 logger 上限并执行超量清理
+    _saveToRust('log_max_size_mb', value.toString());
+    LogService.instance.maxTotalBytes = value * 1024 * 1024;
+  }
+
+  // 侧边栏显示 Setters
+
+  void setShowSidebarStatus(bool value) {
+    if (_showSidebarStatus == value) return;
+    _showSidebarStatus = value;
+    notifyListeners();
+    _saveToRust('show_sidebar_status', value.toString());
+  }
+
+  void setShowSidebarQueues(bool value) {
+    if (_showSidebarQueues == value) return;
+    _showSidebarQueues = value;
+    notifyListeners();
+    _saveToRust('show_sidebar_queues', value.toString());
+  }
+
+  void setShowSidebarCategory(bool value) {
+    if (_showSidebarCategory == value) return;
+    _showSidebarCategory = value;
+    notifyListeners();
+    _saveToRust('show_sidebar_category', value.toString());
+  }
+
+  void setShowSidebarRss(bool value) {
+    if (_showSidebarRss == value) return;
+    _showSidebarRss = value;
+    notifyListeners();
+    _saveToRust('show_sidebar_rss', value.toString());
+  }
+
+  void setReferralFeatureEnabled(bool value) {
+    if (_referralFeatureEnabled == value) return;
+    _referralFeatureEnabled = value;
+    notifyListeners();
+    _saveToRust('referral_feature_enabled', value.toString());
+  }
+
+  /// 设置设备协同区显示覆盖（true=强制显示 / false=强制隐藏，右键隐藏与设置开关共用）。
+  void setShowSidebarDevice(bool value) {
+    if (_showSidebarDevice == value) return;
+    _showSidebarDevice = value;
+    notifyListeners();
+    _saveToRust('show_sidebar_device', value.toString());
+  }
+
+  // 标题栏工具按钮 Setters
+
+  void setShowTitlebarPauseAll(bool value) {
+    if (_showTitlebarPauseAll == value) return;
+    _showTitlebarPauseAll = value;
+    notifyListeners();
+    _saveToRust('show_titlebar_pause_all', value.toString());
+  }
+
+  void setShowTitlebarResumeAll(bool value) {
+    if (_showTitlebarResumeAll == value) return;
+    _showTitlebarResumeAll = value;
+    notifyListeners();
+    _saveToRust('show_titlebar_resume_all', value.toString());
+  }
+
+  void setShowTitlebarSettings(bool value) {
+    if (_showTitlebarSettings == value) return;
+    _showTitlebarSettings = value;
+    notifyListeners();
+    _saveToRust('show_titlebar_settings', value.toString());
+  }
+
+  void setShowTitlebarTheme(bool value) {
+    if (_showTitlebarTheme == value) return;
+    _showTitlebarTheme = value;
+    notifyListeners();
+    _saveToRust('show_titlebar_theme', value.toString());
+  }
+
+  void setSidebarQueuesExpanded(bool value) {
+    if (_sidebarQueuesExpanded == value) return;
+    _sidebarQueuesExpanded = value;
+    notifyListeners();
+    _saveToRust('sidebar_queues_expanded', value.toString());
+  }
+
+  void setSidebarRssExpanded(bool value) {
+    if (_sidebarRssExpanded == value) return;
+    _sidebarRssExpanded = value;
+    notifyListeners();
+    _saveToRust('sidebar_rss_expanded', value.toString());
+  }
+
+  void setSidebarDeviceExpanded(bool value) {
+    if (_sidebarDeviceExpanded == value) return;
+    _sidebarDeviceExpanded = value;
+    notifyListeners();
+    _saveToRust('sidebar_device_expanded', value.toString());
+  }
+
+  void setSidebarCategoryExpanded(bool value) {
+    if (_sidebarCategoryExpanded == value) return;
+    _sidebarCategoryExpanded = value;
+    notifyListeners();
+    _saveToRust('sidebar_category_expanded', value.toString());
+  }
+
+  // 自定义分类 Setters
+
+  /// 持久化分类列表。同时写入「程序」分类迁移 marker：任何一次用户主导的
+  /// 分类变更都意味着当前列表是用户意愿，启动迁移不得再补插「程序」分类。
+  void _persistCategories() {
+    _saveToRust(
+      'custom_categories',
+      CustomCategory.encodeList(_customCategories),
+    );
+    _saveToRust('program_category_migrated', 'true');
+  }
+
+  void setCustomCategories(List<CustomCategory> categories) {
+    _customCategories = List.of(categories);
+    notifyListeners();
+    _persistCategories();
+  }
+
+  void addCustomCategory(CustomCategory category) {
+    _customCategories.add(category);
+    notifyListeners();
+    _persistCategories();
+  }
+
+  void updateCustomCategory(CustomCategory updated) {
+    final idx = _customCategories.indexWhere((c) => c.id == updated.id);
+    if (idx < 0) return;
+    _customCategories[idx] = updated;
+    notifyListeners();
+    _persistCategories();
+  }
+
+  void removeCustomCategory(String id) {
+    _customCategories.removeWhere((c) => c.id == id);
+    notifyListeners();
+    _persistCategories();
+  }
+
+  void reorderCustomCategories(int oldIndex, int newIndex) {
+    if (oldIndex < newIndex) newIndex -= 1;
+    final item = _customCategories.removeAt(oldIndex);
+    _customCategories.insert(newIndex, item);
+    // 更新 position 字段
+    for (int i = 0; i < _customCategories.length; i++) {
+      _customCategories[i] = _customCategories[i].copyWith(position: i);
+    }
+    notifyListeners();
+    _persistCategories();
+  }
+
+  /// 重置某个内置分类到默认状态
+  void resetBuiltinCategory(String builtinType) {
+    final defaults = CustomCategory.defaultCategories();
+    final defaultCat = defaults
+        .where((c) => c.builtinType == builtinType)
+        .firstOrNull;
+    if (defaultCat == null) return;
+    final idx = _customCategories.indexWhere(
+      (c) => c.builtinType == builtinType,
+    );
+    if (idx >= 0) {
+      _customCategories[idx] = defaultCat.copyWith(
+        position: _customCategories[idx].position,
+      );
+    }
+    notifyListeners();
+    _persistCategories();
+  }
+
+  /// 重置所有分类为默认状态（删除自定义分类，恢复内置分类）
+  void resetAllCategories() {
+    _customCategories = CustomCategory.defaultCategories();
+    notifyListeners();
+    _persistCategories();
+  }
+
+  /// 一键分类目录 —— 把每个分类（「全部文件」除外，它等同于全局默认目录）的保存
+  /// 目录设为默认下载目录下的同名子目录。[labelOf] 给出分类的本地化显示名，
+  /// 内置分类按当前界面语言落盘（`视频` / `Video`）。
+  ///
+  /// 返回实际改写的分类数；默认下载目录为空时什么都不做。
+  int applyCategorySaveDirs(String Function(CustomCategory) labelOf) {
+    var changed = 0;
+    for (var i = 0; i < _customCategories.length; i++) {
+      final cat = _customCategories[i];
+      if (cat.builtinType == 'all') continue;
+      final dir = categoryDirUnder(_defaultSaveDir, labelOf(cat));
+      if (dir.isEmpty || dir == cat.saveDir) continue;
+      _customCategories[i] = cat.copyWith(saveDir: dir);
+      changed++;
+    }
+    if (changed == 0) return 0;
+    notifyListeners();
+    _persistCategories();
+    return changed;
+  }
+
+  /// 清除所有分类的保存目录，回到「一切都落默认下载目录」。返回清空的分类数。
+  int clearCategorySaveDirs() {
+    var changed = 0;
+    for (var i = 0; i < _customCategories.length; i++) {
+      final cat = _customCategories[i];
+      if (cat.saveDir.isEmpty) continue;
+      _customCategories[i] = cat.copyWith(saveDir: '');
+      changed++;
+    }
+    if (changed == 0) return 0;
+    notifyListeners();
+    _persistCategories();
+    return changed;
+  }
+
+  /// 每个可设目录的分类是否都已指向「默认下载目录 / 分类名」。
+  /// 一键按钮据此在「应用」与「清除」两态之间切换；任一分类被手动改成别的目录
+  /// 都算未应用，此时再点一次按钮就是覆盖式重新应用。
+  bool categorySaveDirsApplied(String Function(CustomCategory) labelOf) {
+    var any = false;
+    for (final cat in _customCategories) {
+      if (cat.builtinType == 'all') continue;
+      final dir = categoryDirUnder(_defaultSaveDir, labelOf(cat));
+      if (dir.isEmpty) continue;
+      any = true;
+      if (cat.saveDir != dir) return false;
+    }
+    return any;
+  }
+
+  // 代理设置 Setters
+
+  void setProxyMode(String value) {
+    if (_proxyMode == value) return;
+    _proxyMode = value;
+    notifyListeners();
+    _saveProxyConfig('proxy_mode', value);
+  }
+
+  void setProxyType(String value) {
+    if (_proxyType == value) return;
+    _proxyType = value;
+    notifyListeners();
+    _saveProxyConfig('proxy_type', value);
+  }
+
+  void setProxyHost(String value) {
+    if (_proxyHost == value) return;
+    _proxyHost = value;
+    notifyListeners();
+    _saveProxyConfig('proxy_host', value);
+  }
+
+  void setProxyPort(String value) {
+    if (_proxyPort == value) return;
+    _proxyPort = value;
+    notifyListeners();
+    _saveProxyConfig('proxy_port', value);
+  }
+
+  void setProxyUsername(String value) {
+    if (_proxyUsername == value) return;
+    _proxyUsername = value;
+    notifyListeners();
+    _saveProxyConfig('proxy_username', value);
+  }
+
+  void setProxyPassword(String value) {
+    if (_proxyPassword == value) return;
+    _proxyPassword = value;
+    notifyListeners();
+    _saveProxyConfig('proxy_password', value);
+  }
+
+  void setProxyNoList(String value) {
+    if (_proxyNoList == value) return;
+    _proxyNoList = value;
+    notifyListeners();
+    _saveProxyConfig('proxy_no_list', value);
+  }
+
+  /// 覆写已保存的站点凭据 JSON（设置页删除某站点后整体写回）。
+  void setSiteAuthCredentials(String value) {
+    if (_siteAuthCredentials == value) return;
+    _siteAuthCredentials = value;
+    notifyListeners();
+    _saveToRust('site_auth_credentials', value);
+  }
+
+  // BT 设置 Setters
+
+  void setBtEnableDht(bool value) {
+    if (_btEnableDht == value) return;
+    _btEnableDht = value;
+    notifyListeners();
+    _saveToRust('bt_enable_dht', value.toString());
+  }
+
+  void setBtEnableUpnp(bool value) {
+    if (_btEnableUpnp == value) return;
+    _btEnableUpnp = value;
+    notifyListeners();
+    _saveToRust('bt_enable_upnp', value.toString());
+  }
+
+  void setBtPortStart(int value) {
+    if (_btPortStart == value) return;
+    _btPortStart = value;
+    notifyListeners();
+    _saveToRust('bt_port_start', value.toString());
+  }
+
+  void setBtPortEnd(int value) {
+    if (_btPortEnd == value) return;
+    _btPortEnd = value;
+    notifyListeners();
+    _saveToRust('bt_port_end', value.toString());
+  }
+
+  void setBtCustomTrackers(String value) {
+    if (_btCustomTrackers == value) return;
+    _btCustomTrackers = value;
+    notifyListeners();
+    _saveToRust('bt_custom_trackers', value);
+  }
+
+  void setBtSeedRatioEnabled(bool value) {
+    if (_btSeedRatioEnabled == value) return;
+    _btSeedRatioEnabled = value;
+    notifyListeners();
+    if (value) {
+      _btSeedRatioLimit = _btSeedRatioLimitCached;
+    } else {
+      _btSeedRatioLimitCached = _btSeedRatioLimit;
+    }
+    _saveToRust(
+      'bt_seed_ratio_limit',
+      _btSeedRatioEnabled ? _btSeedRatioLimit.toString() : '0',
+    );
+  }
+
+  void setBtSeedRatioLimit(double value) {
+    if (_btSeedRatioLimit == value) return;
+    _btSeedRatioLimit = value;
+    if (_btSeedRatioEnabled) {
+      _btSeedRatioLimitCached = value;
+    }
+    notifyListeners();
+    if (_btSeedRatioEnabled) {
+      _saveToRust('bt_seed_ratio_limit', value.toString());
+    }
+  }
+
+  void setBtSeedPostRatioEnabled(bool value) {
+    if (_btSeedPostRatioEnabled == value) return;
+    _btSeedPostRatioEnabled = value;
+    notifyListeners();
+    if (value) {
+      _btSeedPostRatioLimit = _btSeedPostRatioLimitCached;
+    } else {
+      _btSeedPostRatioLimitCached = _btSeedPostRatioLimit;
+    }
+    _saveToRust(
+      'bt_seed_post_ratio_limit',
+      _btSeedPostRatioEnabled ? _btSeedPostRatioLimit.toString() : '0',
+    );
+  }
+
+  void setBtSeedPostRatioLimit(double value) {
+    if (_btSeedPostRatioLimit == value) return;
+    _btSeedPostRatioLimit = value;
+    if (_btSeedPostRatioEnabled) {
+      _btSeedPostRatioLimitCached = value;
+    }
+    notifyListeners();
+    if (_btSeedPostRatioEnabled) {
+      _saveToRust('bt_seed_post_ratio_limit', value.toString());
+    }
+  }
+
+  void setBtSeedTimeEnabled(bool value) {
+    if (_btSeedTimeEnabled == value) return;
+    _btSeedTimeEnabled = value;
+    notifyListeners();
+    if (value) {
+      _btSeedTimeLimitMinutes = _btSeedTimeLimitMinutesCached;
+    } else {
+      _btSeedTimeLimitMinutesCached = _btSeedTimeLimitMinutes;
+    }
+    _saveToRust(
+      'bt_seed_time_limit_minutes',
+      _btSeedTimeEnabled ? _btSeedTimeLimitMinutes.toString() : '0',
+    );
+  }
+
+  void setBtSeedTimeLimitMinutes(int value) {
+    if (_btSeedTimeLimitMinutes == value) return;
+    _btSeedTimeLimitMinutes = value;
+    if (_btSeedTimeEnabled) {
+      _btSeedTimeLimitMinutesCached = value;
+    }
+    notifyListeners();
+    if (_btSeedTimeEnabled) {
+      _saveToRust('bt_seed_time_limit_minutes', value.toString());
+    }
+  }
+
+  void setBtSeedTimeLimitUnit(String value) {
+    final normalized =
+        const {'hours': 'hours', 'days': 'days'}.containsKey(value)
+        ? value
+        : 'minutes';
+    if (_btSeedTimeLimitUnit == normalized) return;
+    _btSeedTimeLimitUnit = normalized;
+    notifyListeners();
+    _saveToRust('bt_seed_time_limit_unit', normalized);
+  }
+
+  void setBtSeedInactiveTimeEnabled(bool value) {
+    if (_btSeedInactiveTimeEnabled == value) return;
+    _btSeedInactiveTimeEnabled = value;
+    notifyListeners();
+    if (value) {
+      _btSeedInactiveTimeLimitMinutes = _btSeedInactiveTimeLimitMinutesCached;
+    } else {
+      _btSeedInactiveTimeLimitMinutesCached = _btSeedInactiveTimeLimitMinutes;
+    }
+    _saveToRust(
+      'bt_seed_inactive_time_limit_minutes',
+      _btSeedInactiveTimeEnabled
+          ? _btSeedInactiveTimeLimitMinutes.toString()
+          : '0',
+    );
+  }
+
+  void setBtSeedInactiveTimeLimitMinutes(int value) {
+    if (_btSeedInactiveTimeLimitMinutes == value) return;
+    _btSeedInactiveTimeLimitMinutes = value;
+    if (_btSeedInactiveTimeEnabled) {
+      _btSeedInactiveTimeLimitMinutesCached = value;
+    }
+    notifyListeners();
+    if (_btSeedInactiveTimeEnabled) {
+      _saveToRust('bt_seed_inactive_time_limit_minutes', value.toString());
+    }
+  }
+
+  void setBtSeedInactiveTimeLimitUnit(String value) {
+    final normalized =
+        const {'hours': 'hours', 'days': 'days'}.containsKey(value)
+        ? value
+        : 'minutes';
+    if (_btSeedInactiveTimeLimitUnit == normalized) return;
+    _btSeedInactiveTimeLimitUnit = normalized;
+    notifyListeners();
+    _saveToRust('bt_seed_inactive_time_limit_unit', normalized);
+  }
+
+  void setBtSeedConditionsOperator(String value) {
+    final normalized = value == 'and' ? 'and' : 'or';
+    if (_btSeedConditionsOperator == normalized) return;
+    _btSeedConditionsOperator = normalized;
+    notifyListeners();
+    _saveToRust('bt_seed_limit_operator', normalized);
+  }
+
+  void setBtSeedThenAction(String value) {
+    final normalized =
+        const {
+          'delete': 'delete',
+          'delete_files': 'delete_files',
+        }.containsKey(value)
+        ? value
+        : 'stop';
+    if (_btSeedThenAction == normalized) return;
+    _btSeedThenAction = normalized;
+    notifyListeners();
+    _saveToRust('bt_seed_then_action', normalized);
+  }
+
+  void setBtSeedMaxActive(int value) {
+    final clamped = value < 0 ? 0 : value;
+    if (_btSeedMaxActive == clamped) return;
+    _btSeedMaxActive = clamped;
+    notifyListeners();
+    _saveToRust('bt_seed_max_active', clamped.toString());
+  }
+
+  void setBtAutoReseed(bool value) {
+    if (_btAutoReseed == value) return;
+    _btAutoReseed = value;
+    notifyListeners();
+    _saveToRust('bt_auto_reseed', value ? '1' : '0');
+  }
+
+  void setBtSeedEnabled(bool value) {
+    if (_btSeedEnabled == value) return;
+    _btSeedEnabled = value;
+    notifyListeners();
+    _saveToRust('bt_seed_enabled', value ? '1' : '0');
+  }
+
+  // 云同步应用做种限制：与引擎 kv 同一编码（value > 0 = 启用并取该值，
+  // 0 = 关闭）。关闭时保留内存数值与缓存，用户再次手动开启可恢复。
+
+  void applySyncedBtSeedRatioLimit(double value) {
+    final enabled = value > 0.0;
+    if (enabled) {
+      if (_btSeedRatioEnabled && _btSeedRatioLimit == value) return;
+      _btSeedRatioEnabled = true;
+      _btSeedRatioLimit = value;
+      _btSeedRatioLimitCached = value;
+    } else {
+      if (!_btSeedRatioEnabled) return;
+      _btSeedRatioEnabled = false;
+      _btSeedRatioLimitCached = _btSeedRatioLimit;
+    }
+    notifyListeners();
+    _saveToRust('bt_seed_ratio_limit', enabled ? value.toString() : '0');
+  }
+
+  void applySyncedBtSeedPostRatioLimit(double value) {
+    final enabled = value > 0.0;
+    if (enabled) {
+      if (_btSeedPostRatioEnabled && _btSeedPostRatioLimit == value) return;
+      _btSeedPostRatioEnabled = true;
+      _btSeedPostRatioLimit = value;
+      _btSeedPostRatioLimitCached = value;
+    } else {
+      if (!_btSeedPostRatioEnabled) return;
+      _btSeedPostRatioEnabled = false;
+      _btSeedPostRatioLimitCached = _btSeedPostRatioLimit;
+    }
+    notifyListeners();
+    _saveToRust('bt_seed_post_ratio_limit', enabled ? value.toString() : '0');
+  }
+
+  void applySyncedBtSeedTimeLimitMinutes(int value) {
+    final enabled = value > 0;
+    if (enabled) {
+      if (_btSeedTimeEnabled && _btSeedTimeLimitMinutes == value) return;
+      _btSeedTimeEnabled = true;
+      _btSeedTimeLimitMinutes = value;
+      _btSeedTimeLimitMinutesCached = value;
+    } else {
+      if (!_btSeedTimeEnabled) return;
+      _btSeedTimeEnabled = false;
+      _btSeedTimeLimitMinutesCached = _btSeedTimeLimitMinutes;
+    }
+    notifyListeners();
+    _saveToRust('bt_seed_time_limit_minutes', enabled ? value.toString() : '0');
+  }
+
+  void applySyncedBtSeedInactiveTimeLimitMinutes(int value) {
+    final enabled = value > 0;
+    if (enabled) {
+      if (_btSeedInactiveTimeEnabled &&
+          _btSeedInactiveTimeLimitMinutes == value) {
+        return;
+      }
+      _btSeedInactiveTimeEnabled = true;
+      _btSeedInactiveTimeLimitMinutes = value;
+      _btSeedInactiveTimeLimitMinutesCached = value;
+    } else {
+      if (!_btSeedInactiveTimeEnabled) return;
+      _btSeedInactiveTimeEnabled = false;
+      _btSeedInactiveTimeLimitMinutesCached = _btSeedInactiveTimeLimitMinutes;
+    }
+    notifyListeners();
+    _saveToRust(
+      'bt_seed_inactive_time_limit_minutes',
+      enabled ? value.toString() : '0',
+    );
+  }
+
+  // BT Tracker 订阅 Setters
+
+  void setBtTrackerSubEnabled(bool value) {
+    if (_btTrackerSubEnabled == value) return;
+    _btTrackerSubEnabled = value;
+    notifyListeners();
+    _saveToRust('bt_tracker_sub_enabled', value.toString());
+  }
+
+  void setBtTrackerSubUrls(String value) {
+    if (_btTrackerSubUrls == value) return;
+    _btTrackerSubUrls = value;
+    // Rust 端会在订阅地址变化后自动后台刷新一次
+    _btTrackerSubRefreshing = true;
+    _btTrackerSubLastError = '';
+    notifyListeners();
+    _saveToRust('bt_tracker_sub_urls', value);
+  }
+
+  /// 请求 Rust 立即刷新 Tracker 订阅（结果通过 TrackerSubscriptionResult 回传）
+  void refreshTrackerSubscription() {
+    if (_btTrackerSubRefreshing) return;
+    _btTrackerSubRefreshing = true;
+    _btTrackerSubLastError = '';
+    notifyListeners();
+    const UpdateTrackerSubscription().sendSignalToRust();
+  }
+
+  // ED2K 服务器 Setters
+
+  void setEd2kServerList(String value) {
+    if (_ed2kServerList == value) return;
+    _ed2kServerList = value;
+    notifyListeners();
+    _saveToRust('ed2k_server_list', value);
+  }
+
+  void setEd2kServerSubEnabled(bool value) {
+    if (_ed2kServerSubEnabled == value) return;
+    _ed2kServerSubEnabled = value;
+    notifyListeners();
+    _saveToRust('ed2k_server_sub_enabled', value.toString());
+  }
+
+  void setEd2kEnableKad(bool value) {
+    if (_ed2kEnableKad == value) return;
+    _ed2kEnableKad = value;
+    notifyListeners();
+    _saveToRust('ed2k_enable_kad', value.toString());
+  }
+
+  void setEd2kEnableUpnp(bool value) {
+    if (_ed2kEnableUpnp == value) return;
+    _ed2kEnableUpnp = value;
+    notifyListeners();
+    _saveToRust('ed2k_enable_upnp', value.toString());
+  }
+
+  void setEd2kListenPort(int value) {
+    if (_ed2kListenPort == value) return;
+    _ed2kListenPort = value;
+    notifyListeners();
+    _saveToRust('ed2k_listen_port', value.toString());
+  }
+
+  void setEd2kServerSubUrls(String value) {
+    if (_ed2kServerSubUrls == value) return;
+    _ed2kServerSubUrls = value;
+    // Rust 端会在订阅地址变化后自动后台刷新一次
+    _ed2kServerSubRefreshing = true;
+    _ed2kServerSubLastError = '';
+    notifyListeners();
+    _saveToRust('ed2k_server_sub_urls', value);
+  }
+
+  /// 请求 Rust 立即刷新 ED2K 服务器订阅（结果通过 Ed2kServerSubscriptionResult 回传）
+  void refreshEd2kServerSubscription() {
+    if (_ed2kServerSubRefreshing) return;
+    _ed2kServerSubRefreshing = true;
+    _ed2kServerSubLastError = '';
+    notifyListeners();
+    const UpdateEd2kServerSubscription().sendSignalToRust();
+  }
+
+  // 本地 API 服务 Setters
+
+  void setLocalServerEnabled(bool value) {
+    if (_localServerEnabled == value) return;
+    _localServerEnabled = value;
+    notifyListeners();
+    _saveToRust('local_server_enabled', value.toString());
+  }
+
+  void setLocalServerPort(int value) {
+    if (value < 1024 || value > 65535) return;
+    if (_localServerPort == value) return;
+    _localServerPort = value;
+    notifyListeners();
+    _saveToRust('local_server_port', value.toString());
+  }
+
+  void setLocalServerToken(String value) {
+    if (_localServerToken == value) return;
+    _localServerToken = value;
+    notifyListeners();
+    _saveToRust('local_server_token', value);
+  }
+
+  /// 清空访问令牌。若管理 API / MCP 正依赖此令牌（已启用），则一并关闭它们，
+  /// 避免出现「已启用但无 token」的非法状态。
+  void clearLocalServerToken() {
+    if (_localServerToken.isEmpty &&
+        !_localServerApiEnabled &&
+        !_localServerMcpEnabled) {
+      return;
+    }
+    _localServerToken = '';
+    _saveToRust('local_server_token', '');
+    if (_localServerApiEnabled) {
+      _localServerApiEnabled = false;
+      _saveToRust('local_server_api_enabled', 'false');
+    }
+    if (_localServerMcpEnabled) {
+      _localServerMcpEnabled = false;
+      _saveToRust('local_server_mcp_enabled', 'false');
+    }
+    notifyListeners();
+  }
+
+  void setLocalServerTakeoverEnabled(bool value) {
+    if (_localServerTakeoverEnabled == value) return;
+    _localServerTakeoverEnabled = value;
+    notifyListeners();
+    _saveToRust('local_server_takeover_enabled', value.toString());
+  }
+
+  void setLocalServerJsonrpcEnabled(bool value) {
+    if (_localServerJsonrpcEnabled == value) return;
+    _localServerJsonrpcEnabled = value;
+    notifyListeners();
+    _saveToRust('local_server_jsonrpc_enabled', value.toString());
+  }
+
+  /// 管理 API 强制鉴权：从关到开且当前 token 为空时，自动生成 32 位 hex token 并一并保存
+  void setLocalServerApiEnabled(bool value) {
+    if (_localServerApiEnabled == value) return;
+    _localServerApiEnabled = value;
+    if (value && _localServerToken.isEmpty) {
+      _localServerToken = _generateHexToken();
+      _saveToRust('local_server_token', _localServerToken);
+    }
+    notifyListeners();
+    _saveToRust('local_server_api_enabled', value.toString());
+  }
+
+  /// MCP 端点强制鉴权（与管理 API 共用 token）：从关到开且当前 token 为空时，自动生成并保存
+  void setLocalServerMcpEnabled(bool value) {
+    if (_localServerMcpEnabled == value) return;
+    _localServerMcpEnabled = value;
+    if (value && _localServerToken.isEmpty) {
+      _localServerToken = _generateHexToken();
+      _saveToRust('local_server_token', _localServerToken);
+    }
+    notifyListeners();
+    _saveToRust('local_server_mcp_enabled', value.toString());
+  }
+
+  /// 允许局域网 / 组网访问：开启后本机 API 服务绑定 0.0.0.0（Rust 端热重启监听），
+  /// 使同网络或用户自建组网内的设备可访问本机服务与配对；关闭则仅回环可达。
+  void setLocalServerLanEnabled(bool value) {
+    if (_localServerLanEnabled == value) return;
+    _localServerLanEnabled = value;
+    notifyListeners();
+    _saveToRust('local_server_lan_enabled', value.toString());
+  }
+
+  /// 允许任意来源的跨域（CORS）请求：开启后本机 API 对所有响应带
+  /// `Access-Control-Allow-Origin: *`（Rust 端热重启监听），使浏览器页面里的
+  /// 跨域 `fetch()` 能直接调用本机服务；关闭则预检失败、网页无法访问。
+  void setLocalServerCorsAllowAll(bool value) {
+    if (_localServerCorsAllowAll == value) return;
+    _localServerCorsAllowAll = value;
+    notifyListeners();
+    _saveToRust('local_server_cors_allow_all', value.toString());
+  }
+
+  /// 生成 32 位随机 hex token（管理 API 自动鉴权 / UI 手动重新生成共用）
+  static String _generateHexToken() {
+    final r = Random.secure();
+    return List<int>.generate(
+      16,
+      (_) => r.nextInt(256),
+    ).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
+
+  // UA 设置 Setter
+
+  void setGlobalUserAgent(String value) {
+    if (_globalUserAgent == value) return;
+    _globalUserAgent = value;
+    notifyListeners();
+    _saveToRust('global_user_agent', value);
+  }
+
+  // 默认队列 Setter
+  void setDefaultQueueId(String value) {
+    if (_defaultQueueId == value) return;
+    _defaultQueueId = value;
+    notifyListeners();
+    _saveToRust('default_queue_id', value);
+  }
+
+  // 文件已存在时处理方式 Setter
+  void setFileExistsBehavior(String value) {
+    if (_fileExistsBehavior == value) return;
+    _fileExistsBehavior = value;
+    notifyListeners();
+    _saveToRust('file_exists_behavior', value);
+  }
+
+  // 文件被删除/移动时的动作 Setter
+  void setFileMissingAction(String value) {
+    if (_fileMissingAction == value) return;
+    _fileMissingAction = value;
+    notifyListeners();
+    _saveToRust('file_missing_action', value);
+  }
+
+  // 文件管理器命令 Setters
+  void setRevealFileCmd(String value) {
+    if (_revealFileCmd == value) return;
+    _revealFileCmd = value;
+    notifyListeners();
+    _saveToRust('reveal_file_cmd', value);
+  }
+
+  // 文件关联操作
+
+  /// 标记已弹窗提示过文件关联（持久化到 Rust SQLite）
+  void markTorrentAssocPrompted() {
+    if (_torrentAssocPrompted) return;
+    _torrentAssocPrompted = true;
+    notifyListeners();
+    _saveToRust('torrent_assoc_prompted', 'true');
+  }
+
+  /// 请求 Rust 检查当前 .torrent 文件关联状态
+  void checkFileAssociation() {
+    const CheckFileAssociation().sendSignalToRust();
+  }
+
+  /// 设置或取消 .torrent 文件关联。
+  /// 乐观更新 UI，Rust 回传真实状态后会校正。
+  ///
+  /// Toggling OFF records a persisted opt-out so the live status reported
+  /// back by Rust cannot clobber the user's choice (see
+  /// [handleFileAssociationStatus]); toggling ON clears it.
+  void setFileAssociation(bool enable) {
+    logInfo('Settings', 'setFileAssociation: enable=$enable');
+    _torrentAssociated = enable;
+    _torrentAssocUserDisabled = !enable;
+    notifyListeners();
+    _saveToRust('torrent_assoc_user_disabled', (!enable).toString());
+    SetFileAssociation(enable: enable).sendSignalToRust();
+  }
+
+  /// 请求 Rust 检查当前 ed2k:// 协议关联状态。
+  void checkEd2kProtocolAssociation() {
+    const CheckUrlProtocol(scheme: _ed2kScheme).sendSignalToRust();
+  }
+
+  /// 设置或取消 ed2k:// 链接关联（乐观更新 UI，Rust 回传真实状态后校正）。
+  ///
+  /// 与 [setFileAssociation] 同构：关闭时记录持久化的 opt-out，避免实时状态
+  /// 把用户的 OFF 又顶回 ON。
+  void setEd2kProtocolAssociation(bool enable) {
+    logInfo('Settings', 'setEd2kProtocolAssociation: enable=$enable');
+    _ed2kProtocolAssociated = enable;
+    _ed2kAssocUserDisabled = !enable;
+    notifyListeners();
+    _saveToRust('ed2k_assoc_user_disabled', (!enable).toString());
+    SetUrlProtocol(scheme: _ed2kScheme, enable: enable).sendSignalToRust();
+  }
+
+  /// 请求 Rust 检查当前 magnet: 协议关联状态。
+  void checkMagnetProtocolAssociation() {
+    const CheckUrlProtocol(scheme: _magnetScheme).sendSignalToRust();
+  }
+
+  /// 设置或取消 magnet: 链接关联（乐观更新 UI，Rust 回传真实状态后校正）。
+  ///
+  /// 与 [setEd2kProtocolAssociation] 同构。打开是显式接管：即使其他客户端
+  /// （qBittorrent 等）已注册 magnet，Rust 侧 register 也会覆盖为 FluxDown；
+  /// 关闭只删除 FluxDown 自己的注册（其他客户端的注册自动恢复生效），
+  /// 并持久化 opt-out 阻止下次启动自动注册。
+  void setMagnetProtocolAssociation(bool enable) {
+    logInfo('Settings', 'setMagnetProtocolAssociation: enable=$enable');
+    _magnetProtocolAssociated = enable;
+    _magnetAssocUserDisabled = !enable;
+    notifyListeners();
+    _saveToRust('magnet_assoc_user_disabled', (!enable).toString());
+    SetUrlProtocol(scheme: _magnetScheme, enable: enable).sendSignalToRust();
+  }
+
+  /// 设置开机自启动，返回是否成功。
+  /// 操作后通过 [launchAtStartup.isEnabled] 验证注册表实际状态，
+  /// 若与预期不符则回滚 UI 状态。
+  Future<bool> setAutoStartup(bool value) async {
+    if (_autoStartup == value) return true;
+
+    // 先乐观更新 UI
+    _autoStartup = value;
+    notifyListeners();
+
+    try {
+      if (value) {
+        await launchAtStartup.enable();
+      } else {
+        await launchAtStartup.disable();
+      }
+
+      // 验证实际状态
+      final actual = await launchAtStartup.isEnabled();
+      if (actual == value) {
+        _saveToRust('auto_startup', value.toString());
+        return true;
+      }
+
+      // 验证失败 — 回滚
+      _autoStartup = !value;
+      notifyListeners();
+      return false;
+    } catch (_) {
+      // 异常 — 回滚
+      _autoStartup = !value;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 请求 Rust 端加载配置
+  // ---------------------------------------------------------------------------
+
+  void requestConfig() {
+    const RequestConfig().sendSignalToRust();
+  }
+
+  // ---------------------------------------------------------------------------
+  // 内部
+  // ---------------------------------------------------------------------------
+
+  void _startListening() {
+    _configSub = ConfigLoaded.rustSignalStream.listen(_onConfigLoaded);
+    _trackerSubSub = TrackerSubscriptionResult.rustSignalStream.listen(
+      _onTrackerSubResult,
+    );
+    _ed2kSubSub = Ed2kServerSubscriptionResult.rustSignalStream.listen(
+      _onEd2kServerSubResult,
+    );
+    if (_enableFileAssoc) {
+      _fileAssocSub = FileAssociationStatus.rustSignalStream.listen(
+        _onFileAssocStatus,
+      );
+      _urlProtocolSub = UrlProtocolStatus.rustSignalStream.listen(
+        _onUrlProtocolStatus,
+      );
+    }
+  }
+
+  void _onTrackerSubResult(RustSignalPack<TrackerSubscriptionResult> pack) {
+    final msg = pack.message;
+    logInfo(
+      'Settings',
+      'tracker subscription result: success=${msg.success}, '
+          'count=${msg.trackerCount}, sources=${msg.okSources}/${msg.totalSources}',
+    );
+    _btTrackerSubRefreshing = false;
+    if (msg.success) {
+      _btTrackerSubCount = msg.trackerCount;
+      _btTrackerSubUpdatedAt = msg.updatedAt;
+      _btTrackerSubLastError = '';
+    } else {
+      _btTrackerSubLastError = msg.error;
+    }
+    notifyListeners();
+  }
+
+  void _onEd2kServerSubResult(
+    RustSignalPack<Ed2kServerSubscriptionResult> pack,
+  ) {
+    final msg = pack.message;
+    logInfo(
+      'Settings',
+      'ed2k server subscription result: success=${msg.success}, '
+          'count=${msg.serverCount}, sources=${msg.okSources}/${msg.totalSources}',
+    );
+    _ed2kServerSubRefreshing = false;
+    if (msg.success) {
+      _ed2kServerSubCount = msg.serverCount;
+      _ed2kServerSubUpdatedAt = msg.updatedAt;
+      _ed2kServerSubLastError = '';
+    } else {
+      _ed2kServerSubLastError = msg.error;
+    }
+    notifyListeners();
+  }
+
+  void _onFileAssocStatus(RustSignalPack<FileAssociationStatus> pack) {
+    handleFileAssociationStatus(pack.message.isAssociated);
+  }
+
+  /// Applies a live .torrent association status reported by Rust.
+  /// Exposed for tests; production code receives it via the signal stream.
+  ///
+  /// A persisted user opt-out gates the reported status: on Linux .deb
+  /// installs the system-wide MIME registration is root-owned, so after
+  /// `disassociate()` the live query still resolves FluxDown and would
+  /// otherwise snap a user-requested OFF back to ON (issue #98).
+  @visibleForTesting
+  void handleFileAssociationStatus(bool associated) {
+    final effective = associated && !_torrentAssocUserDisabled;
+    logInfo(
+      'Settings',
+      'file association status: $associated (effective: $effective)',
+    );
+    if (_torrentAssociated != effective) {
+      _torrentAssociated = effective;
+      notifyListeners();
+    }
+  }
+
+  void _onUrlProtocolStatus(RustSignalPack<UrlProtocolStatus> pack) {
+    // 单条信号服务所有 scheme（fluxdown:// 的启动自注册也走同一路），
+    // 只消费 ed2k / magnet。
+    switch (pack.message.scheme) {
+      case _ed2kScheme:
+        handleEd2kProtocolStatus(pack.message.isRegistered);
+      case _magnetScheme:
+        handleMagnetProtocolStatus(pack.message.isRegistered);
+    }
+  }
+
+  /// Applies a live `ed2k://` handler status reported by Rust.
+  /// Exposed for tests; production code receives it via the signal stream.
+  @visibleForTesting
+  void handleEd2kProtocolStatus(bool registered) {
+    final effective = registered && !_ed2kAssocUserDisabled;
+    logInfo(
+      'Settings',
+      'ed2k protocol status: $registered (effective: $effective)',
+    );
+    if (_ed2kProtocolAssociated != effective) {
+      _ed2kProtocolAssociated = effective;
+      notifyListeners();
+    }
+  }
+
+  /// Applies a live `magnet:` handler status reported by Rust.
+  /// Exposed for tests; production code receives it via the signal stream.
+  @visibleForTesting
+  void handleMagnetProtocolStatus(bool registered) {
+    final effective = registered && !_magnetAssocUserDisabled;
+    logInfo(
+      'Settings',
+      'magnet protocol status: $registered (effective: $effective)',
+    );
+    if (_magnetProtocolAssociated != effective) {
+      _magnetProtocolAssociated = effective;
+      notifyListeners();
+    }
+  }
+
+  /// 日志用值截断：压平换行并限制长度，避免 tracker 列表 / base64 缓存
+  /// （如 ed2k_nodes_dat_cache ~8KB）把日志文件撑爆。
+  static String _truncateForLog(String value) {
+    const maxLen = 120;
+    final flat = value.replaceAll('\r\n', r'\n').replaceAll('\n', r'\n');
+    if (flat.length <= maxLen) return flat;
+    return '${flat.substring(0, maxLen)}…(${value.length} chars)';
+  }
+
+  void _onConfigLoaded(RustSignalPack<ConfigLoaded> pack) {
+    applyLoadedConfig(pack.message.entries);
+  }
+
+  /// 已完整逐键打印过的配置快照哈希（进程级）。
+  ///
+  /// 一次启动里 `ConfigLoaded` 会被多个 SettingsProvider 实例各收一遍
+  /// （HomePage 的 globalInstance + ExternalDownloadService 持有的 fallback
+  /// 实例），内容完全相同却各刷 60~120 行。实测一个会话触发 5 次、
+  /// 占日志总量 70%+，把 2MB 分卷阈值迅速撑爆、挤掉真正有用的历史。
+  /// 内容与上次一致时只留一行摘要。
+  static int? _dumpedConfigHash;
+
+  /// Applies config entries loaded from Rust.
+  /// Exposed for tests; production code receives them via the signal stream.
+  @visibleForTesting
+  void applyLoadedConfig(List<ConfigEntry> entries) {
+    final hash = Object.hashAll([
+      for (final entry in entries) Object.hash(entry.key, entry.value),
+    ]);
+    final dumpKeys = hash != _dumpedConfigHash;
+    _dumpedConfigHash = hash;
+    logInfo(
+      'Settings',
+      dumpKeys
+          ? '_onConfigLoaded: ${entries.length} entries'
+          : '_onConfigLoaded: ${entries.length} entries (unchanged)',
+    );
+    String legacyOpenDirCmd = '';
+    // 追踪 reveal_file_cmd 键是否出现在配置中（区分「从未设置」与「已清空」）。
+    bool revealFileCmdPresent = false;
+    // 追踪「程序」分类迁移是否已执行过（键存在 = 已迁移，删除不再复活）。
+    bool programCategoryMigrated = false;
+    for (final entry in entries) {
+      if (dumpKeys) {
+        logInfo(
+          'Settings',
+          '  config: ${entry.key}=${_truncateForLog(entry.value)}',
+        );
+      }
+      switch (entry.key) {
+        case 'default_save_dir':
+          _defaultSaveDir = entry.value;
+        case 'default_segments':
+          _defaultSegments = int.tryParse(entry.value) ?? 0;
+        case 'auto_max_connections':
+          _autoMaxConnections = int.tryParse(entry.value) ?? 16;
+        case 'cdn_multi_enabled':
+          _cdnMultiEnabled = entry.value == '1' || entry.value == 'true';
+        case 'cdn_max_nodes':
+          _cdnMaxNodes = (int.tryParse(entry.value) ?? 0).clamp(0, 8);
+        case 'domain_conn_caps':
+          _connPolicyCount = _parseConnPolicyCount(entry.value);
+        case 'max_concurrent_tasks':
+          _maxConcurrentTasks = int.tryParse(entry.value) ?? 5;
+        case 'speed_limit_bytes':
+          _speedLimitBytes = int.tryParse(entry.value) ?? 0;
+        case 'speed_limit_unit':
+          _speedLimitUnit = kSpeedLimitUnits.contains(entry.value)
+              ? entry.value
+              : kDefaultSpeedLimitUnit;
+        case 'upload_limit_bytes':
+          _uploadLimitBytes = int.tryParse(entry.value) ?? 0;
+        case 'max_auto_retries':
+          _maxAutoRetries = int.tryParse(entry.value) ?? 3;
+        case 'auto_retry_delay_secs':
+          _autoRetryDelaySecs = int.tryParse(entry.value) ?? 5;
+        case 'auto_resume_on_start':
+          _autoResumeOnStart = entry.value == 'true';
+        case 'close_to_tray':
+          _closeToTray = entry.value == 'true';
+        case 'start_minimized_to_tray':
+          _startMinimizedToTray = entry.value == 'true';
+        case 'auto_startup':
+          _autoStartup = entry.value == 'true';
+        case 'auto_check_update':
+          _autoCheckUpdate = entry.value == 'true';
+        case 'analytics_enabled':
+          _analyticsEnabled = entry.value == 'true';
+        case 'update_channel':
+          _updateChannel = entry.value.isEmpty ? 'stable' : entry.value;
+        case 'bt_enable_dht':
+          _btEnableDht = entry.value == 'true';
+        case 'bt_enable_upnp':
+          _btEnableUpnp = entry.value == 'true';
+        case 'bt_port_start':
+          _btPortStart = int.tryParse(entry.value) ?? 6881;
+        case 'bt_port_end':
+          _btPortEnd = int.tryParse(entry.value) ?? 6891;
+        case 'bt_custom_trackers':
+          _btCustomTrackers = entry.value;
+        case 'bt_seed_ratio_limit':
+          _btSeedRatioLimit = double.tryParse(entry.value) ?? 0.0;
+          _btSeedRatioEnabled = _btSeedRatioLimit > 0.0;
+          _btSeedRatioLimitCached = _btSeedRatioEnabled
+              ? _btSeedRatioLimit
+              : 1.0;
+        case 'bt_seed_post_ratio_limit':
+          _btSeedPostRatioLimit = double.tryParse(entry.value) ?? 0.0;
+          _btSeedPostRatioEnabled = _btSeedPostRatioLimit > 0.0;
+          _btSeedPostRatioLimitCached = _btSeedPostRatioEnabled
+              ? _btSeedPostRatioLimit
+              : 1.0;
+        case 'bt_seed_time_limit_minutes':
+          _btSeedTimeLimitMinutes = int.tryParse(entry.value) ?? 0;
+          _btSeedTimeEnabled = _btSeedTimeLimitMinutes > 0;
+          _btSeedTimeLimitMinutesCached = _btSeedTimeEnabled
+              ? _btSeedTimeLimitMinutes
+              : 72 * 60;
+        case 'bt_seed_time_limit_unit':
+          _btSeedTimeLimitUnit =
+              const {'hours': 'hours', 'days': 'days'}.containsKey(entry.value)
+              ? entry.value
+              : 'minutes';
+        case 'bt_seed_inactive_time_limit_minutes':
+          _btSeedInactiveTimeLimitMinutes = int.tryParse(entry.value) ?? 0;
+          _btSeedInactiveTimeEnabled = _btSeedInactiveTimeLimitMinutes > 0;
+          _btSeedInactiveTimeLimitMinutesCached = _btSeedInactiveTimeEnabled
+              ? _btSeedInactiveTimeLimitMinutes
+              : 30;
+        case 'bt_seed_inactive_time_limit_unit':
+          _btSeedInactiveTimeLimitUnit =
+              const {'hours': 'hours', 'days': 'days'}.containsKey(entry.value)
+              ? entry.value
+              : 'minutes';
+        case 'bt_seed_limit_operator':
+          _btSeedConditionsOperator = entry.value == 'and' ? 'and' : 'or';
+        case 'bt_seed_then_action':
+          _btSeedThenAction =
+              const {
+                'delete': 'delete',
+                'delete_files': 'delete_files',
+              }.containsKey(entry.value)
+              ? entry.value
+              : 'stop';
+        case 'bt_seed_max_active':
+          _btSeedMaxActive = int.tryParse(entry.value) ?? 0;
+        case 'bt_auto_reseed':
+          _btAutoReseed = entry.value != '0';
+        case 'bt_seed_enabled':
+          _btSeedEnabled = entry.value != '0';
+        case 'bt_tracker_sub_enabled':
+          _btTrackerSubEnabled = entry.value == 'true';
+        case 'bt_tracker_sub_urls':
+          _btTrackerSubUrls = entry.value;
+        case 'bt_tracker_sub_cache':
+          final cache = entry.value.trim();
+          _btTrackerSubCount = cache.isEmpty ? 0 : cache.split('\n').length;
+        case 'bt_tracker_sub_updated_at':
+          _btTrackerSubUpdatedAt = int.tryParse(entry.value) ?? 0;
+        case 'ed2k_server_list':
+          _ed2kServerList = entry.value;
+        case 'ed2k_server_sub_enabled':
+          _ed2kServerSubEnabled = entry.value == 'true';
+        case 'ed2k_server_sub_urls':
+          _ed2kServerSubUrls = entry.value;
+        case 'ed2k_server_sub_cache':
+          final ed2kCache = entry.value.trim();
+          _ed2kServerSubCount = ed2kCache.isEmpty
+              ? 0
+              : ed2kCache.split(',').length;
+        case 'ed2k_server_sub_updated_at':
+          _ed2kServerSubUpdatedAt = int.tryParse(entry.value) ?? 0;
+        case 'ed2k_enable_kad':
+          _ed2kEnableKad = entry.value == 'true';
+        case 'ed2k_enable_upnp':
+          _ed2kEnableUpnp = entry.value == 'true';
+        case 'ed2k_listen_port':
+          _ed2kListenPort = int.tryParse(entry.value) ?? 0;
+        case 'torrent_assoc_prompted':
+          _torrentAssocPrompted = entry.value == 'true';
+        case 'torrent_assoc_user_disabled':
+          _torrentAssocUserDisabled = entry.value == 'true';
+        case 'ed2k_assoc_user_disabled':
+          _ed2kAssocUserDisabled = entry.value == 'true';
+        case 'magnet_assoc_user_disabled':
+          _magnetAssocUserDisabled = entry.value == 'true';
+        case 'ui_background_image':
+          _customBackgroundPath = entry.value;
+        case 'notify_on_complete':
+          _notifyOnComplete = entry.value != 'false'; // 默认 true
+        case 'webhook.endpoints':
+          _webhookEndpoints = WebhookEndpoint.decodeList(entry.value);
+        case 'silent_download_enabled':
+          _silentDownloadEnabled = entry.value == 'true'; // 默认 false
+        case 'silent_skip_selection':
+          _silentSkipSelection = entry.value == 'true'; // 默认 false
+        case 'use_server_time':
+          _useServerTime = entry.value == 'true'; // 默认 false
+        case 'keep_awake_while_downloading':
+          _keepAwakeWhileDownloading = entry.value == 'true'; // 默认 false
+        case 'floating_ball_enabled':
+          _floatingBallEnabled = entry.value == 'true'; // 默认 false
+        case 'floating_ball_x':
+          _floatingBallX = double.tryParse(entry.value) ?? -1;
+        case 'floating_ball_y':
+          _floatingBallY = double.tryParse(entry.value) ?? -1;
+        case 'floating_ball_active_only':
+          _floatingBallActiveOnly = entry.value == 'true'; // 默认 false
+        case 'clipboard_watch_enabled':
+          _clipboardWatchEnabled = entry.value == 'true'; // 默认 false
+        case 'log_max_size_mb':
+          _logMaxSizeMb = int.tryParse(entry.value) ?? 10;
+          LogService.instance.maxTotalBytes = _logMaxSizeMb * 1024 * 1024;
+        // 代理键落盘走 200ms 防抖（_saveProxyConfig）：若某键仍在待写队列，
+        // 说明内存值比引擎快照新，跳过回写，否则防抖到期会把被快照覆盖的
+        // 旧值重新持久化（例如「关闭代理并开启多 CDN」后立即进入设置分区
+        // 触发 RequestConfig 的竞态）。
+        case 'proxy_mode' when !_pendingProxyKeys.contains('proxy_mode'):
+          _proxyMode = entry.value;
+        case 'proxy_type' when !_pendingProxyKeys.contains('proxy_type'):
+          _proxyType = entry.value;
+        case 'proxy_host' when !_pendingProxyKeys.contains('proxy_host'):
+          _proxyHost = entry.value;
+        case 'proxy_port' when !_pendingProxyKeys.contains('proxy_port'):
+          _proxyPort = entry.value;
+        case 'proxy_username'
+            when !_pendingProxyKeys.contains('proxy_username'):
+          _proxyUsername = entry.value;
+        case 'proxy_password'
+            when !_pendingProxyKeys.contains('proxy_password'):
+          _proxyPassword = entry.value;
+        case 'proxy_no_list' when !_pendingProxyKeys.contains('proxy_no_list'):
+          _proxyNoList = entry.value;
+        case 'site_auth_credentials':
+          _siteAuthCredentials = entry.value;
+        case 'local_server_enabled':
+          _localServerEnabled = entry.value == 'true';
+        case 'local_server_port':
+          _localServerPort = int.tryParse(entry.value) ?? 17800;
+        case 'local_server_token':
+          _localServerToken = entry.value;
+        case 'local_server_takeover_enabled':
+          _localServerTakeoverEnabled = entry.value == 'true';
+        case 'local_server_jsonrpc_enabled':
+          _localServerJsonrpcEnabled = entry.value == 'true';
+        case 'local_server_api_enabled':
+          _localServerApiEnabled = entry.value == 'true';
+        case 'local_server_mcp_enabled':
+          _localServerMcpEnabled = entry.value == 'true';
+        case 'local_server_lan_enabled':
+          _localServerLanEnabled = entry.value == 'true';
+        case 'local_server_cors_allow_all':
+          _localServerCorsAllowAll = entry.value == 'true';
+        case 'global_user_agent':
+          _globalUserAgent = entry.value;
+        case 'default_queue_id':
+          _defaultQueueId = entry.value;
+        case 'file_exists_behavior':
+          _fileExistsBehavior = entry.value.isEmpty ? 'rename' : entry.value;
+        case 'file_missing_action':
+          _fileMissingAction = entry.value == 'delete' ? 'delete' : 'keep';
+        case 'last_dialog_threads':
+          _lastDialogThreads = entry.value;
+        case 'last_target_device':
+          _lastTargetDevice = entry.value;
+        case 'remember_last_save_dir':
+          _rememberLastSaveDir = entry.value == 'true';
+        case 'last_save_dir':
+          _lastSaveDir = entry.value;
+        case 'reveal_file_cmd':
+          _revealFileCmd = entry.value;
+          revealFileCmdPresent = true;
+        case 'open_dir_cmd':
+          legacyOpenDirCmd = entry.value;
+        case 'show_sidebar_status':
+          _showSidebarStatus = entry.value != 'false';
+        case 'show_sidebar_queues':
+          _showSidebarQueues = entry.value != 'false';
+        case 'show_sidebar_category':
+          _showSidebarCategory = entry.value != 'false';
+        case 'show_sidebar_rss':
+          _showSidebarRss = entry.value != 'false';
+        case 'referral_feature_enabled':
+          _referralFeatureEnabled = entry.value == 'true';
+        case 'show_sidebar_device':
+          _showSidebarDevice = entry.value == 'true'
+              ? true
+              : entry.value == 'false'
+              ? false
+              : null;
+        case 'show_titlebar_pause_all':
+          _showTitlebarPauseAll = entry.value != 'false';
+        case 'show_titlebar_resume_all':
+          _showTitlebarResumeAll = entry.value != 'false';
+        case 'show_titlebar_settings':
+          _showTitlebarSettings = entry.value != 'false';
+        case 'show_titlebar_theme':
+          _showTitlebarTheme = entry.value != 'false';
+        case 'sidebar_queues_expanded':
+          _sidebarQueuesExpanded = entry.value != 'false';
+        case 'sidebar_category_expanded':
+          _sidebarCategoryExpanded = entry.value == 'true';
+        case 'sidebar_rss_expanded':
+          _sidebarRssExpanded = entry.value != 'false';
+        case 'sidebar_device_expanded':
+          _sidebarDeviceExpanded = entry.value != 'false';
+        case 'custom_categories':
+          _customCategories = CustomCategory.decodeList(entry.value);
+        case 'program_category_migrated':
+          programCategoryMigrated = true;
+      }
+    }
+    // 一次性迁移：把旧版拆分的「打开目录」命令(open_dir_cmd)并入统一的文件
+    // 管理器命令。仅当 reveal_file_cmd 从未被持久化过（配置中无此键）时才搬；
+    // 用户主动清空会留下空串条目（键存在），不再被旧值复活——修复「清空后
+    // 无法重置为默认，每次启动都被 open_dir_cmd 搬回来」。
+    if (!revealFileCmdPresent && legacyOpenDirCmd.isNotEmpty) {
+      _revealFileCmd = legacyOpenDirCmd;
+      _saveToRust('reveal_file_cmd', legacyOpenDirCmd);
+    }
+    _loaded = true;
+    if (!_loadedCompleter.isCompleted) {
+      _loadedCompleter.complete();
+    }
+    notifyListeners();
+    // 首次启动：若无自定义分类配置，使用内置默认分类
+    if (_customCategories.isEmpty) {
+      _customCategories = CustomCategory.defaultCategories();
+    }
+    // 一次性迁移：为旧配置补充「程序」内置分类（插到「压缩包」之前）。
+    // 以显式 marker 键判定是否已迁移——不能用「列表里没有 program」当判据，
+    // 否则用户删除该内置分类后每次启动都会被重新插回。
+    if (!programCategoryMigrated) {
+      if (!_customCategories.any((c) => c.builtinType == 'program')) {
+        final defaults = CustomCategory.defaultCategories();
+        final program = defaults.firstWhere((c) => c.builtinType == 'program');
+        final archiveIdx = _customCategories.indexWhere(
+          (c) => c.builtinType == 'archive',
+        );
+        final insertAt = archiveIdx >= 0
+            ? archiveIdx
+            : _customCategories.length;
+        final pos = archiveIdx >= 0
+            ? _customCategories[archiveIdx].position
+            : program.position;
+        _customCategories.insert(insertAt, program.copyWith(position: pos));
+        // 顺延后续分类的 position，保证排序稳定
+        for (var i = insertAt + 1; i < _customCategories.length; i++) {
+          final c = _customCategories[i];
+          if (c.position >= pos && c.position < 100) {
+            _customCategories[i] = c.copyWith(position: c.position + 1);
+          }
+        }
+        _persistCategories();
+      }
+    }
+    // 配置加载后，立即查询文件/协议关联的实际状态（仅启用了该功能的实例）
+    if (_enableFileAssoc) {
+      checkFileAssociation();
+      checkEd2kProtocolAssociation();
+      checkMagnetProtocolAssociation();
+    }
+  }
+
+  void _saveToRust(String key, String value) {
+    SaveConfig(key: key, value: value).sendSignalToRust();
+  }
+
+  /// 代理配置防抖保存：200ms 内的多次变更合并为一次批量发送，
+  /// 避免用户连续输入时触发多次 reqwest Client 重建。
+  void _saveProxyConfig(String key, String value) {
+    _pendingProxyKeys.add(key);
+    _proxyDebounceTimer?.cancel();
+    _proxyDebounceTimer = Timer(const Duration(milliseconds: 200), () {
+      for (final k in _pendingProxyKeys) {
+        _saveToRust(k, _proxyValueForKey(k));
+      }
+      _pendingProxyKeys.clear();
+      _proxyDebounceTimer = null;
+    });
+  }
+
+  /// 从当前内存状态读取代理字段值（供防抖 timer 回调使用）。
+  String _proxyValueForKey(String key) => switch (key) {
+    'proxy_mode' => _proxyMode,
+    'proxy_type' => _proxyType,
+    'proxy_host' => _proxyHost,
+    'proxy_port' => _proxyPort,
+    'proxy_username' => _proxyUsername,
+    'proxy_password' => _proxyPassword,
+    'proxy_no_list' => _proxyNoList,
+    _ => '',
+  };
+
+  /// 启动时同步开机启动状态（从系统注册表读取实际状态）。
+  /// 移动端无开机启动概念，launch_at_startup 插件也未注册，直接跳过。
+  Future<void> _syncAutoStartupState() async {
+    if (Platform.isAndroid || Platform.isIOS) return;
+    final actual = await launchAtStartup.isEnabled();
+    if (_autoStartup != actual) {
+      _autoStartup = actual;
+      notifyListeners();
+    }
+  }
+
+  /// 平台默认下载目录（公开只读：供移动端判断「用户是否已自定义」）
+  static String get platformDefaultSaveDir => _platformDefaultSaveDir();
+
+  /// 平台默认下载目录。
+  ///
+  /// **桌面端不在 Dart 侧推导**：真实默认值由 Rust 用系统 API 解析
+  /// （Windows 已知文件夹 `FOLDERID_Downloads` / Linux XDG user-dirs /
+  /// macOS，见 `native/engine/src/user_dirs.rs`），首次运行写入 config 并随
+  /// 配置下发到这里。`$HOME/Downloads` 拼接在用户迁移过「下载」文件夹时是
+  /// 错的，故桌面端返回空串——配置到达前 UI 只显示占位符，不会写出错路径。
+  static String _platformDefaultSaveDir() {
+    if (Platform.isAndroid) {
+      // 应用专属外部目录，无需存储权限即可写入；
+      // 公共 Download 目录（SAF/MediaStore）作为后续跟进项。
+      // 与 Rust 侧 `download_actor::default_save_dir` 的 Android 分支保持一致。
+      return '/storage/emulated/0/Android/data/com.fluxdown.app/files/Download';
+    }
+    return '';
+  }
+}
