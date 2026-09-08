@@ -148,6 +148,19 @@ fn is_retriable_error(msg: &str) -> bool {
         || lower.contains("incomplete download")
         // reqwest Kind::Decode：TCP 连接在 body 传输中途被服务端/中间节点切断，大文件尤其常见
         || lower.contains("error decoding response body")
+        // DNS/域名解析失败（Wi‑Fi 切换、DNS 抖动、临时解析故障等瞬时错误，
+        // 重试通常自愈；此前不在白名单里会让任务停在 error 等人工恢复）
+        || lower.contains("dns")
+        || lower.contains("lookup")
+        || lower.contains("no such host")
+        || lower.contains("name or service not known")
+        || lower.contains("nodename nor servname provided")
+        || lower.contains("temporary failure in name resolution")
+        || (lower.contains("resolve") && lower.contains("failed"))
+        // 源站瞬时过载/限流：配合线性退避重试，不判为永久失败（404/403 仍排除）
+        || lower.contains("503 service unavailable")
+        || lower.contains("502 bad gateway")
+        || lower.contains("429 too many requests")
         // Content-Encoding on Range response — retry will use single-stream mode
         || lower.contains("content-encoding")
         // BT 完成前逐 piece 校验失败（BUG-BT-PHANTOM-PIECES）：重试会重新
@@ -10134,6 +10147,29 @@ mod tests {
             !is_retriable_error(msg),
             "magnet metadata timeout must not trigger auto-retry"
         );
+    }
+
+    /// 掉线自动重连优化：DNS/域名解析失败属瞬时错误，必须可自动重试——
+    /// Wi‑Fi 切换/DNS 抖动场景重试即可自愈，此前缺白名单会停在 error。
+    #[test]
+    fn dns_resolution_failure_is_retriable() {
+        assert!(is_retriable_error(
+            "error sending request for url (https://example.com/file.bin): failed to lookup address information: No such host is known. (os error 11001)"
+        ));
+        assert!(is_retriable_error(
+            "dns error: temporary failure in name resolution"
+        ));
+    }
+
+    /// 掉线自动重连优化：源站瞬时过载/限流（502/503/429）可自动重试，
+    /// 永久性 4xx（如 404/403）仍不重试。
+    #[test]
+    fn transient_http_status_is_retriable_but_permanent_is_not() {
+        assert!(is_retriable_error("HTTP 503 Service Unavailable"));
+        assert!(is_retriable_error("HTTP 502 Bad Gateway"));
+        assert!(is_retriable_error("HTTP 429 Too Many Requests"));
+        assert!(!is_retriable_error("HTTP 404 Not Found"));
+        assert!(!is_retriable_error("HTTP 403 Forbidden"));
     }
 
     // -------------------------------------------------------------------------
