@@ -2771,347 +2771,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fluxdown_agent"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "axum",
- "base64 0.22.1",
- "chacha20poly1305",
- "directories",
- "ed25519-dalek",
- "fluxdown_api",
- "fluxdown_protocol",
- "fs2",
- "futures-util",
- "hkdf 0.12.4",
- "keepawake",
- "mdns-sd",
- "notify-rust",
- "rand 0.9.2",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tokio-tungstenite",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "uuid",
- "winreg",
- "x25519-dalek",
-]
-
-[[package]]
-name = "fluxdown_api"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "axum",
- "fluxdown_protocol",
- "futures-util",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tokio-tungstenite",
- "tokio-util",
- "tracing",
- "utoipa",
- "uuid",
-]
-
-[[package]]
-name = "fluxdown_cli"
-version = "0.1.0"
-dependencies = [
- "clap",
- "directories",
- "fluxdown_api",
- "fluxdown_engine",
- "fluxdown_protocol",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tokio",
- "toml 1.1.2+spec-1.1.0",
-]
-
-[[package]]
-name = "fluxdown_daemon"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "axum",
- "base64 0.22.1",
- "fluxdown_engine",
- "fluxdown_engine_protocol",
- "fluxdown_protocol",
- "fs2",
- "futures-util",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "fluxdown_engine"
-version = "0.1.0"
-dependencies = [
- "aes",
- "anyhow",
- "async-compression",
- "async-trait",
- "base64 0.22.1",
- "bytes",
- "cbc",
- "chacha20poly1305",
- "chrono",
- "dash-mpd",
- "directories",
- "ed25519-dalek",
- "encoding_rs",
- "feed-rs",
- "flate2",
- "fs2",
- "futures-util",
- "hex 0.4.3",
- "hkdf 0.12.4",
- "hmac 0.12.1",
- "http",
- "igd-next",
- "libc",
- "librqbit",
- "m3u8-rs",
- "md-5 0.10.6",
- "md4",
- "mdns-sd",
- "quick-xml 0.41.0",
- "rand 0.9.2",
- "regex",
- "reqwest 0.12.28",
- "rquickjs",
- "serde",
- "serde_json",
- "sha1 0.10.6",
- "sha2 0.10.9",
- "sqlx",
- "suppaftp",
- "thiserror 2.0.18",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "ts2mp4",
- "url",
- "uuid",
- "windows-sys 0.59.0",
- "winreg",
- "x25519-dalek",
- "zip",
-]
-
-[[package]]
-name = "fluxdown_engine_protocol"
-version = "0.1.0"
-dependencies = [
- "fluxdown_engine",
- "fluxdown_protocol",
- "serde_json",
-]
-
-[[package]]
-name = "fluxdown_nmh"
-version = "0.1.0"
-dependencies = [
- "libc",
- "serde",
- "serde_json",
- "winresource",
-]
-
-[[package]]
-name = "fluxdown_protocol"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "utoipa",
-]
-
-[[package]]
-name = "fluxdown_server"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "axum",
- "base64 0.22.1",
- "fluxdown_api",
- "fluxdown_engine",
- "fluxdown_engine_protocol",
- "fluxdown_protocol",
- "fs2",
- "futures-util",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tokio-util",
- "tower-http 0.7.0",
- "utoipa",
- "uuid",
-]
-
-[[package]]
-name = "fluxdown_ui_account"
-version = "0.1.0"
-dependencies = [
- "fluxdown_protocol",
- "fluxdown_ui_i18n",
- "fluxdown_ui_theme",
- "gpui",
- "gpui-component",
- "serde_json",
-]
-
-[[package]]
-name = "fluxdown_ui_app"
-version = "0.1.0"
-dependencies = [
- "directories",
- "fluxdown_protocol",
- "fluxdown_ui_account",
- "fluxdown_ui_downloads",
- "fluxdown_ui_extensions",
- "fluxdown_ui_i18n",
- "fluxdown_ui_rss",
- "fluxdown_ui_settings",
- "fluxdown_ui_shell",
- "fluxdown_ui_theme",
- "futures-util",
- "gpui",
- "gpui-component",
- "gpui-component-assets",
- "gpui_platform",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tokio-tungstenite",
- "winresource",
-]
-
-[[package]]
-name = "fluxdown_ui_components"
-version = "0.1.0"
-dependencies = [
- "fluxdown_ui_theme",
- "gpui",
- "gpui-base",
-]
-
-[[package]]
-name = "fluxdown_ui_downloads"
-version = "0.1.0"
-dependencies = [
- "fluxdown_protocol",
- "fluxdown_ui_components",
- "fluxdown_ui_i18n",
- "fluxdown_ui_theme",
- "gpui",
- "gpui-component",
- "serde_json",
-]
-
-[[package]]
-name = "fluxdown_ui_extensions"
-version = "0.1.0"
-dependencies = [
- "fluxdown_protocol",
- "fluxdown_ui_i18n",
- "fluxdown_ui_theme",
- "gpui",
- "gpui-component",
- "serde_json",
-]
-
-[[package]]
-name = "fluxdown_ui_i18n"
-version = "0.1.0"
-dependencies = [
- "serde_json",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "fluxdown_ui_rss"
-version = "0.1.0"
-dependencies = [
- "fluxdown_protocol",
- "fluxdown_ui_i18n",
- "fluxdown_ui_theme",
- "gpui",
- "gpui-component",
- "serde_json",
-]
-
-[[package]]
-name = "fluxdown_ui_settings"
-version = "0.1.0"
-dependencies = [
- "fluxdown_protocol",
- "fluxdown_ui_components",
- "fluxdown_ui_i18n",
- "fluxdown_ui_theme",
- "gpui",
- "gpui-component",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "fluxdown_ui_shell"
-version = "0.1.0"
-dependencies = [
- "fluxdown_ui_components",
- "fluxdown_ui_i18n",
- "fluxdown_ui_theme",
- "gpui",
- "gpui-component",
-]
-
-[[package]]
-name = "fluxdown_ui_theme"
-version = "0.1.0"
-dependencies = [
- "gpui",
- "gpui-base",
- "gpui-component",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "fluxdown_updater"
-version = "0.1.0"
-dependencies = [
- "flate2",
- "libc",
- "tar",
- "thiserror 2.0.18",
- "windows-sys 0.59.0",
- "winresource",
- "zip",
-]
-
-[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4390,10 +4049,6 @@ dependencies = [
  "chrono",
  "dash-mpd",
  "encoding_rs",
- "fluxdown_api",
- "fluxdown_engine",
- "fluxdown_engine_protocol",
- "fluxdown_protocol",
  "futures-util",
  "hex 0.4.3",
  "http",
@@ -4402,6 +4057,10 @@ dependencies = [
  "md-5 0.10.6",
  "messages",
  "reqwest 0.12.28",
+ "rinadown_api",
+ "rinadown_engine",
+ "rinadown_engine_protocol",
+ "rinadown_protocol",
  "rinf",
  "serde",
  "serde_json",
@@ -7897,6 +7556,347 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47b34b781b31e5d73e9fbc8689c70551fd1ade9a19e3e28cfec8580a79290cc4"
 dependencies = [
  "bytemuck",
+]
+
+[[package]]
+name = "rinadown_agent"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64 0.22.1",
+ "chacha20poly1305",
+ "directories",
+ "ed25519-dalek",
+ "fs2",
+ "futures-util",
+ "hkdf 0.12.4",
+ "keepawake",
+ "mdns-sd",
+ "notify-rust",
+ "rand 0.9.2",
+ "reqwest 0.12.28",
+ "rinadown_api",
+ "rinadown_protocol",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+ "winreg",
+ "x25519-dalek",
+]
+
+[[package]]
+name = "rinadown_api"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "futures-util",
+ "rinadown_protocol",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util",
+ "tracing",
+ "utoipa",
+ "uuid",
+]
+
+[[package]]
+name = "rinadown_cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "directories",
+ "reqwest 0.12.28",
+ "rinadown_api",
+ "rinadown_engine",
+ "rinadown_protocol",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml 1.1.2+spec-1.1.0",
+]
+
+[[package]]
+name = "rinadown_daemon"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64 0.22.1",
+ "fs2",
+ "futures-util",
+ "rinadown_engine",
+ "rinadown_engine_protocol",
+ "rinadown_protocol",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "rinadown_engine"
+version = "0.1.0"
+dependencies = [
+ "aes",
+ "anyhow",
+ "async-compression",
+ "async-trait",
+ "base64 0.22.1",
+ "bytes",
+ "cbc",
+ "chacha20poly1305",
+ "chrono",
+ "dash-mpd",
+ "directories",
+ "ed25519-dalek",
+ "encoding_rs",
+ "feed-rs",
+ "flate2",
+ "fs2",
+ "futures-util",
+ "hex 0.4.3",
+ "hkdf 0.12.4",
+ "hmac 0.12.1",
+ "http",
+ "igd-next",
+ "libc",
+ "librqbit",
+ "m3u8-rs",
+ "md-5 0.10.6",
+ "md4",
+ "mdns-sd",
+ "quick-xml 0.41.0",
+ "rand 0.9.2",
+ "regex",
+ "reqwest 0.12.28",
+ "rquickjs",
+ "serde",
+ "serde_json",
+ "sha1 0.10.6",
+ "sha2 0.10.9",
+ "sqlx",
+ "suppaftp",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "ts2mp4",
+ "url",
+ "uuid",
+ "windows-sys 0.59.0",
+ "winreg",
+ "x25519-dalek",
+ "zip",
+]
+
+[[package]]
+name = "rinadown_engine_protocol"
+version = "0.1.0"
+dependencies = [
+ "rinadown_engine",
+ "rinadown_protocol",
+ "serde_json",
+]
+
+[[package]]
+name = "rinadown_nmh"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde",
+ "serde_json",
+ "winresource",
+]
+
+[[package]]
+name = "rinadown_protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "utoipa",
+]
+
+[[package]]
+name = "rinadown_server"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64 0.22.1",
+ "fs2",
+ "futures-util",
+ "reqwest 0.12.28",
+ "rinadown_api",
+ "rinadown_engine",
+ "rinadown_engine_protocol",
+ "rinadown_protocol",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tower-http 0.7.0",
+ "utoipa",
+ "uuid",
+]
+
+[[package]]
+name = "rinadown_ui_account"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "rinadown_protocol",
+ "rinadown_ui_i18n",
+ "rinadown_ui_theme",
+ "serde_json",
+]
+
+[[package]]
+name = "rinadown_ui_app"
+version = "0.1.0"
+dependencies = [
+ "directories",
+ "futures-util",
+ "gpui",
+ "gpui-component",
+ "gpui-component-assets",
+ "gpui_platform",
+ "rinadown_protocol",
+ "rinadown_ui_account",
+ "rinadown_ui_downloads",
+ "rinadown_ui_extensions",
+ "rinadown_ui_i18n",
+ "rinadown_ui_rss",
+ "rinadown_ui_settings",
+ "rinadown_ui_shell",
+ "rinadown_ui_theme",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-tungstenite",
+ "winresource",
+]
+
+[[package]]
+name = "rinadown_ui_components"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-base",
+ "rinadown_ui_theme",
+]
+
+[[package]]
+name = "rinadown_ui_downloads"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "rinadown_protocol",
+ "rinadown_ui_components",
+ "rinadown_ui_i18n",
+ "rinadown_ui_theme",
+ "serde_json",
+]
+
+[[package]]
+name = "rinadown_ui_extensions"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "rinadown_protocol",
+ "rinadown_ui_i18n",
+ "rinadown_ui_theme",
+ "serde_json",
+]
+
+[[package]]
+name = "rinadown_ui_i18n"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "rinadown_ui_rss"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "rinadown_protocol",
+ "rinadown_ui_i18n",
+ "rinadown_ui_theme",
+ "serde_json",
+]
+
+[[package]]
+name = "rinadown_ui_settings"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "rinadown_protocol",
+ "rinadown_ui_components",
+ "rinadown_ui_i18n",
+ "rinadown_ui_theme",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "rinadown_ui_shell"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-component",
+ "rinadown_ui_components",
+ "rinadown_ui_i18n",
+ "rinadown_ui_theme",
+]
+
+[[package]]
+name = "rinadown_ui_theme"
+version = "0.1.0"
+dependencies = [
+ "gpui",
+ "gpui-base",
+ "gpui-component",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "rinadown_updater"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "libc",
+ "tar",
+ "thiserror 2.0.18",
+ "windows-sys 0.59.0",
+ "winresource",
+ "zip",
 ]
 
 [[package]]

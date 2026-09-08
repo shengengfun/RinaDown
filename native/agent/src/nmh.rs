@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use fluxdown_protocol::{DownloadRequest, TaskDto};
+use rinadown_protocol::{DownloadRequest, TaskDto};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
@@ -158,7 +158,7 @@ impl NmhService {
     async fn task_list(&self, msg_id: u64) -> PipeResponse {
         let tasks = match self
             .daemon
-            .call::<Value, Vec<TaskDto>>(fluxdown_protocol::method::DAEMON_TASK_LIST, None)
+            .call::<Value, Vec<TaskDto>>(rinadown_protocol::method::DAEMON_TASK_LIST, None)
             .await
         {
             Ok(tasks) => tasks,
@@ -173,9 +173,9 @@ impl NmhService {
             Err(error) => return PipeResponse::error(msg_id, error.to_string()),
         };
         let method = match operation.op.as_str() {
-            "pause" => fluxdown_protocol::method::DAEMON_TASK_PAUSE,
-            "resume" => fluxdown_protocol::method::DAEMON_TASK_RESUME,
-            "remove" => fluxdown_protocol::method::DAEMON_TASK_DELETE,
+            "pause" => rinadown_protocol::method::DAEMON_TASK_PAUSE,
+            "resume" => rinadown_protocol::method::DAEMON_TASK_RESUME,
+            "remove" => rinadown_protocol::method::DAEMON_TASK_DELETE,
             other => return PipeResponse::error(msg_id, format!("unknown task op: {other}")),
         };
         let params = if operation.op == "remove" {
@@ -197,7 +197,7 @@ impl NmhService {
         let task = match self
             .daemon
             .call::<Value, TaskDto>(
-                fluxdown_protocol::method::DAEMON_TASK_GET,
+                rinadown_protocol::method::DAEMON_TASK_GET,
                 Some(serde_json::json!({"taskId": request.task_id})),
             )
             .await
@@ -320,18 +320,18 @@ async fn run_server(service: NmhService, cancel: CancellationToken) -> Result<()
 #[cfg(target_os = "linux")]
 fn unix_socket_path() -> std::path::PathBuf {
     std::env::var_os("HOME").map_or_else(
-        || std::path::PathBuf::from("/tmp/fluxdown.sock"),
-        |home| std::path::PathBuf::from(home).join(".local/share/fluxdown/fluxdown.sock"),
+        || std::path::PathBuf::from("/tmp/rinadown.sock"),
+        |home| std::path::PathBuf::from(home).join(".local/share/rinadown/rinadown.sock"),
     )
 }
 
 #[cfg(target_os = "macos")]
 fn unix_socket_path() -> std::path::PathBuf {
     std::env::var_os("HOME").map_or_else(
-        || std::path::PathBuf::from("/tmp/fluxdown.sock"),
+        || std::path::PathBuf::from("/tmp/rinadown.sock"),
         |home| {
             std::path::PathBuf::from(home)
-                .join("Library/Application Support/fluxdown/fluxdown.sock")
+                .join("Library/Application Support/rinadown/rinadown.sock")
         },
     )
 }
@@ -339,8 +339,8 @@ fn unix_socket_path() -> std::path::PathBuf {
 #[cfg(all(unix, not(any(target_os = "linux", target_os = "macos"))))]
 fn unix_socket_path() -> std::path::PathBuf {
     std::env::var_os("XDG_RUNTIME_DIR").map_or_else(
-        || std::path::PathBuf::from("/tmp/fluxdown.sock"),
-        |dir| std::path::PathBuf::from(dir).join("fluxdown.sock"),
+        || std::path::PathBuf::from("/tmp/rinadown.sock"),
+        |dir| std::path::PathBuf::from(dir).join("rinadown.sock"),
     )
 }
 
@@ -381,7 +381,7 @@ pub fn ipc_endpoint() -> String {
 }
 
 #[cfg(windows)]
-const PIPE_NAME: &str = r"\\.\pipe\fluxdown";
+const PIPE_NAME: &str = r"\\.\pipe\rinadown";
 
 /// 以中继的长度帧协议向本进程 IPC 端点发送 `ping`，成功返回 `pong` 载荷。
 pub async fn probe_ipc(timeout: std::time::Duration) -> Result<String, std::io::Error> {
@@ -430,28 +430,28 @@ where
     }
 }
 
-/// 浏览器 Native Messaging Host 清单注册：写出指向 `fluxdown_nmh` 中继的清单，
+/// 浏览器 Native Messaging Host 清单注册：写出指向 `rinadown_nmh` 中继的清单，
 /// 并为 Doctor 提供只读诊断快照。
 ///
 /// 注册目标与 Flutter 时代的 hub 完全一致（Chrome/Edge/Firefox 及各 Chromium 分支），
-/// 但中继二进制按 `fluxdown-agent` 的同级目录查找。
+/// 但中继二进制按 `rinadown-agent` 的同级目录查找。
 pub mod registry {
     use std::io;
     use std::path::{Path, PathBuf};
 
     use serde::Serialize;
 
-    const NMH_NAME: &str = "com.fluxdown.nmh";
-    const NMH_DESCRIPTION: &str = "FluxDown Native Messaging Host";
+    const NMH_NAME: &str = "com.rinadown.nmh";
+    const NMH_DESCRIPTION: &str = "RinaDown Native Messaging Host";
     #[cfg(windows)]
-    const NMH_EXE_NAME: &str = "fluxdown_nmh.exe";
+    const NMH_EXE_NAME: &str = "rinadown_nmh.exe";
     #[cfg(not(windows))]
-    const NMH_EXE_NAME: &str = "fluxdown_nmh";
+    const NMH_EXE_NAME: &str = "rinadown_nmh";
     /// Chrome 扩展 ID（wxt.config.ts 里通过 `key` 固定）。
     const CHROME_EXTENSION_ID: &str = "chrome-extension://meleenglfggcmcajknpeeeiobnpfmahc/";
     /// Edge 商店扩展 ID：Edge 忽略清单 `key`，必须单独放行，否则 connectNative 报 forbidden。
     const EDGE_EXTENSION_ID: &str = "chrome-extension://nglkkjbogjghekbhhcnccnpfedjbdhhd/";
-    const FIREFOX_EXTENSION_ID: &str = "fluxdown@fluxdown.app";
+    const FIREFOX_EXTENSION_ID: &str = "rinadown@rinadown.app";
 
     /// 单个浏览器的 NMH 注册状态。
     #[derive(Debug, Clone)]
@@ -551,7 +551,7 @@ pub mod registry {
         }
         Err(io::Error::new(
             io::ErrorKind::NotFound,
-            format!("{NMH_EXE_NAME} not found. Build it with: cargo build -p fluxdown_nmh"),
+            format!("{NMH_EXE_NAME} not found. Build it with: cargo build -p rinadown_nmh"),
         ))
     }
 
@@ -582,8 +582,8 @@ pub mod registry {
 
         use super::{EDGE_EXTENSION_ID, NmhDiagnosis, NmhTarget};
 
-        const MANIFEST_FILENAME: &str = "com.fluxdown.nmh.json";
-        const NMH_WRAPPER_NAME: &str = "fluxdown_nmh.sh";
+        const MANIFEST_FILENAME: &str = "com.rinadown.nmh.json";
+        const NMH_WRAPPER_NAME: &str = "rinadown_nmh.sh";
 
         fn home_dir() -> Option<PathBuf> {
             directories::BaseDirs::new().map(|dirs| dirs.home_dir().to_path_buf())
@@ -599,7 +599,7 @@ pub mod registry {
             home_dir().map(|home| {
                 home.join("Library")
                     .join("Application Support")
-                    .join("fluxdown")
+                    .join("rinadown")
                     .join(NMH_WRAPPER_NAME)
             })
         }
@@ -609,7 +609,7 @@ pub mod registry {
             home_dir().map(|home| {
                 home.join(".local")
                     .join("share")
-                    .join("fluxdown")
+                    .join("rinadown")
                     .join(NMH_WRAPPER_NAME)
             })
         }
@@ -950,8 +950,8 @@ pub mod registry {
 
         use super::{EDGE_EXTENSION_ID, NMH_NAME, NmhDiagnosis, NmhTarget};
 
-        const MANIFEST_FILENAME_CHROMIUM: &str = "com.fluxdown.nmh.json";
-        const MANIFEST_FILENAME_FIREFOX: &str = "com.fluxdown.nmh.firefox.json";
+        const MANIFEST_FILENAME_CHROMIUM: &str = "com.rinadown.nmh.json";
+        const MANIFEST_FILENAME_FIREFOX: &str = "com.rinadown.nmh.firefox.json";
         /// Brave/Vivaldi/Opera 等分支在自身键缺失时回退读 Chrome 键，只需 Chrome 与 Edge。
         const CHROMIUM_REG_PATHS: [(&str, &str); 2] = [
             (r"Software\Google\Chrome\NativeMessagingHosts", "Chrome"),
@@ -1109,7 +1109,7 @@ mod tests {
     async fn ipc_ping_round_trips_through_frame_protocol() {
         let daemon = Arc::new(crate::daemon_client::DaemonClient::disconnected());
         let events =
-            crate::event_hub::AgentEventHub::new(fluxdown_protocol::AgentSnapshot::default());
+            crate::event_hub::AgentEventHub::new(rinadown_protocol::AgentSnapshot::default());
         let capture = Arc::new(crate::capture::CaptureService::new(daemon.clone(), events));
         let service = NmhService::new(daemon, capture);
         let (client, server) = tokio::io::duplex(4096);

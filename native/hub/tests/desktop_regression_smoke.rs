@@ -1,12 +1,12 @@
-//! 桌面回归冒烟测试 —— `docs/fluxdown-engine-decouple-plan.md` Verification
+//! 桌面回归冒烟测试 —— `docs/rinadown-engine-decouple-plan.md` Verification
 //! 条款 6。
 //!
-//! **范围调整说明**：原条款要求"迁移前后对比"，但 hub → `fluxdown_engine`
+//! **范围调整说明**：原条款要求"迁移前后对比"，但 hub → `rinadown_engine`
 //! 的搬移已经完成合并，无法再产出"迁移前"基线（现有代码就是迁移后的唯一
 //! 版本）。按计划 Assumptions 第 28/142 行"若触发范围上限降级，回归验证降级
 //! 为静态等价性检查"的先例，本测试改为**静态等价性检查**：不做前后对比，而
 //! 是验证当前（迁移后）通过 hub 使用的确切构造路径
-//! （`fluxdown_engine::Engine::new` → `DownloadManager::create_task` →
+//! （`rinadown_engine::Engine::new` → `DownloadManager::create_task` →
 //! `downloader`/`segment_coordinator` → `EventSink` → `progress_reporter`）
 //! 发起一次真实多段下载时，产生的 `TaskProgress`/`SegmentProgress` 事件序列
 //! 在结构上是自洽、正确的 —— 这本身就是对整个 hub 适配层端到端正确性的
@@ -27,10 +27,10 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::events::{EngineEvent, EventSink};
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection};
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::events::{EngineEvent, EventSink};
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::{Engine, EngineConfig, NoopSelection};
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -371,7 +371,7 @@ fn assert_contiguous_coverage(segments: &[(i32, i64, i64)], total_bytes: i64, ct
 // 测试
 // ===========================================================================
 
-/// 端到端验证：hub 使用的 `fluxdown_engine::Engine` 构造路径
+/// 端到端验证：hub 使用的 `rinadown_engine::Engine` 构造路径
 /// （`Engine::new` → `DownloadManager::create_task` → 真实多段下载 →
 /// `EventSink`/`progress_reporter`）产生结构自洽的 `TaskProgress`/
 /// `SegmentProgress` 事件序列，且下载文件字节级正确。
@@ -385,7 +385,7 @@ async fn desktop_regression_smoke() {
     let url = server.url();
 
     let work_dir = std::env::temp_dir().join(format!(
-        "fluxdown_desktop_regression_smoke_{}",
+        "rinadown_desktop_regression_smoke_{}",
         std::process::id()
     ));
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
@@ -420,7 +420,7 @@ async fn desktop_regression_smoke() {
         .manager
         .take_progress_rx()
         .expect("take_progress_rx should return Some on first call");
-    tokio::spawn(fluxdown_engine::download_manager::progress_reporter(
+    tokio::spawn(rinadown_engine::download_manager::progress_reporter(
         progress_rx,
         engine.db.clone(),
         sink.clone(),
@@ -435,7 +435,7 @@ async fn desktop_regression_smoke() {
 
     engine
         .manager
-        .create_task(fluxdown_engine::download_manager::NewTaskSpec {
+        .create_task(rinadown_engine::download_manager::NewTaskSpec {
             url: url.clone(),
             save_dir: save_dir.clone(),
             file_name: file_name.clone(),

@@ -1,5 +1,5 @@
 //! 端到端：yt-dlp 示例插件 `hooks.js` 的 `onDone` 经 `flux.ffmpeg` 把非 mp4 产物
-//! 转为 mp4。真实执行依赖 ffmpeg，经 `FLUXDOWN_TEST_FFMPEG=<绝对路径>` 注入；
+//! 转为 mp4。真实执行依赖 ffmpeg，经 `RINADOWN_TEST_FFMPEG=<绝对路径>` 注入；
 //! 未设置则跳过（保持 CI 无 ffmpeg 时确定性）。
 //!
 //! 仅 `plugins` feature 下编译运行。
@@ -10,21 +10,21 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use fluxdown_engine::db::Db;
-use fluxdown_engine::plugin::bridge::EngineBridge;
-use fluxdown_engine::plugin::quickjs::QuickJsScriptRuntime;
-use fluxdown_engine::plugin::runtime::{
+use rinadown_engine::db::Db;
+use rinadown_engine::plugin::bridge::EngineBridge;
+use rinadown_engine::plugin::quickjs::QuickJsScriptRuntime;
+use rinadown_engine::plugin::runtime::{
     ExecutionBudget, FfmpegSpec, HostContext, PluginBridge, PluginEntryKind, PluginEvent,
     PluginScript, ScriptRuntime,
 };
-use fluxdown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::proxy_config::ProxyConfig;
 
 fn unique_dir(tag: &str) -> PathBuf {
     static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let mut d = std::env::temp_dir();
     d.push(format!(
-        "fluxdown_ythook_{}_{}_{}",
+        "rinadown_ythook_{}_{}_{}",
         tag,
         std::process::id(),
         n
@@ -35,7 +35,7 @@ fn unique_dir(tag: &str) -> PathBuf {
 
 async fn make_bridge(data_dir: &Path, ffmpeg: &str) -> Arc<EngineBridge> {
     let db = Db::open(data_dir).await.expect("open db");
-    db.set_config(fluxdown_engine::components::CONFIG_FFMPEG_PATH, ffmpeg)
+    db.set_config(rinadown_engine::components::CONFIG_FFMPEG_PATH, ffmpeg)
         .await
         .expect("seed ffmpeg path");
     let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
@@ -99,7 +99,7 @@ async fn run_on_done(
     settings_json: &str,
 ) {
     let script = PluginScript {
-        identity: "fluxdown@ytdlp".to_string(),
+        identity: "rinadown@ytdlp".to_string(),
         source: hooks_source(),
         entry_fn_hint: PluginEntryKind::Hook,
         version: "1.2.0".to_string(),
@@ -136,8 +136,8 @@ async fn run_on_done(
 /// preferMp4=false + 非 mp4 产物 → onDone 应产出同名 .mp4。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn on_done_converts_webm_to_mp4() {
-    let Ok(ffmpeg) = std::env::var("FLUXDOWN_TEST_FFMPEG") else {
-        eprintln!("[skip] 未设置 FLUXDOWN_TEST_FFMPEG，跳过真实转码");
+    let Ok(ffmpeg) = std::env::var("RINADOWN_TEST_FFMPEG") else {
+        eprintln!("[skip] 未设置 RINADOWN_TEST_FFMPEG，跳过真实转码");
         return;
     };
     let data_dir = unique_dir("data_conv");
@@ -164,8 +164,8 @@ async fn on_done_converts_webm_to_mp4() {
 /// preferMp4=true → 门控短路，不产出 mp4（源 webm 原样保留）。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn on_done_skips_when_prefer_mp4() {
-    let Ok(ffmpeg) = std::env::var("FLUXDOWN_TEST_FFMPEG") else {
-        eprintln!("[skip] 未设置 FLUXDOWN_TEST_FFMPEG，跳过门控断言");
+    let Ok(ffmpeg) = std::env::var("RINADOWN_TEST_FFMPEG") else {
+        eprintln!("[skip] 未设置 RINADOWN_TEST_FFMPEG，跳过门控断言");
         return;
     };
     let data_dir = unique_dir("data_skip");

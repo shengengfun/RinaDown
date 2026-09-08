@@ -1,4 +1,4 @@
-use fluxdown_protocol::{
+use rinadown_protocol::{
     AgentLoginResult, AgentSessionDto, CloudDevice, CloudUser, CloudUserStatus, Entitlements,
     GatewayPatchParams, RemoteTaskStatus,
 };
@@ -91,7 +91,7 @@ fn gateway_patch_is_partial_and_never_echoes_user_token() -> Result<(), serde_js
     }))?;
     assert_eq!(patch.cors_enabled, Some(true));
     assert_eq!(patch.api_enabled, None);
-    let status = fluxdown_protocol::GatewayStatusDto {
+    let status = rinadown_protocol::GatewayStatusDto {
         cors_enabled: true,
         user_token_configured: true,
         ..Default::default()

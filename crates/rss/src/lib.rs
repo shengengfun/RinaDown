@@ -2,7 +2,7 @@
 
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use fluxdown_ui_i18n::Translator;
+use rinadown_ui_i18n::Translator;
 use gpui::{
     AppContext as _, Context, Entity, IntoElement, ParentElement, Render, Styled, Window, div,
     prelude::FluentBuilder as _,
@@ -16,7 +16,7 @@ use gpui_component::{
 };
 
 pub type PortFuture<T> =
-    Pin<Box<dyn Future<Output = Result<T, fluxdown_protocol::RpcErrorData>> + Send + 'static>>;
+    Pin<Box<dyn Future<Output = Result<T, rinadown_protocol::RpcErrorData>> + Send + 'static>>;
 
 pub trait RssPort: Send + Sync {
     fn call(
@@ -28,7 +28,7 @@ pub trait RssPort: Send + Sync {
 
 pub struct RssController {
     port: Arc<dyn RssPort>,
-    sources: Vec<fluxdown_protocol::RssSourceDto>,
+    sources: Vec<rinadown_protocol::RssSourceDto>,
     stale: bool,
 }
 
@@ -40,24 +40,24 @@ impl RssController {
             stale: true,
         }
     }
-    pub fn replace_snapshot(&mut self, snapshot: &fluxdown_protocol::AgentSnapshot) {
+    pub fn replace_snapshot(&mut self, snapshot: &rinadown_protocol::AgentSnapshot) {
         self.sources.clone_from(&snapshot.daemon.rss_sources);
         self.stale = false;
     }
-    pub fn apply_event(&mut self, event: &fluxdown_protocol::ServiceEvent) {
-        let fluxdown_protocol::ServiceEvent::Agent(event) = event else {
+    pub fn apply_event(&mut self, event: &rinadown_protocol::ServiceEvent) {
+        let rinadown_protocol::ServiceEvent::Agent(event) = event else {
             return;
         };
         match event {
-            fluxdown_protocol::AgentEvent::DaemonSnapshotReplaced(snapshot) => {
+            rinadown_protocol::AgentEvent::DaemonSnapshotReplaced(snapshot) => {
                 self.sources.clone_from(&snapshot.rss_sources);
                 self.stale = false;
             }
-            fluxdown_protocol::AgentEvent::DaemonConnectionChanged(connected) => {
+            rinadown_protocol::AgentEvent::DaemonConnectionChanged(connected) => {
                 self.stale = !connected;
             }
-            fluxdown_protocol::AgentEvent::Daemon(fluxdown_protocol::DaemonEvent::Engine(
-                fluxdown_protocol::WsServerMsg::RssSourcesChanged { sources },
+            rinadown_protocol::AgentEvent::Daemon(rinadown_protocol::DaemonEvent::Engine(
+                rinadown_protocol::WsServerMsg::RssSourcesChanged { sources },
             )) => self.sources.clone_from(sources),
             _ => {}
         }
@@ -65,7 +65,7 @@ impl RssController {
     pub fn mark_stale(&mut self) {
         self.stale = true;
     }
-    pub fn sources(&self) -> &[fluxdown_protocol::RssSourceDto] {
+    pub fn sources(&self) -> &[rinadown_protocol::RssSourceDto] {
         &self.sources
     }
     pub fn is_stale(&self) -> bool {
@@ -76,7 +76,7 @@ impl RssController {
             return unavailable();
         }
         self.port.call(
-            fluxdown_protocol::method::DAEMON_RSS_CREATE_SOURCE,
+            rinadown_protocol::method::DAEMON_RSS_CREATE_SOURCE,
             serde_json::json!({"url": url, "enabled": true, "autoDownload": false}),
         )
     }
@@ -85,21 +85,21 @@ impl RssController {
             return unavailable();
         }
         self.port.call(
-            fluxdown_protocol::method::DAEMON_RSS_DELETE_SOURCE,
+            rinadown_protocol::method::DAEMON_RSS_DELETE_SOURCE,
             serde_json::json!({"sourceId": source_id}),
         )
     }
     pub fn refresh(&self, source_id: String) -> PortFuture<serde_json::Value> {
         if self.stale {
             return Box::pin(async {
-                Err(fluxdown_protocol::RpcErrorData::new(
-                    fluxdown_protocol::ApplicationErrorCode::Unavailable,
+                Err(rinadown_protocol::RpcErrorData::new(
+                    rinadown_protocol::ApplicationErrorCode::Unavailable,
                     true,
                 ))
             });
         }
         self.port.call(
-            fluxdown_protocol::method::DAEMON_RSS_REFRESH_SOURCE,
+            rinadown_protocol::method::DAEMON_RSS_REFRESH_SOURCE,
             serde_json::json!({"sourceId": source_id}),
         )
     }
@@ -107,8 +107,8 @@ impl RssController {
 
 fn unavailable() -> PortFuture<serde_json::Value> {
     Box::pin(async {
-        Err(fluxdown_protocol::RpcErrorData::new(
-            fluxdown_protocol::ApplicationErrorCode::Unavailable,
+        Err(rinadown_protocol::RpcErrorData::new(
+            rinadown_protocol::ApplicationErrorCode::Unavailable,
             true,
         ))
     })
@@ -139,14 +139,14 @@ impl RssView {
     }
     pub fn replace_snapshot(
         &mut self,
-        snapshot: &fluxdown_protocol::AgentSnapshot,
+        snapshot: &rinadown_protocol::AgentSnapshot,
         cx: &mut Context<Self>,
     ) {
         self.last_error = None;
         self.controller.replace_snapshot(snapshot);
         cx.notify();
     }
-    pub fn apply_event(&mut self, event: &fluxdown_protocol::ServiceEvent, cx: &mut Context<Self>) {
+    pub fn apply_event(&mut self, event: &rinadown_protocol::ServiceEvent, cx: &mut Context<Self>) {
         self.controller.apply_event(event);
         cx.notify();
     }

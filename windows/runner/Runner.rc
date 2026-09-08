@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "FluxDown" "\0"
-            VALUE "FileDescription", "FluxDown" "\0"
+            VALUE "CompanyName", "RinaDown" "\0"
+            VALUE "FileDescription", "RinaDown" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "com.fluxdown.app" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 FluxDown. All rights reserved." "\0"
-            VALUE "OriginalFilename", "flux_down.exe" "\0"
-            VALUE "ProductName", "FluxDown" "\0"
+            VALUE "InternalName", "com.rinadown.app" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 RinaDown. All rights reserved." "\0"
+            VALUE "OriginalFilename", "rina_down.exe" "\0"
+            VALUE "ProductName", "RinaDown" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

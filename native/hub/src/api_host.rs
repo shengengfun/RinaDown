@@ -1,4 +1,4 @@
-//! [`HubApiHost`] —— `fluxdown_api::service::ApiHost` 的桌面 App 实现。
+//! [`HubApiHost`] —— `rinadown_api::service::ApiHost` 的桌面 App 实现。
 //!
 //! ## 读写分离
 //!
@@ -28,8 +28,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use fluxdown_api::service::{ApiError, ApiHost, LiveSpeed, TaskEvent};
-use fluxdown_protocol::daemon::{
+use rinadown_api::service::{ApiError, ApiHost, LiveSpeed, TaskEvent};
+use rinadown_protocol::daemon::{
     CreateGroupRequest, CreateTaskRequest, DownloadRequest, GroupDto, QueueDto,
     ResolvePreviewRequest, ResolvePreviewResponse, RssItemActionRequest, RssItemDto, RssSourceDto,
     RssValidateRequest, RssValidateResponse, TaskDto,
@@ -37,20 +37,20 @@ use fluxdown_protocol::daemon::{
 #[cfg(hub_link)]
 use std::time::Duration;
 
-use fluxdown_engine::db::Db;
-use fluxdown_engine::download_manager::{CreateGroupSpec, GroupItemSpec, ResolvePreviewOutcome};
+use rinadown_engine::db::Db;
+use rinadown_engine::download_manager::{CreateGroupSpec, GroupItemSpec, ResolvePreviewOutcome};
 #[cfg(hub_link)]
-use fluxdown_engine::link::{DiscoveredPeer, DiscoveryKind, LinkError, WireHello};
+use rinadown_engine::link::{DiscoveredPeer, DiscoveryKind, LinkError, WireHello};
 #[cfg(hub_plugins)]
-use fluxdown_engine::plugin::{MarketClient, PluginManager};
+use rinadown_engine::plugin::{MarketClient, PluginManager};
 #[cfg(hub_link)]
-use fluxdown_protocol::daemon::{
+use rinadown_protocol::daemon::{
     LinkAuth, LinkCodeResponse, LinkDeviceInfo, LinkDiscoveredPeer, LinkPairBeginResponse,
     LinkPairConfirmOutcome, LinkPairConfirmRequest, LinkPairHelloRequest, LinkPairHelloResponse,
     LinkPingInfo, LinkTaskRequest,
 };
 #[cfg(hub_plugins)]
-use fluxdown_protocol::daemon::{MarketEntryDto, PluginDto};
+use rinadown_protocol::daemon::{MarketEntryDto, PluginDto};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 /// 任务实时速率表：`task_id → LiveSpeed`。写端见 [`crate::rinf_sink::RinfEventSink`]；
@@ -144,12 +144,12 @@ pub enum ApiCommand {
     /// `source` 装箱理由同 [`ApiCommand::CreateTask`]：`RssSourceInfo` 携带
     /// 十余个过滤/命名字段，远大于其余变体（clippy::large_enum_variant）。
     RssCreate {
-        source: Box<fluxdown_engine::rss::model::RssSourceInfo>,
+        source: Box<rinadown_engine::rss::model::RssSourceInfo>,
         ack: oneshot::Sender<Option<String>>,
     },
     /// 更新订阅可编辑字段；`false` = 订阅不存在（映射 404）。装箱理由同上。
     RssUpdate {
-        source: Box<fluxdown_engine::rss::model::RssSourceInfo>,
+        source: Box<rinadown_engine::rss::model::RssSourceInfo>,
         ack: oneshot::Sender<bool>,
     },
     /// 删除订阅（级联条目）；`false` = 订阅不存在。
@@ -178,11 +178,11 @@ pub enum ApiCommand {
         cookies: String,
         user_agent: String,
         proxy_url: String,
-        ack: oneshot::Sender<Box<fluxdown_engine::rss::RssValidateOutcome>>,
+        ack: oneshot::Sender<Box<rinadown_engine::rss::RssValidateOutcome>>,
     },
 }
 
-/// 桌面 App 的 API 宿主。构造后传给 `fluxdown_api::server::spawn_api_server`。
+/// 桌面 App 的 API 宿主。构造后传给 `rinadown_api::server::spawn_api_server`。
 pub struct HubApiHost {
     db: Db,
     cmd_tx: mpsc::Sender<ApiCommand>,
@@ -202,7 +202,7 @@ pub struct HubApiHost {
     data_dir: PathBuf,
     /// 本地设备互联管理器（桌面 `hub_link`；`None` = mDNS 关闭）。
     #[cfg(hub_link)]
-    link: Option<Arc<fluxdown_engine::link::LinkManager>>,
+    link: Option<Arc<rinadown_engine::link::LinkManager>>,
 }
 
 impl HubApiHost {
@@ -219,7 +219,7 @@ impl HubApiHost {
         task_events_tx: broadcast::Sender<TaskEvent>,
         #[cfg(hub_plugins)] plugin_manager: Option<Arc<PluginManager>>,
         data_dir: PathBuf,
-        #[cfg(hub_link)] link: Option<Arc<fluxdown_engine::link::LinkManager>>,
+        #[cfg(hub_link)] link: Option<Arc<rinadown_engine::link::LinkManager>>,
     ) -> Self {
         Self {
             db,
@@ -287,7 +287,7 @@ impl ApiHost for HubApiHost {
             .map(|tasks| {
                 tasks
                     .into_iter()
-                    .map(fluxdown_engine_protocol::task_info_to_dto)
+                    .map(rinadown_engine_protocol::task_info_to_dto)
                     .collect()
             })
             .map_err(|e| ApiError::Internal(e.to_string()))
@@ -297,7 +297,7 @@ impl ApiHost for HubApiHost {
         self.db
             .load_task_by_id(task_id)
             .await
-            .map(|t| t.map(fluxdown_engine_protocol::task_info_to_dto))
+            .map(|t| t.map(rinadown_engine_protocol::task_info_to_dto))
             .map_err(|e| ApiError::Internal(e.to_string()))
     }
 
@@ -352,7 +352,7 @@ impl ApiHost for HubApiHost {
             .await
             .map(|qs| {
                 qs.into_iter()
-                    .map(fluxdown_engine_protocol::queue_info_to_dto)
+                    .map(rinadown_engine_protocol::queue_info_to_dto)
                     .collect()
             })
             .map_err(|e| ApiError::Internal(e.to_string()))
@@ -404,7 +404,7 @@ impl ApiHost for HubApiHost {
             .list()
             .await
             .into_iter()
-            .map(fluxdown_engine_protocol::plugin_info_to_dto)
+            .map(rinadown_engine_protocol::plugin_info_to_dto)
             .collect())
     }
 
@@ -479,7 +479,7 @@ impl ApiHost for HubApiHost {
         Ok(idx
             .entries
             .into_iter()
-            .map(fluxdown_engine_protocol::market_entry_to_dto)
+            .map(rinadown_engine_protocol::market_entry_to_dto)
             .collect())
     }
 
@@ -500,7 +500,7 @@ impl ApiHost for HubApiHost {
             return Vec::new();
         };
         let perms = pm.permissions_of(identity).await;
-        fluxdown_engine::plugin::dependencies::missing_components(&self.db, &self.data_dir, &perms)
+        rinadown_engine::plugin::dependencies::missing_components(&self.db, &self.data_dir, &perms)
             .await
     }
 
@@ -600,7 +600,7 @@ impl ApiHost for HubApiHost {
             .map(|groups| {
                 groups
                     .into_iter()
-                    .map(fluxdown_engine_protocol::group_info_to_dto)
+                    .map(rinadown_engine_protocol::group_info_to_dto)
                     .collect()
             })
             .map_err(|e| ApiError::Internal(e.to_string()))
@@ -645,7 +645,7 @@ impl ApiHost for HubApiHost {
             .map(|sources| {
                 sources
                     .into_iter()
-                    .map(fluxdown_engine_protocol::rss_source_info_to_dto)
+                    .map(rinadown_engine_protocol::rss_source_info_to_dto)
                     .collect()
             })
             .map_err(|e| ApiError::Internal(e.to_string()))
@@ -653,7 +653,7 @@ impl ApiHost for HubApiHost {
 
     async fn create_rss_source(&self, req: RssSourceDto) -> Result<String, ApiError> {
         self.send_cmd(|ack| ApiCommand::RssCreate {
-            source: Box::new(fluxdown_engine_protocol::rss_source_dto_to_engine(req)),
+            source: Box::new(rinadown_engine_protocol::rss_source_dto_to_engine(req)),
             ack,
         })
         .await?
@@ -663,7 +663,7 @@ impl ApiHost for HubApiHost {
     /// 路径参数是订阅身份的唯一来源：body 里的 `sourceId` 一律以它覆盖，
     /// 避免「改 A 的地址却写进 B」。
     async fn update_rss_source(&self, source_id: &str, req: RssSourceDto) -> Result<(), ApiError> {
-        let mut source = fluxdown_engine_protocol::rss_source_dto_to_engine(req);
+        let mut source = rinadown_engine_protocol::rss_source_dto_to_engine(req);
         source.source_id = source_id.to_string();
         match self
             .send_cmd(|ack| ApiCommand::RssUpdate {
@@ -709,12 +709,12 @@ impl ApiHost for HubApiHost {
     /// 保证 REST 拉取与 WS 推送看到的是同一个窗口。
     async fn list_rss_items(&self, source_id: &str) -> Result<Vec<RssItemDto>, ApiError> {
         self.db
-            .load_rss_items(source_id, fluxdown_engine::rss::MAX_ITEMS_PER_SOURCE)
+            .load_rss_items(source_id, rinadown_engine::rss::MAX_ITEMS_PER_SOURCE)
             .await
             .map(|items| {
                 items
                     .into_iter()
-                    .map(fluxdown_engine_protocol::rss_item_info_to_dto)
+                    .map(rinadown_engine_protocol::rss_item_info_to_dto)
                     .collect()
             })
             .map_err(|e| ApiError::Internal(e.to_string()))
@@ -755,7 +755,7 @@ impl ApiHost for HubApiHost {
             items: outcome
                 .items
                 .into_iter()
-                .map(fluxdown_engine_protocol::rss_item_info_to_dto)
+                .map(rinadown_engine_protocol::rss_item_info_to_dto)
                 .collect(),
             error: outcome.error,
         })
@@ -1009,9 +1009,9 @@ fn link_discovered_dto(p: DiscoveredPeer) -> LinkDiscoveredPeer {
 /// 把插件清单条目转换为 REST 预解析响应 DTO（`hub` 侧 wire↔engine 转换，
 /// 见 [`HubApiHost::resolve_preview`]）。
 fn manifest_item_to_preview_dto(
-    item: fluxdown_engine::model::ManifestItemInfo,
-) -> fluxdown_protocol::daemon::PreviewItemDto {
-    fluxdown_protocol::daemon::PreviewItemDto {
+    item: rinadown_engine::model::ManifestItemInfo,
+) -> rinadown_protocol::daemon::PreviewItemDto {
+    rinadown_protocol::daemon::PreviewItemDto {
         id: item.id,
         name: item.name,
         path: item.path,
@@ -1019,7 +1019,7 @@ fn manifest_item_to_preview_dto(
         variants: item
             .variants
             .into_iter()
-            .map(|v| fluxdown_protocol::daemon::PreviewVariantDto {
+            .map(|v| rinadown_protocol::daemon::PreviewVariantDto {
                 id: v.id,
                 label: v.label,
                 size: v.size,
@@ -1035,12 +1035,12 @@ fn link_opt_str(s: String) -> Option<String> {
 }
 
 /// 引擎 [`PairConfirmOutcome`] → API [`LinkPairConfirmOutcome`]。两者字段一致但分属
-/// 两个 crate（`fluxdown_api` 不依赖引擎的可选 link 模块），这里做一次显式搬运。
+/// 两个 crate（`rinadown_api` 不依赖引擎的可选 link 模块），这里做一次显式搬运。
 #[cfg(hub_link)]
 fn map_confirm_outcome(
-    outcome: fluxdown_engine::link::PairConfirmOutcome,
+    outcome: rinadown_engine::link::PairConfirmOutcome,
 ) -> LinkPairConfirmOutcome {
-    use fluxdown_engine::link::PairConfirmOutcome as E;
+    use rinadown_engine::link::PairConfirmOutcome as E;
     match outcome {
         E::Paired => LinkPairConfirmOutcome::Paired,
         E::Declined => LinkPairConfirmOutcome::Declined,
@@ -1070,7 +1070,7 @@ fn map_link_err(e: LinkError) -> ApiError {
 
 /// `self.link` 为 `None`（本宿主未启用/未初始化设备互联）时的统一错误。
 ///
-/// 复用 [`fluxdown_api::service::link_unsupported`] 的稳定契约 message
+/// 复用 [`rinadown_api::service::link_unsupported`] 的稳定契约 message
 /// （`"device link not supported by this host"`）——不能改用
 /// `ApiError::Unavailable`（固定文案 `"app shutting down"`，语义是宿主
 /// 正在关闭/命令通道已断，牛头不对马嘴）。Web 侧 `isLinkUnsupportedError()`
@@ -1078,5 +1078,5 @@ fn map_link_err(e: LinkError) -> ApiError {
 /// 文案用错就等于把这条 UX 分支废掉。
 #[cfg(hub_link)]
 fn link_disabled() -> ApiError {
-    fluxdown_api::service::link_unsupported()
+    rinadown_api::service::link_unsupported()
 }

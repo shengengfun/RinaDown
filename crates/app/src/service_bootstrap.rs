@@ -1,4 +1,4 @@
-//! GPUI 对同级 `fluxdown-agent` 的单飞启动与异步回收。
+//! GPUI 对同级 `rinadown-agent` 的单飞启动与异步回收。
 
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -58,14 +58,14 @@ impl ServiceBootstrap {
 }
 
 fn agent_executable() -> Result<PathBuf, std::io::Error> {
-    if let Some(path) = std::env::var_os("FLUXDOWN_AGENT_BIN") {
+    if let Some(path) = std::env::var_os("RINADOWN_AGENT_BIN") {
         return Ok(PathBuf::from(path));
     }
     let current = std::env::current_exe()?;
     Ok(current.with_file_name(if cfg!(windows) {
-        "fluxdown-agent.exe"
+        "rinadown-agent.exe"
     } else {
-        "fluxdown-agent"
+        "rinadown-agent"
     }))
 }
 
@@ -80,8 +80,8 @@ fn set_no_console_window(_command: &mut std::process::Command) {}
 
 #[derive(Debug, thiserror::Error)]
 pub enum BootstrapError {
-    #[error("could not locate fluxdown-agent: {0}")]
+    #[error("could not locate rinadown-agent: {0}")]
     Locate(#[from] std::io::Error),
-    #[error("could not spawn fluxdown-agent: {0}")]
+    #[error("could not spawn rinadown-agent: {0}")]
     Spawn(String),
 }

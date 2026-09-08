@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
-use fluxdown_ui_components::activity_button as activity_bar_button;
-use fluxdown_ui_i18n::Translator;
-use fluxdown_ui_theme::active_theme;
+use rinadown_ui_components::activity_button as activity_bar_button;
+use rinadown_ui_i18n::Translator;
+use rinadown_ui_theme::active_theme;
 use gpui::{
     AnyElement, AnyView, App, Context, Div, Entity, Img, InteractiveElement as _, IntoElement,
     MouseButton, ParentElement, Render, SharedString, StatefulInteractiveElement as _, Styled,
@@ -91,7 +91,7 @@ impl ShellAction {
     }
 }
 
-/// 使用 FluxDown 自定义标题栏承载任意能力页面的辅助窗口。
+/// 使用 RinaDown 自定义标题栏承载任意能力页面的辅助窗口。
 pub struct AuxiliaryWindowView {
     _translator: Entity<Translator>,
     title: SharedString,

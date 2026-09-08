@@ -1,4 +1,4 @@
-# 本地转录（ASR）插件设计 · fluxdown@transcribe
+# 本地转录（ASR）插件设计 · rinadown@transcribe
 
 > 目标：下载完成（含 yt-dlp 直链 + ffmpeg mux 产物）后，用**本地模型**把视频/音频
 > 转录成 SRT/VTT 字幕侧车文件。参照 `D:\Project\Audire`：模型走 **whisper.cpp 的
@@ -10,19 +10,19 @@
 
 ## 1. 为什么不能只写一个“onDone JS”
 
-FluxDown 插件只能在受控面调用宿主已授权的工具：目前仅 `ffmpeg` / `yt-dlp` 两个
+RinaDown 插件只能在受控面调用宿主已授权的工具：目前仅 `ffmpeg` / `yt-dlp` 两个
 权限（`native/engine/src/plugin/manifest.rs::VALID_PERMISSIONS` 闭合枚举）。插件
 无权任意 spawn 可执行文件。要做本地 ASR 必须新增一个**受管组件 + 对应插件权限**，
 否则 manifest 校验直接拒绝。因此这是一个“组件级”功能，需按下表逐层落地。
 
 ## 2. 与 Audire 的对接映射
 
-| Audire | FluxDown 对应方案 |
+| Audire | RinaDown 对应方案 |
 |---|---|
 | `whisper.cpp` 预编译后端 + `models/ggml-*.bin`（见 Audire `docs/models.md`：tiny/small/medium/large-v3/large-v3-turbo 及多语言变体） | 新增受管组件 `whisper`（桌面分发平台官方 whisper.cpp CLI 单文件二进制），模型文件由用户在设置中指定目录/URL（不随仓库分发，版权与体积原因） |
-| 前端选择模型 + 本地执行 | FluxDown「组件页」安装 whisper 后端；「插件设置」填模型路径与语言/格式 |
+| 前端选择模型 + 本地执行 | RinaDown「组件页」安装 whisper 后端；「插件设置」填模型路径与语言/格式 |
 | `Transcript{segments:[{start,stop,text,speaker}]}` 输出 | 插件钩子接收 stdout JSON（whisper `-oj`），在 JS 内组 SRT/VTT 写入 `flux.fs` 工作区，随后用产物注册（对齐 ffmpeg 转码产物注册方式） |
-| ffmpeg 抽取/预处理 | 复用 FluxDown 已装 ffmpeg：先抽 16k 单声道 wav 到工作区再喂 whisper |
+| ffmpeg 抽取/预处理 | 复用 RinaDown 已装 ffmpeg：先抽 16k 单声道 wav 到工作区再喂 whisper |
 
 ## 3. 改动坐标（新增受管组件通用面，镜像 `ffmpeg`/`ytdlp` 先例）
 
@@ -42,7 +42,7 @@ FluxDown 插件只能在受控面调用宿主已授权的工具：目前仅 `ffm
      `engine/Cargo.toml` 组件 feature 依赖照旧。
    - `plugin/dependencies.rs`：把 `whisper` 权限映射到组件缺件提示（UI 提醒）。
 3. 协议 / 宿主接线：
-   - `fluxdown_protocol` daemon `ComponentKind` + `ComponentStatusDto`/版本枚举加
+   - `rinadown_protocol` daemon `ComponentKind` + `ComponentStatusDto`/版本枚举加
      `Whisper`；`native/protocol` 若走 daemon 同样补。
    - `native/daemon/src/service.rs` / `native/server/src/routes_ext.rs` / hub
      `download_actor.rs` 的组件 install/uninstall/status 三臂照 ffmpeg/ytdlp 补齐
@@ -57,7 +57,7 @@ FluxDown 插件只能在受控面调用宿主已授权的工具：目前仅 `ffm
      （model/language/format 来自插件设置）→ stdout JSON → 组装 srt/vtt 写入
      `flux.fs` → `flux.task.recordArtifact(...)` 登记字幕产物。
    - `engine/tests/example_plugins.rs` 自动校验 manifest 合法（真实运行需
-     `FLUXDOWN_TEST_WHISPER=<abs>` + 模型，仿 `plugin_ytdlp` 集成测试）。
+     `RINADOWN_TEST_WHISPER=<abs>` + 模型，仿 `plugin_ytdlp` 集成测试）。
 
 ## 4. 模型与运行时（对齐 Audire `docs/models.md`）
 
@@ -71,9 +71,9 @@ FluxDown 插件只能在受控面调用宿主已授权的工具：目前仅 `ffm
 
 ## 5. 验收
 
-- `cargo test -p fluxdown_engine --features plugins,components --test example_plugins`
+- `cargo test -p rinadown_engine --features plugins,components --test example_plugins`
   校验新 manifest 可加载、权限合法。
-- `cargo check -p fluxdown_engine`（关 plugins）验证主链路零变化。
+- `cargo check -p rinadown_engine`（关 plugins）验证主链路零变化。
 - 真实冒烟（需 whisper 二进制 + 模型）：下载短视频 → 完成后生成同名 `.srt`，
   时间戳与音频对齐；删除任务时字幕产物随 ffmpeg mp4 一并清理（`task_artifacts`）。
 - 不引入第三方 crates：whisper 走子进程，运行时只需现有 reqwest + fs 能力。

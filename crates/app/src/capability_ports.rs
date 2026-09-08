@@ -12,12 +12,12 @@ impl AgentRssPort {
     }
 }
 
-impl fluxdown_ui_rss::RssPort for AgentRssPort {
+impl rinadown_ui_rss::RssPort for AgentRssPort {
     fn call(
         &self,
         method: &'static str,
         params: serde_json::Value,
-    ) -> fluxdown_ui_rss::PortFuture<serde_json::Value> {
+    ) -> rinadown_ui_rss::PortFuture<serde_json::Value> {
         self.client.call(method, Some(params))
     }
 }
@@ -32,12 +32,12 @@ impl AgentExtensionsPort {
     }
 }
 
-impl fluxdown_ui_extensions::ExtensionsPort for AgentExtensionsPort {
+impl rinadown_ui_extensions::ExtensionsPort for AgentExtensionsPort {
     fn call(
         &self,
         method: &'static str,
         params: serde_json::Value,
-    ) -> fluxdown_ui_extensions::PortFuture<serde_json::Value> {
+    ) -> rinadown_ui_extensions::PortFuture<serde_json::Value> {
         self.client.call(method, Some(params))
     }
 }

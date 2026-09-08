@@ -17,7 +17,7 @@ interface LogoItem {
   imageUrl?: string;
 }
 
-const STORAGE_PREFIX = "fluxdown-logo-voted-";
+const STORAGE_PREFIX = "rinadown-logo-voted-";
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const ALLOWED_TYPES = [
   "image/png",

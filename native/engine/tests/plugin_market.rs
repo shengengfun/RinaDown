@@ -11,10 +11,10 @@ use std::io::Write as _;
 use std::net::TcpListener;
 use std::sync::Arc;
 
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::plugin::{MarketClient, MarketError};
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::plugin::{MarketClient, MarketError};
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
 
 /// 本地服务器：GET 任意路径返回预置 body（用于服务 index.json）。
 fn spawn_index_server(body: String) -> (u16, std::thread::JoinHandle<()>) {
@@ -74,7 +74,7 @@ fn index_json(sequence: u64, mirror: &str) -> String {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn fetch_index_parses_and_enforces_watermark() {
-    let work = std::env::temp_dir().join(format!("fluxdown-market-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-market-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let engine = make_engine(&work).await;
     let pm = engine.manager.plugin_manager().expect("pm");
@@ -107,7 +107,7 @@ async fn fetch_index_parses_and_enforces_watermark() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn http_mirror_rejected_https_only() {
-    let work = std::env::temp_dir().join(format!("fluxdown-market-http-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-market-http-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let engine = make_engine(&work).await;
     let pm = engine.manager.plugin_manager().expect("pm");
@@ -131,7 +131,7 @@ async fn http_mirror_rejected_https_only() {
 /// 截断报 `IndexTooLarge`，而非 `.text()` 全量缓冲撑爆内存。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn oversized_index_rejected() {
-    let work = std::env::temp_dir().join(format!("fluxdown-market-big-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-market-big-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let engine = make_engine(&work).await;
     let pm = engine.manager.plugin_manager().expect("pm");

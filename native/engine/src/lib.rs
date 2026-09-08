@@ -1,4 +1,4 @@
-//! `fluxdown_engine` —— FluxDown 下载引擎,零 FFI 依赖。
+//! `rinadown_engine` —— RinaDown 下载引擎,零 FFI 依赖。
 //!
 //! 本 crate 承载 HTTP/FTP/BT/HLS/DASH 下载核心逻辑,通过 [`events::EventSink`]
 //! 与 [`selection::HostSelection`] 两个 trait 与宿主(hub/CLI/Web+Server/Phone)
@@ -74,16 +74,16 @@ use selection::{HostSelection, SelectionOutcome};
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::EngineConfig;
-/// use fluxdown_engine::bt_downloader::BtConfig;
-/// use fluxdown_engine::proxy_config::ProxyConfig;
+/// use rinadown_engine::EngineConfig;
+/// use rinadown_engine::bt_downloader::BtConfig;
+/// use rinadown_engine::proxy_config::ProxyConfig;
 ///
 /// let config = EngineConfig {
 ///     max_concurrent: 5,
 ///     speed_limit_bps: 0,
 ///     upload_limit_bps: 0,
 ///     default_save_dir: "/tmp/downloads".to_string(),
-///     app_data_dir: "/tmp/fluxdown".to_string(),
+///     app_data_dir: "/tmp/rinadown".to_string(),
 ///     bt_config: BtConfig::default(),
 ///     proxy_config: ProxyConfig::default(),
 ///     user_agent: String::new(),
@@ -126,7 +126,7 @@ pub enum EngineError {
     Plugin(String),
 }
 
-/// FluxDown 下载引擎 facade —— 零 FFI 依赖,是本 crate 的唯一公开入口。
+/// RinaDown 下载引擎 facade —— 零 FFI 依赖,是本 crate 的唯一公开入口。
 ///
 /// 聚合 [`db::Db`](Db)(持久化)与
 /// [`download_manager::DownloadManager`](DownloadManager)(任务生命周期/
@@ -138,17 +138,17 @@ pub enum EngineError {
 ///
 /// ```no_run
 /// use std::sync::Arc;
-/// use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
-/// use fluxdown_engine::bt_downloader::BtConfig;
-/// use fluxdown_engine::proxy_config::ProxyConfig;
+/// use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+/// use rinadown_engine::bt_downloader::BtConfig;
+/// use rinadown_engine::proxy_config::ProxyConfig;
 ///
-/// # async fn run() -> Result<(), fluxdown_engine::EngineError> {
+/// # async fn run() -> Result<(), rinadown_engine::EngineError> {
 /// let config = EngineConfig {
 ///     max_concurrent: 5,
 ///     speed_limit_bps: 0,
 ///     upload_limit_bps: 0,
 ///     default_save_dir: "/tmp/downloads".to_string(),
-///     app_data_dir: "/tmp/fluxdown".to_string(),
+///     app_data_dir: "/tmp/rinadown".to_string(),
 ///     bt_config: BtConfig::default(),
 ///     proxy_config: ProxyConfig::default(),
 ///     user_agent: String::new(),
@@ -411,7 +411,7 @@ impl Engine {
 
 #[cfg(feature = "plugins")]
 async fn ensure_builtin_ytdlp_plugin(plugins_root: &Path) {
-    let plugin_dir = plugins_root.join("fluxdown@ytdlp");
+    let plugin_dir = plugins_root.join("rinadown@ytdlp");
     let manifest_path = plugin_dir.join("manifest.json");
     if tokio::fs::try_exists(&manifest_path).await.unwrap_or(false) {
         return;
@@ -449,8 +449,8 @@ async fn ensure_builtin_ytdlp_plugin(plugins_root: &Path) {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::NoopSink;
-/// use fluxdown_engine::events::{EngineEvent, EventSink};
+/// use rinadown_engine::NoopSink;
+/// use rinadown_engine::events::{EngineEvent, EventSink};
 ///
 /// let sink = NoopSink;
 /// sink.emit(EngineEvent::TaskMetaProbed {
@@ -482,8 +482,8 @@ impl EventSink for NoopSink {
 ///
 /// ```
 /// # async fn run() {
-/// use fluxdown_engine::NoopSelection;
-/// use fluxdown_engine::selection::{HostSelection, SelectionOutcome};
+/// use rinadown_engine::NoopSelection;
+/// use rinadown_engine::selection::{HostSelection, SelectionOutcome};
 /// use std::time::Duration;
 ///
 /// let selector = NoopSelection;

@@ -1,6 +1,6 @@
-// FluxDown 插件：yt-dlp 通用视频解析（classic script，入口挂 globalThis）。
+// RinaDown 插件：yt-dlp 通用视频解析（classic script，入口挂 globalThis）。
 //
-// 原理：调用 FluxDown 自带的 yt-dlp 组件（flux.ytdlp），以 `-J`（--dump-single-json）
+// 原理：调用 RinaDown 自带的 yt-dlp 组件（flux.ytdlp），以 `-J`（--dump-single-json）
 // 提取选定格式的直链，交回引擎做多段并发下载 + 断点续传。yt-dlp 自身负责客户端
 // 伪装 / 签名解密 / 格式选择 / 站点适配——覆盖上千个站点（YouTube / Bilibili /
 // Twitter / Vimeo / TikTok / Twitch …），本插件只做「解析格式 → 直链回填 +
@@ -40,22 +40,22 @@
 // 路径），故运行时须在 PATH。
 //
 // 高级：可经「附加 yt-dlp 参数」设置项追加任意 yt-dlp 参数（空格/引号分隔），
-// 直通 yt-dlp 高级能力；FluxDown bridge 仍会拒绝危险开关（--exec 等）。播放列表 URL
+// 直通 yt-dlp 高级能力；RinaDown bridge 仍会拒绝危险开关（--exec 等）。播放列表 URL
 // 可经「播放列表条目」设置项选择下载第几条（--playlist-items 单值）。
 //
-// yt-dlp 组件可在 App「组件」页安装；FluxDown 会自动注入 `--ffmpeg-location`（合并/
+// yt-dlp 组件可在 App「组件」页安装；RinaDown 会自动注入 `--ffmpeg-location`（合并/
 // remux 依赖 ffmpeg，插件自带的 --ffmpeg-location 会被 bridge 拒绝）。
 //
 // 返回值约定（ResolveResult）：
 //   url / audioUrl / fileName / totalBytes / extraHeaders / ephemeral / rangeSupported
 //   （详见各字段回填处注释）。
-//   variants（可选，画质/格式多选项数组；非空时 FluxDown 弹框让用户选择，60s 超时或
+//   variants（可选，画质/格式多选项数组；非空时 RinaDown 弹框让用户选择，60s 超时或
 //   headless/免打扰场景下自动回退 defaultVariantIndex 指向的档位）。元素字段
 //   （camelCase，对应引擎 `plugin::runtime::ResolveVariant`）：
 //     label       展示标签，如 "1080p MP4" / "Audio only (m4a)"（必填非空，≤200 字符）
 //     url         该档的直链（语义同顶层 url：一次性签名直链，ephemeral）
 //     audioUrl    音视频分离场景的配对音频直链；本插件恒显式传值（无需覆盖顶层
-//                 时传 ''），避免 FluxDown 收敛逻辑遗留上一档的音频直链
+//                 时传 ''），避免 RinaDown 收敛逻辑遗留上一档的音频直链
 //     fileName    覆盖顶层 fileName（含该档正确的容器扩展名）
 //     totalBytes  该档总字节数，未知传 0（引擎侧等价于省略）
 //     bandwidth   码率（bps），未知为 0，仅供弹框展示/排序
@@ -63,7 +63,7 @@
 //     container   容器/扩展名（如 "mp4"/"webm"/"m4a"），可为空
 //   defaultVariantIndex：弹框超时/免打扰/headless 无交互时回退的档位。本实现恒
 //   为 0——variants[0] 是「最佳画质」默认档，其字段与顶层 url/audioUrl/fileName/
-//   totalBytes 逐一相同，故旧版 FluxDown（无 variants 支持）行为不回退；其后附加
+//   totalBytes 逐一相同，故旧版 RinaDown（无 variants 支持）行为不回退；其后附加
 //   各分辨率梯度档（去重）+ 1 个纯音频档，供用户在弹框选择。
 
 // 一次调用内让 yt-dlp 轮询的 player_client 顺序（任一通过即用，仅 YouTube 生效）。
@@ -117,7 +117,7 @@ function buildFormat(preferMp4) {
 }
 
 // 解析「附加 yt-dlp 参数」设置项为 argv 数组：空格分隔，支持单/双引号包裹含空格
-// 的值，支持 \" 转义。空串 → 空数组。FluxDown bridge 会对危险开关二次拦截。
+// 的值，支持 \" 转义。空串 → 空数组。RinaDown bridge 会对危险开关二次拦截。
 function parseExtraArgs(raw) {
   var s = (raw || '').trim();
   if (!s) return [];
@@ -221,7 +221,7 @@ function pickVideoAtOrBelow(formats, targetHeight, preferMp4) {
 }
 
 // 组装单个 variant 对象（camelCase 字段，契约见文件头注释）。audioUrl /
-// fileName / totalBytes 恒显式赋值（未知传 ''/0，而非省略字段），保证 FluxDown
+// fileName / totalBytes 恒显式赋值（未知传 ''/0，而非省略字段），保证 RinaDown
 // 收敛逻辑（download_manager.rs::collapse_resolve_variants，仅 Some 才覆盖
 // 顶层字段）不会遗留上一次收敛/默认档的字段。
 function buildVariant(opts) {
@@ -244,7 +244,7 @@ function buildVariant(opts) {
 //   variants[1..]     = 从 info.formats 派生的分辨率梯度档（去重、至多 4 个）
 //                       + 1 个纯音频档（若默认档本身已是纯音频则跳过，避免重复）
 //   defaultVariantIndex 恒为 0（见 variants[0] 说明）。
-// info.formats 缺失/为空时仅返回单元素数组（FluxDown 按 variants.len()<=1 跳过弹框）。
+// info.formats 缺失/为空时仅返回单元素数组（RinaDown 按 variants.len()<=1 跳过弹框）。
 function buildVariants(info, preferMp4, base, singleMeta) {
   var list = [
     buildVariant({
@@ -483,7 +483,7 @@ globalThis.resolve = async (ctx) => {
     args.push('--no-playlist');
   }
   // JS 运行时：yt-dlp 2026 起把 YouTube 的 n-sig 挑战求解强制外部化（EJS），
-  // 缺运行时则 YouTube 格式 URL 缺失、只剩 storyboard（下不了）。FluxDown 自动注入的
+  // 缺运行时则 YouTube 格式 URL 缺失、只剩 storyboard（下不了）。RinaDown 自动注入的
   // --ffmpeg-location 不含 JS 运行时，故须显式指定。bridge 校验器拒绝含盘符/
   // 绝对路径的参数，因此只能传裸名（如 'node'），运行时须在 PATH 中。默认 node，
   // 设置项可切 deno/quickjs 或 none（none = 不注入，靠 nsig 缓存，多数视频会失败）。
@@ -497,7 +497,7 @@ globalThis.resolve = async (ctx) => {
     await flux.fs.writeFile('cookies.txt', cookiesText);
     args.push('--cookies', 'cookies.txt');
   }
-  // 附加参数（高级）：追加到命令末尾（URL 之前）。FluxDown bridge 二次拦截危险开关。
+  // 附加参数（高级）：追加到命令末尾（URL 之前）。RinaDown bridge 二次拦截危险开关。
   var extra = parseExtraArgs(flux.settings.extraArgs);
   for (var ei = 0; ei < extra.length; ei++) args.push(extra[ei]);
   args.push(ctx.url);

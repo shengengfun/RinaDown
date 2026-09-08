@@ -10,7 +10,7 @@ repeatMode: after-gap
 repeatGap: 2
 ---
 
-该命令属于 FluxDown 项目禁令：
+该命令属于 RinaDown 项目禁令：
 
 - `flutter run -d windows`：AGENTS.md 明确禁止运行。改用 `flutter analyze` / `flutter test` / `cargo check -p <crate>` 验证。
 - `cargo test --workspace`：禁止全量跑。用 `cargo nextest run -p <crate> <filter>` 或 `cargo test -p <crate> -- <filter>` 精准跑。

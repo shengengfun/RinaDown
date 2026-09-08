@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/widgets/ui_scale_widget.dart';
+import 'package:rina_down/src/widgets/ui_scale_widget.dart';
 
 /// 复刻 main.dart 中的接入结构：
 /// WidgetsApp.builder → MediaQuery(size/scale) → UiScaleWidget → 页面。

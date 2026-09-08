@@ -7,8 +7,8 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use fluxdown_protocol::method;
-use fluxdown_protocol::{
+use rinadown_protocol::method;
+use rinadown_protocol::{
     AgentSnapshot, ApplicationErrorCode, EventFrame, RequestId, RpcErrorData, RpcNotification,
     RpcRequest, RpcResponse, ServiceHello, ServiceRole, Snapshot, SnapshotBody,
 };
@@ -62,7 +62,7 @@ impl AgentClient {
         let runtime = Arc::new(
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
-                .thread_name("fluxdown-agent-client")
+                .thread_name("rinadown-agent-client")
                 .build()
                 .map_err(AgentClientError::Runtime)?,
         );
@@ -168,10 +168,10 @@ async fn connect(config: &AgentClientConfig) -> Result<(Socket, AgentSnapshot), 
         .await
         .map_err(classify_connect_error)?;
     let hello = serde_json::json!({
-        "clientName": "fluxdown-desktop",
+        "clientName": "rinadown-desktop",
         "clientVersion": env!("CARGO_PKG_VERSION"),
-        "minProtocolVersion": fluxdown_protocol::MIN_PROTOCOL_VERSION,
-        "maxProtocolVersion": fluxdown_protocol::PROTOCOL_VERSION,
+        "minProtocolVersion": rinadown_protocol::MIN_PROTOCOL_VERSION,
+        "maxProtocolVersion": rinadown_protocol::PROTOCOL_VERSION,
         "requestedRole": "agent",
         "capabilities": [method::CAPABILITY_CLIENT_SELECTIONS]
     });
@@ -179,7 +179,7 @@ async fn connect(config: &AgentClientConfig) -> Result<(Socket, AgentSnapshot), 
     let service = serde_json::from_value::<ServiceHello>(hello_value)
         .map_err(|_| ConnectError::Fatal(protocol_error()))?;
     if service.role != ServiceRole::Agent
-        || service.protocol_version != fluxdown_protocol::PROTOCOL_VERSION
+        || service.protocol_version != rinadown_protocol::PROTOCOL_VERSION
     {
         return Err(ConnectError::Fatal(protocol_error()));
     }

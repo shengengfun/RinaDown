@@ -22,7 +22,7 @@ const zh = lang === "zh";
 const all = await getCollection("docs");
 const { groups } = buildDocsNav(all, lang);
 
-const site = Astro.site ?? new URL("https://fluxdown.zerx.dev");
+const site = Astro.site ?? new URL("https://rinadown.zerx.dev");
 const enUrl = new URL("/docs/en/", site).href;
 const zhUrl = new URL("/docs/zh/", site).href;
 const alternates = [
@@ -31,13 +31,13 @@ const alternates = [
   { lang: "x-default", href: enUrl },
 ];
 
-const title = zh ? "文档 - FluxDown" : "Docs - FluxDown";
+const title = zh ? "文档 - RinaDown" : "Docs - RinaDown";
 const description = zh
-  ? "FluxDown 使用文档:安装、快速上手、下载协议、浏览器扩展、Headless 服务器与 API。"
-  : "FluxDown documentation: installation, quick start, download protocols, browser extension, headless server and API.";
+  ? "RinaDown 使用文档:安装、快速上手、下载协议、浏览器扩展、Headless 服务器与 API。"
+  : "RinaDown documentation: installation, quick start, download protocols, browser extension, headless server and API.";
 
 /* ── bento 拼贴配置:分区 → 跨度/描述/图标 ── */
-const REPO = "https://github.com/zerx-lab/fluxdown";
+const REPO = "https://github.com/zerx-lab/rinadown";
 
 const SECTION_META: Record<
   SectionId,
@@ -45,7 +45,7 @@ const SECTION_META: Record<
 > = {
   "getting-started": {
     span: "lg:col-span-1",
-    desc: { en: "Install FluxDown and start your first download in minutes.", zh: "几分钟内完成安装,开始第一个下载任务。" },
+    desc: { en: "Install RinaDown and start your first download in minutes.", zh: "几分钟内完成安装,开始第一个下载任务。" },
     icon: `<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>`,
   },
   protocols: {
@@ -60,7 +60,7 @@ const SECTION_META: Record<
   },
   "headless-server": {
     span: "lg:col-span-1",
-    desc: { en: "Run FluxDown headless with a Web UI, WebSocket and REST.", zh: "以 Headless 模式运行,自带 Web UI 与 WS/REST 控制。" },
+    desc: { en: "Run RinaDown headless with a Web UI, WebSocket and REST.", zh: "以 Headless 模式运行,自带 Web UI 与 WS/REST 控制。" },
     icon: `<rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/>`,
   },
   api: {
@@ -70,7 +70,7 @@ const SECTION_META: Record<
   },
   plugins: {
     span: "lg:col-span-1",
-    desc: { en: "Extend FluxDown with JavaScript plugins — URL resolvers and task hooks.", zh: "用 JavaScript 插件扩展 FluxDown —— 链接解析与任务钩子。" },
+    desc: { en: "Extend RinaDown with JavaScript plugins — URL resolvers and task hooks.", zh: "用 JavaScript 插件扩展 RinaDown —— 链接解析与任务钩子。" },
     icon: `<path d="M15 7h1a2 2 0 0 1 2 2v1a2 2 0 0 0 2 2 2 2 0 0 1 0 4 2 2 0 0 0-2 2v1a2 2 0 0 1-2 2h-1a2 2 0 0 0-2-2 2 2 0 0 0-2 2H9a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2 2 2 0 0 1 0-4 2 2 0 0 0 2-2V9a2 2 0 0 1 2-2h1a2 2 0 0 0 2-2 2 2 0 0 1 2 2z"/>`,
   },
   contributing: {
@@ -105,7 +105,7 @@ const SECTION_META: Record<
         </p>
         <h1 class="mt-3 text-4xl font-bold tracking-tight text-dark-text sm:text-5xl">
           {zh ? "了解 " : "Master "}
-          <span class="bg-gradient-to-r from-brand-sky to-brand-cyan bg-clip-text text-transparent">FluxDown</span>
+          <span class="bg-gradient-to-r from-brand-sky to-brand-cyan bg-clip-text text-transparent">RinaDown</span>
         </h1>
         <p class="mt-4 text-base leading-relaxed text-dark-text-secondary sm:text-lg">
           {
@@ -210,7 +210,7 @@ const SECTION_META: Record<
       <div class="mt-10 flex flex-col items-start justify-between gap-4 rounded-3xl border border-dark-border bg-dark-surface1/50 p-6 backdrop-blur-sm sm:flex-row sm:items-center">
         <div>
           <h2 class="text-sm font-semibold text-dark-text">
-            {zh ? "发现问题、想补充内容,或想看到你的语言?" : "Spotted an issue, want to add something, or want FluxDown in your language?"}
+            {zh ? "发现问题、想补充内容,或想看到你的语言?" : "Spotted an issue, want to add something, or want RinaDown in your language?"}
           </h2>
           <p class="mt-1 text-sm text-dark-text-muted">
             {
@@ -225,7 +225,7 @@ const SECTION_META: Record<
             href={`/docs/${lang}/contributing/translations/`}
             class="rounded-full border border-brand-sky/30 bg-brand-sky/10 px-4 py-2 text-sm font-medium text-brand-sky transition-colors hover:bg-brand-sky/20"
           >
-            {zh ? "参与翻译 →" : "Translate FluxDown →"}
+            {zh ? "参与翻译 →" : "Translate RinaDown →"}
           </a>
           <a
             href={`/docs/${lang}/contributing/docs/`}

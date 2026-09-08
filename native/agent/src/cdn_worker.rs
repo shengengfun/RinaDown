@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     AgentEvent, CdnConfigApplyParams, CdnReportAckParams, CdnReportLeaseDto, DaemonEvent,
     ServiceEvent, WsServerMsg,
 };
@@ -108,7 +108,7 @@ impl CdnWorker {
         let _: Value = self
             .daemon
             .call(
-                fluxdown_protocol::method::DAEMON_CDN_CONFIG_APPLY,
+                rinadown_protocol::method::DAEMON_CDN_CONFIG_APPLY,
                 Some(CdnConfigApplyParams { values }),
             )
             .await
@@ -120,7 +120,7 @@ impl CdnWorker {
         let lease: Option<CdnReportLeaseDto> = self
             .daemon
             .call::<Value, Option<CdnReportLeaseDto>>(
-                fluxdown_protocol::method::DAEMON_CDN_REPORTS_PEEK,
+                rinadown_protocol::method::DAEMON_CDN_REPORTS_PEEK,
                 None,
             )
             .await
@@ -137,7 +137,7 @@ impl CdnWorker {
         let _: Value = self
             .daemon
             .call(
-                fluxdown_protocol::method::DAEMON_CDN_REPORTS_ACK,
+                rinadown_protocol::method::DAEMON_CDN_REPORTS_ACK,
                 Some(CdnReportAckParams {
                     batch_id: lease.batch_id,
                 }),
@@ -181,7 +181,7 @@ pub enum WorkerError {
     #[error(transparent)]
     Cloud(#[from] CloudError),
     #[error("daemon CDN RPC failed: {0:?}")]
-    Daemon(fluxdown_protocol::RpcErrorData),
+    Daemon(rinadown_protocol::RpcErrorData),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
 }

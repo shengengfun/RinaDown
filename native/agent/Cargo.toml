@@ -1,11 +1,11 @@
 [package]
-name = "fluxdown_agent"
+name = "rinadown_agent"
 version = "0.1.0"
 edition.workspace = true
 publish = false
 
 [[bin]]
-name = "fluxdown-agent"
+name = "rinadown-agent"
 path = "src/main.rs"
 
 [lints]
@@ -18,8 +18,8 @@ base64 = "0.22"
 chacha20poly1305 = "0.10"
 directories = "6"
 ed25519-dalek = "3.0.0"
-fluxdown_api = { version = "0.1.0", path = "../api" }
-fluxdown_protocol = { path = "../protocol" }
+rinadown_api = { version = "0.1.0", path = "../api" }
+rinadown_protocol = { path = "../protocol" }
 fs2 = "0.4.3"
 futures-util = "0.3.32"
 hkdf = "0.12"

@@ -3,7 +3,7 @@
 //! 服务器自己充当演示文件的 HTTP 源：内容为确定性生成的字节流（不落盘、
 //! 不出外网），支持 HEAD 与单段 `Range`，因此引擎的元数据探测、多线程
 //! 分段、断点续传全部走**真实** HTTP 下载路径；按连接限速让进度条以
-//! 可观察的速度推进。仅在演示模式（`FLUXDOWN_DEMO` / `FLUXDOWN_DEMO_URL`）
+//! 可观察的速度推进。仅在演示模式（`RINADOWN_DEMO` / `RINADOWN_DEMO_URL`）
 //! 下挂载，见 `main.rs`。
 
 use std::time::Duration;
@@ -50,7 +50,7 @@ async fn demo_file(method: Method, headers: HeaderMap) -> Response {
         .header(header::CONTENT_LENGTH, len)
         .header(
             header::CONTENT_DISPOSITION,
-            "attachment; filename=\"FluxDown-Demo.bin\"",
+            "attachment; filename=\"RinaDown-Demo.bin\"",
         );
     if status == StatusCode::PARTIAL_CONTENT {
         builder = builder.header(

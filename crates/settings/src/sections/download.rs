@@ -1,7 +1,7 @@
 //! 下载：保存位置、行为、连接与性能、自动重试、高级。
 
-use fluxdown_ui_components::{ButtonVariant, button};
-use fluxdown_ui_theme::active_theme;
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_theme::active_theme;
 use gpui::{App, ParentElement, SharedString, Styled, div};
 use gpui_component::{
     Icon, IconName, h_flex,

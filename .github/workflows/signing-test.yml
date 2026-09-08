@@ -14,7 +14,7 @@ permissions:
 
 env:
   SIGNPATH_ORGANIZATION_ID: 8e88ecd8-8099-49f5-9edf-e43053de7d3e
-  SIGNPATH_PROJECT_SLUG: FluxDown
+  SIGNPATH_PROJECT_SLUG: RinaDown
   SIGNPATH_SIGNING_POLICY: test-signing
   SIGNPATH_ARTIFACT_CONFIG: windows-exe-zip
 
@@ -138,12 +138,12 @@ jobs:
 
       # ── Bundle MSVC CRT runtime DLLs（与 release.yml 同步）──
       # 干净系统上缺 VCRedist 时所有 exe 报 STATUS_DLL_NOT_FOUND；随应用
-      # 目录分发 CRT DLL，架构按 flux_down.exe 的 PE 头实测。
+      # 目录分发 CRT DLL，架构按 rina_down.exe 的 PE 头实测。
       - name: Bundle MSVC CRT runtime DLLs
         shell: pwsh
         run: |
           $release = "build\windows\${{ matrix.arch }}\runner\Release"
-          $bytes = [System.IO.File]::ReadAllBytes("$release\flux_down.exe")
+          $bytes = [System.IO.File]::ReadAllBytes("$release\rina_down.exe")
           $peOff = [BitConverter]::ToInt32($bytes, 0x3C)
           $machine = [BitConverter]::ToUInt16($bytes, $peOff + 4)
           $archDir = switch ($machine) {
@@ -151,7 +151,7 @@ jobs:
             0xAA64 { 'arm64' }
             default { throw ("Unexpected PE machine type: 0x{0:X4}" -f $machine) }
           }
-          Write-Host "flux_down.exe PE machine: $archDir"
+          Write-Host "rina_down.exe PE machine: $archDir"
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $vsRoot = & $vswhere -latest -products * -property installationPath
           if (-not $vsRoot) { throw "Visual Studio installation not found via vswhere" }
@@ -221,7 +221,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-installer-${{ matrix.arch }}
-          path: build/installer/FluxDown-*.exe
+          path: build/installer/RinaDown-*.exe
 
       - name: Sign installer (SignPath)
         uses: signpath/github-action-submit-signing-request@v2
@@ -246,7 +246,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -Path "build\windows\${{ matrix.arch }}\runner\Release\portable" -ItemType File -Force | Out-Null
-          Compress-Archive -Path "build\windows\${{ matrix.arch }}\runner\Release\*" -DestinationPath "build\installer\FluxDown-${{ steps.version.outputs.VERSION }}-windows-${{ matrix.arch }}-portable.zip"
+          Compress-Archive -Path "build\windows\${{ matrix.arch }}\runner\Release\*" -DestinationPath "build\installer\RinaDown-${{ steps.version.outputs.VERSION }}-windows-${{ matrix.arch }}-portable.zip"
 
       # ── 校验：安装器 + portable zip 内所有 exe 必须带 Authenticode 签名 ──
       # 测试证书是自签的，Status 不会是 Valid（根不受信），
@@ -264,8 +264,8 @@ jobs:
               $script:failed = $true
             }
           }
-          Get-ChildItem "build\installer\FluxDown-*.exe" | ForEach-Object { Check-Sig $_.FullName }
-          Expand-Archive "build\installer\FluxDown-*-portable.zip" -DestinationPath "build\verify-portable"
+          Get-ChildItem "build\installer\RinaDown-*.exe" | ForEach-Object { Check-Sig $_.FullName }
+          Expand-Archive "build\installer\RinaDown-*-portable.zip" -DestinationPath "build\verify-portable"
           Get-ChildItem "build\verify-portable" -Recurse -Filter *.exe | ForEach-Object { Check-Sig $_.FullName }
           if ($failed) { exit 1 }
           Write-Host "All executables carry an Authenticode signature."
@@ -275,10 +275,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: signtest-installer-${{ matrix.arch }}
-          path: build/installer/FluxDown-*.exe
+          path: build/installer/RinaDown-*.exe
 
       - name: Upload signed portable zip
         uses: actions/upload-artifact@v4
         with:
           name: signtest-portable-${{ matrix.arch }}
-          path: build/installer/FluxDown-*-portable.zip
+          path: build/installer/RinaDown-*-portable.zip

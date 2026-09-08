@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use gpui::{AssetSource, Result, SharedString};
 
 /// 下载能力在活动栏使用的图标路径。
-pub const DOWNLOAD_ICON_PATH: &str = "fluxdown/icons/download.svg";
+pub const DOWNLOAD_ICON_PATH: &str = "rinadown/icons/download.svg";
 const DOWNLOAD_ICON: &[u8] = include_bytes!("../assets/download.svg");
 
 /// 下载能力拥有的嵌入资源。

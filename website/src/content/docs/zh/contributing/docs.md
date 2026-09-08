@@ -6,7 +6,7 @@ order: 1
 sourceHash: "a38a85515fc6"
 ---
 
-本文档托管在公开仓库 [zerx-lab/fluxdown](https://github.com/zerx-lab/fluxdown),每一页都有**编辑此页**入口。
+本文档托管在公开仓库 [zerx-lab/rinadown](https://github.com/zerx-lab/rinadown),每一页都有**编辑此页**入口。
 
 ## 贡献流程
 

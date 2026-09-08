@@ -11,10 +11,10 @@
 // instantiation needed (it requires rinf FFI, see list_sections_test.dart).
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/models/download_controller.dart';
-import 'package:flux_down/src/models/download_task.dart';
-import 'package:flux_down/src/models/list_entity.dart';
-import 'package:flux_down/src/models/task_group.dart';
+import 'package:rina_down/src/models/download_controller.dart';
+import 'package:rina_down/src/models/download_task.dart';
+import 'package:rina_down/src/models/list_entity.dart';
+import 'package:rina_down/src/models/task_group.dart';
 
 DownloadTask _task({
   required String id,

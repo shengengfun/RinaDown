@@ -1,7 +1,7 @@
-# FluxDown internals · 索引 · 架构图 · 目录树
+# RinaDown internals · 索引 · 架构图 · 目录树
 
-> 本文件是 `FluxDown/AGENTS.md` 的深挖附录：只放**枚举性 / 可从源码复原**的细节，硬不变式与红线在 AGENTS.md。
-> 路径以 `FluxDown/` 为根（cwd=工作区根时前置 `FluxDown/`）。事实层以源码为准，文档给坐标。
+> 本文件是 `RinaDown/AGENTS.md` 的深挖附录：只放**枚举性 / 可从源码复原**的细节，硬不变式与红线在 AGENTS.md。
+> 路径以 `RinaDown/` 为根（cwd=工作区根时前置 `RinaDown/`）。事实层以源码为准，文档给坐标。
 
 ---
 
@@ -10,7 +10,7 @@
 > **"Downloads, Supercharged."**（下载，全面加速。）
 
 - **核心价值主张**: Rust 驱动的高速多协议下载，永久免费，零广告，零追踪（仅两条匿名部署遥测，可关），本地优先，无需账号即可全功能使用。
-- **平台矩阵（已发布）**: Windows / macOS / Linux 桌面 App、Android App、headless Web 服务器（Docker/群晖/QNAP/OpenWrt/Unraid/CasaOS）、CLI（`fluxdown`）、浏览器扩展、用户脚本。iOS 代码存在但无发布 job。
+- **平台矩阵（已发布）**: Windows / macOS / Linux 桌面 App、Android App、headless Web 服务器（Docker/群晖/QNAP/OpenWrt/Unraid/CasaOS）、CLI（`rinadown`）、浏览器扩展、用户脚本。iOS 代码存在但无发布 job。
 - **可选云能力（FluxCloud）**: 登录账号后跨设备**配置同步**（客户端已落地，见 `clients.md`「Flutter 前端架构」）；下载本身永远本地，账号非必需。
 
 ---
@@ -30,7 +30,7 @@
 
 ## 顶层架构
 
-**一个引擎，多个宿主，多个客户端。** 所有下载逻辑集中在 `fluxdown_engine`（`native/engine`，零 FFI/零 rinf 依赖），通过**三个引擎自有 trait** 与外界解耦：
+**一个引擎，多个宿主，多个客户端。** 所有下载逻辑集中在 `rinadown_engine`（`native/engine`，零 FFI/零 rinf 依赖），通过**三个引擎自有 trait** 与外界解耦：
 
 | Trait | 定义位置 | 方向 | 职责 |
 |---|---|---|---|
@@ -44,15 +44,15 @@ flowchart TB
     ext[浏览器扩展 WXT]
     us[用户脚本 Tampermonkey]
     web[Web SPA React]
-    cli[CLI fluxdown]
+    cli[CLI rinadown]
     aria[aria2/MCP 客户端]
   end
   subgraph hosts[宿主 impl 三 trait]
     hub[hub: 桌面/移动 App<br/>唯一 rinf FFI]
     srv[server: headless<br/>axum + WS + SPA]
   end
-  api[fluxdown_api<br/>ApiHost 契约 + HTTP 面]
-  eng[fluxdown_engine<br/>协议/分段/DB/队列/组/插件]
+  api[rinadown_api<br/>ApiHost 契约 + HTTP 面]
+  eng[rinadown_engine<br/>协议/分段/DB/队列/组/插件]
   clients --> api
   api --> hub
   api --> srv
@@ -63,7 +63,7 @@ flowchart TB
 ```
 
 **要点**：
-- `fluxdown_api` 只依赖 `&dyn ApiHost`，不碰引擎——同一套 HTTP 面（脚本接管 + aria2 JSON-RPC（POST 与 WS）+ MCP + `/api/v1` 管理 + OpenAPI）可服务任意宿主。
+- `rinadown_api` 只依赖 `&dyn ApiHost`，不碰引擎——同一套 HTTP 面（脚本接管 + aria2 JSON-RPC（POST 与 WS）+ MCP + `/api/v1` 管理 + OpenAPI）可服务任意宿主。
 - 两个生产宿主：`hub`（App，actor=`download_actor.rs`）、`server`（headless，actor=`actor.rs`）。两者的 actor **都必须** drain `resolve_rx`（off-actor 插件解析回流）与 `plugin_retry_rx`，否则命中 resolver 的下载会永久挂起。
 - 客户端捕获有三条并行前端进同一本机 RPC（`:17800/download`）：扩展（webRequest+downloads 全拦截）、用户脚本（页面态 `GM_xmlhttpRequest` 回退）、桌面确认框。
 - **并发模型**: current_thread tokio actor 串行化写；每个下载 spawn 独立 task + CancellationToken；插件 resolve 永不阻塞 actor（off-actor spawn + 通道回流）。
@@ -77,11 +77,11 @@ flowchart TB
     wasm[GPUI WASM Web]
     third[CLI / 第三方客户端]
   end
-  agent[fluxdown-agent<br/>账户/同步/设备/UI Gateway]
-  daemon[fluxdownd<br/>纯下载管理核心]
-  protocol[fluxdown_protocol<br/>传输无关 wire / 版本握手]
+  agent[rinadown-agent<br/>账户/同步/设备/UI Gateway]
+  daemon[rinadownd<br/>纯下载管理核心]
+  protocol[rinadown_protocol<br/>传输无关 wire / 版本握手]
   cloud[FluxCloud]
-  engine[fluxdown_engine]
+  engine[rinadown_engine]
   gpui --> agent
   wasm --> agent
   third --> agent
@@ -104,7 +104,7 @@ flowchart TB
 ## 仓库结构（顶层坐标）
 
 ```
-FluxDown/
+RinaDown/
 ├── lib/src/            Flutter 前端（桌面+移动，共享 models/i18n/theme/bindings）
 │   ├── bindings/       ⚠️ rinf 自动生成，勿手改
 │   ├── models/         状态与领域模型（ChangeNotifier + rinf 信号）
@@ -120,21 +120,21 @@ FluxDown/
 │   ├── theme/          完整 gpui-base semantic token + shadcn neutral + 运行时投影
 │   ├── components/     基于 gpui-base 行为原语的主题化应用组件
 │   ├── shell/          窗口、顶层导航、locale/theme 状态
-│   └── app/            `fluxdown-desktop` 薄二进制入口
+│   └── app/            `rinadown-desktop` 薄二进制入口
 ├── native/             Rust workspace 引擎/宿主层（根 members=`native/*` + `crates/*`）
-│   ├── engine/         `fluxdown_engine`：下载引擎（零 FFI）——核心，见 `engine.md`「下载引擎」
-│   ├── api/            `fluxdown_api`：ApiHost 契约 + HTTP 面（零 rinf）——见 `hosts-and-api.md`「HTTP API」
-│   ├── protocol/       `fluxdown_protocol`：daemon / agent / 客户端共享的传输无关协议基线
-│   ├── daemon/         `fluxdown_daemon`：纯下载常驻核心边界（运行链路迁移中）
-│   ├── agent/          `fluxdown_agent`：云功能与官方 UI Gateway 边界（运行链路迁移中）
-│   ├── server/         `fluxdown_server`：headless Web 服务器——见 `hosts-and-api.md`「Headless 服务器」
+│   ├── engine/         `rinadown_engine`：下载引擎（零 FFI）——核心，见 `engine.md`「下载引擎」
+│   ├── api/            `rinadown_api`：ApiHost 契约 + HTTP 面（零 rinf）——见 `hosts-and-api.md`「HTTP API」
+│   ├── protocol/       `rinadown_protocol`：daemon / agent / 客户端共享的传输无关协议基线
+│   ├── daemon/         `rinadown_daemon`：纯下载常驻核心边界（运行链路迁移中）
+│   ├── agent/          `rinadown_agent`：云功能与官方 UI Gateway 边界（运行链路迁移中）
+│   ├── server/         `rinadown_server`：headless Web 服务器——见 `hosts-and-api.md`「Headless 服务器」
 │   ├── hub/            rinf FFI 适配层（唯一碰 rinf）——见 `hosts-and-api.md`「宿主与客户端 crate」
-│   ├── cli/            `fluxdown_cli`：二进制 `fluxdown`——见 `hosts-and-api.md`「宿主与客户端 crate」
+│   ├── cli/            `rinadown_cli`：二进制 `rinadown`——见 `hosts-and-api.md`「宿主与客户端 crate」
 │   ├── nmh/            Native Messaging Host 中继二进制
-│   └── fluxdown_updater/  独立自更新 helper 二进制（hub 拉起）
+│   └── rinadown_updater/  独立自更新 helper 二进制（hub 拉起）
 ├── web/                Web SPA（React 19 + TanStack + Tailwind v4，bun）——见 `clients.md`「Web SPA」
 ├── website/            官网（Astro SSR + 内容集文档系统）——见 `clients.md`「官网」
-├── fluxDown/           WXT 浏览器扩展（Chrome/Firefox MV3）——见 `clients.md`「浏览器扩展与用户脚本」
+├── rinaDown/           WXT 浏览器扩展（Chrome/Firefox MV3）——见 `clients.md`「浏览器扩展与用户脚本」
 ├── userscript/         Tampermonkey 用户脚本（扩展替代）——见 `clients.md`「浏览器扩展与用户脚本」
 ├── examples/plugins/   插件示例（.fxplug 源）
 ├── packaging/          NAS 包脚本（synology/qnap/openwrt）——见 `hosts-and-api.md`「Headless 服务器」

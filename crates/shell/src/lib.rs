@@ -1,4 +1,4 @@
-//! FluxDown GPUI 桌面窗口 shell。
+//! RinaDown GPUI 桌面窗口 shell。
 //!
 //! 本 crate 只提供窗口 chrome、活动栏、路由和内容槽位；业务页面由 app
 //! 创建后以 [`ShellRoute`] 注入。
@@ -13,7 +13,7 @@ use gpui_component::TitleBar;
 pub use assets::*;
 pub use view::*;
 
-/// 构造 FluxDown 主窗口选项。
+/// 构造 RinaDown 主窗口选项。
 pub fn main_window_options() -> WindowOptions {
     let mut options = TitleBar::window_options();
     options.window_min_size = Some(size(gpui::px(720.), gpui::px(520.)));
@@ -21,7 +21,7 @@ pub fn main_window_options() -> WindowOptions {
     options
 }
 
-/// 构造使用 FluxDown 自定义标题栏的辅助窗口选项。
+/// 构造使用 RinaDown 自定义标题栏的辅助窗口选项。
 pub fn auxiliary_window_options(title: impl Into<SharedString>) -> WindowOptions {
     let mut options = TitleBar::window_options();
     if let Some(titlebar) = options.titlebar.as_mut() {

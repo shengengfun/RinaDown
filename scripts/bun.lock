@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "fluxdown-scripts",
+      "name": "rinadown-scripts",
       "dependencies": {
         "sharp": "^0.34.2",
       },

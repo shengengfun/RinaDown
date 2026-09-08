@@ -18,7 +18,7 @@ sourceHash: "b8cae49fcfee"
 | `description` | 否 | string | 显示在插件列表里。 |
 | `homepage` | 否 | string | 项目或作者主页。 |
 | `icon` | 否 | string | 相对插件文件夹的路径。禁止 `..`、绝对路径、盘符、以 `/` 或 `\` 开头。 |
-| `minAppVersion` | 否 | string | 三段版本号。运行中的 FluxDown 比它旧时，插件在加载阶段被跳过（记日志，不算错误）。 |
+| `minAppVersion` | 否 | string | 三段版本号。运行中的 RinaDown 比它旧时，插件在加载阶段被跳过（记日志，不算错误）。 |
 | `resolvers` | 否 | array | v1 **至多一个**。见下。 |
 | `hooks` | 否 | object | 见下。 |
 | `permissions` | 否 | array | 能力授权。v1 接受 `"ffmpeg"` 与 `"ytdlp"`，未知值一律拒绝。 |
@@ -64,7 +64,7 @@ sourceHash: "b8cae49fcfee"
 | `events` | 是 | 非空，只能取 `onStart`、`onError`、`onDone`、`onMetaProbed`，其余一律拒绝。 |
 | `match` | 否 | 可选的 URL 过滤器，pattern 规则同上；存在时 `urls` 不能为空。省略 = 所有任务都触发。 |
 
-注意：同一插件如果还声明了 resolver，`onMetaProbed` 对它的任务永远不触发——带 resolver 的任务直接跳过元数据探测。你照订阅的话，FluxDown 会记一条警告日志。
+注意：同一插件如果还声明了 resolver，`onMetaProbed` 对它的任务永远不触发——带 resolver 的任务直接跳过元数据探测。你照订阅的话，RinaDown 会记一条警告日志。
 
 ## `permissions`
 
@@ -79,7 +79,7 @@ sourceHash: "b8cae49fcfee"
 { "permissions": ["ffmpeg", "ytdlp"] }
 ```
 
-未知值会让整份 manifest 失败——这样不认识某权限的旧版 FluxDown 会拒绝该插件，而不是悄悄忽略；新增权限时请一并抬高 `minAppVersion`。
+未知值会让整份 manifest 失败——这样不认识某权限的旧版 RinaDown 会拒绝该插件，而不是悄悄忽略；新增权限时请一并抬高 `minAppVersion`。
 
 ## `settings[]`
 

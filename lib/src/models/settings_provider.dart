@@ -91,15 +91,15 @@ class SettingsProvider extends ChangeNotifier {
 
   // 文件关联
   bool _torrentAssocPrompted = false; // 是否已弹窗提示过文件关联
-  bool _torrentAssociated = false; // .torrent 文件是否已关联到 FluxDown
+  bool _torrentAssociated = false; // .torrent 文件是否已关联到 RinaDown
   // User explicitly turned association OFF (persisted). Needed because on
   // Linux .deb installs the system-wide MIME registration is root-owned and
   // cannot be removed, so the live query alone can never report false.
   bool _torrentAssocUserDisabled = false;
   // ed2k:// 链接关联（系统协议处理器；与 .torrent 文件关联同族但独立开关）。
   bool _ed2kProtocolAssociated = false;
-  // 同 _torrentAssocUserDisabled：Linux 上只有 FluxDown 声明
-  // x-scheme-handler/ed2k 时，撤销用户级覆盖后 xdg-mime 仍会解析回 FluxDown，
+  // 同 _torrentAssocUserDisabled：Linux 上只有 RinaDown 声明
+  // x-scheme-handler/ed2k 时，撤销用户级覆盖后 xdg-mime 仍会解析回 RinaDown，
   // 光靠实时查询永远回不到 false。
   bool _ed2kAssocUserDisabled = false;
   // magnet: 链接关联（系统协议处理器）。默认开启：Rust 启动时非抢占式
@@ -1692,8 +1692,8 @@ class SettingsProvider extends ChangeNotifier {
   /// 设置或取消 magnet: 链接关联（乐观更新 UI，Rust 回传真实状态后校正）。
   ///
   /// 与 [setEd2kProtocolAssociation] 同构。打开是显式接管：即使其他客户端
-  /// （qBittorrent 等）已注册 magnet，Rust 侧 register 也会覆盖为 FluxDown；
-  /// 关闭只删除 FluxDown 自己的注册（其他客户端的注册自动恢复生效），
+  /// （qBittorrent 等）已注册 magnet，Rust 侧 register 也会覆盖为 RinaDown；
+  /// 关闭只删除 RinaDown 自己的注册（其他客户端的注册自动恢复生效），
   /// 并持久化 opt-out 阻止下次启动自动注册。
   void setMagnetProtocolAssociation(bool enable) {
     logInfo('Settings', 'setMagnetProtocolAssociation: enable=$enable');
@@ -1817,7 +1817,7 @@ class SettingsProvider extends ChangeNotifier {
   ///
   /// A persisted user opt-out gates the reported status: on Linux .deb
   /// installs the system-wide MIME registration is root-owned, so after
-  /// `disassociate()` the live query still resolves FluxDown and would
+  /// `disassociate()` the live query still resolves RinaDown and would
   /// otherwise snap a user-requested OFF back to ON (issue #98).
   @visibleForTesting
   void handleFileAssociationStatus(bool associated) {
@@ -1833,7 +1833,7 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   void _onUrlProtocolStatus(RustSignalPack<UrlProtocolStatus> pack) {
-    // 单条信号服务所有 scheme（fluxdown:// 的启动自注册也走同一路），
+    // 单条信号服务所有 scheme（rinadown:// 的启动自注册也走同一路），
     // 只消费 ed2k / magnet。
     switch (pack.message.scheme) {
       case _ed2kScheme:
@@ -2305,7 +2305,7 @@ class SettingsProvider extends ChangeNotifier {
       // 应用专属外部目录，无需存储权限即可写入；
       // 公共 Download 目录（SAF/MediaStore）作为后续跟进项。
       // 与 Rust 侧 `download_actor::default_save_dir` 的 Android 分支保持一致。
-      return '/storage/emulated/0/Android/data/com.fluxdown.app/files/Download';
+      return '/storage/emulated/0/Android/data/com.rinadown.app/files/Download';
     }
     return '';
   }

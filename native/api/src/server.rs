@@ -1,11 +1,11 @@
-//! axum HTTP 服务器 —— FluxDown 本机 API 服务。
+//! axum HTTP 服务器 —— RinaDown 本机 API 服务。
 //!
 //! 一个端口、一个服务器，三组按配置独立启停的路由：
 //!
 //! | 路由组 | 端点 | 开关 | 鉴权 |
 //! |---|---|---|---|
 //! | 探活 | `GET /ping` | 总开关 | 无 |
-//! | 脚本接管 | `POST /download`、`/download/batch` | `takeover_enabled` | `X-FluxDown-Client` 头 + 可选 token |
+//! | 脚本接管 | `POST /download`、`/download/batch` | `takeover_enabled` | `X-RinaDown-Client` 头 + 可选 token |
 //! | aria2 兼容 | `POST /jsonrpc`、`GET /jsonrpc`（WS 升级） | `jsonrpc_enabled` | 可选 token（头或 `token:xxx`；WS 仅 `token:xxx`） |
 //! | 管理 API | `/api/v1/*` | `management_enabled` | **强制** token（Bearer 或头） |
 //!
@@ -37,7 +37,7 @@ use crate::mcp::handle_mcp;
 use crate::routes;
 use crate::service::{ApiError, ApiHost, UNKNOWN_ENDPOINT_MESSAGE};
 use crate::takeover::parse_batch;
-use fluxdown_protocol::daemon::{
+use rinadown_protocol::daemon::{
     CreateGroupRequest, CreateGroupResponse, CreateTaskRequest, CreatedTask, DownloadRequest,
     LinkAuth, LinkDeviceTaskRequest, LinkDevicesResponse, LinkDiscoveredResponse,
     LinkDiscoveryRequest, LinkOkResponse, LinkPairApproveRequest, LinkPairBeginRequest,
@@ -68,7 +68,7 @@ const ALLOW_PRIVATE_NETWORK: HeaderName =
 ///
 /// ```
 /// use std::collections::HashMap;
-/// use fluxdown_api::server::ApiServerConfig;
+/// use rinadown_api::server::ApiServerConfig;
 ///
 /// let cfg = ApiServerConfig::from_config_map(&HashMap::new(), "1.0.0");
 /// assert!(cfg.enabled);            // 默认启用
@@ -94,7 +94,7 @@ pub struct ApiServerConfig {
     /// 管理 API 子开关（`local_server_api_enabled`，默认 false）。
     pub management_enabled: bool,
     /// MCP 端点子开关（`local_server_mcp_enabled`，默认 false）。
-    /// 与管理 API 共用 token 鉴权（Bearer / X-FluxDown-Token）。
+    /// 与管理 API 共用 token 鉴权（Bearer / X-RinaDown-Token）。
     pub mcp_enabled: bool,
     /// 允许局域网 / 组网访问（`local_server_lan_enabled`，默认 false）。
     /// 为 true 时绑定 `0.0.0.0` 使同网络 / 用户自建组网内的设备可达（供免账号本地
@@ -487,8 +487,8 @@ pub fn api_router(host: Arc<dyn ApiHost>, config: ApiServerConfig) -> Router {
 ///
 /// **用户显式开启后**：预检与真实响应都带 `Access-Control-Allow-Origin: *`，
 /// 等价于 aria2 的 `--rpc-allow-origin-all`。`Allow-Headers` 原样回显请求的
-/// `Access-Control-Request-Headers`（缺省 `*`），使 `X-FluxDown-Client` /
-/// `X-FluxDown-Token` / `Authorization` 等自定义头都能过检；额外带
+/// `Access-Control-Request-Headers`（缺省 `*`），使 `X-RinaDown-Client` /
+/// `X-RinaDown-Token` / `Authorization` 等自定义头都能过检；额外带
 /// `Access-Control-Allow-Private-Network: true` 满足 Chrome 对「公网页面 →
 /// 本地回环」的私有网络访问门禁。不发 `Allow-Credentials`：`*` 与凭据互斥，
 /// 且本服务鉴权走请求头而非 Cookie，浏览器不会自动附带任何身份。
@@ -612,7 +612,7 @@ impl IntoResponse for ApiError {
 pub(crate) async fn ping(State(state): State<AppState>) -> Response {
     let mut body = json!({
         "success": true,
-        "app": "FluxDown",
+        "app": "RinaDown",
         "version": state.config.app_version,
         "message": "pong",
     });
@@ -638,8 +638,8 @@ pub(crate) async fn ping(State(state): State<AppState>) -> Response {
     description = "配对握手第一步（发起方 → 响应方）。**无 token 鉴权**：由响应方 UI 展示的一次性配对码守卫，重复/过期码拒绝。",
     request_body = LinkPairHelloRequest,
     responses(
-        (status = 200, description = "响应方临时公钥 + SAS 材料", body = fluxdown_protocol::daemon::LinkPairHelloResponse),
-        (status = 400, description = "配对码错误/过期/已用，或载荷非法", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "响应方临时公钥 + SAS 材料", body = rinadown_protocol::daemon::LinkPairHelloResponse),
+        (status = 400, description = "配对码错误/过期/已用，或载荷非法", body = rinadown_protocol::daemon::ResultMessage),
     )
 )]
 pub(crate) async fn api_link_pair_hello(
@@ -681,7 +681,7 @@ pub(crate) async fn api_link_pair_hello(
     request_body = LinkPairConfirmRequest,
     responses(
         (status = 200, description = "`{success,paired,reason}`"),
-        (status = 400, description = "会话不存在/已过期，或载荷非法", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 400, description = "会话不存在/已过期，或载荷非法", body = rinadown_protocol::daemon::ResultMessage),
     )
 )]
 pub(crate) async fn api_link_pair_confirm(State(state): State<AppState>, body: Bytes) -> Response {
@@ -711,9 +711,9 @@ pub(crate) async fn api_link_pair_confirm(State(state): State<AppState>, body: B
     description = "数据面：已配对设备下发下载任务。**无 management token**，鉴权靠 `X-FluxLink-Device`/`X-FluxLink-Ts`/`X-FluxLink-Nonce`/`X-FluxLink-Auth` 头做每对设备独立密钥的 HMAC 校验。\n\n\
 请求体是对明文 JSON 任务描述做 AEAD 加密后的**二进制密文**（`Content-Type: application/octet-stream`），非普通 JSON；宿主校验鉴权头后解密再反序列化。",
     responses(
-        (status = 200, description = "创建成功", body = fluxdown_protocol::daemon::CreatedTask),
-        (status = 400, description = "载荷非法（含解密失败）", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "缺少/无效链路鉴权头", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "创建成功", body = rinadown_protocol::daemon::CreatedTask),
+        (status = 400, description = "载荷非法（含解密失败）", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "缺少/无效链路鉴权头", body = rinadown_protocol::daemon::ResultMessage),
     )
 )]
 pub(crate) async fn api_link_create_task(
@@ -744,8 +744,8 @@ pub(crate) async fn api_link_create_task(
 #[utoipa::path(post, path = "/api/v1/link/code", tag = "link",
     description = "生成一次性配对码，供发起方在 pair/hello 出示。**需 management token**。",
     responses(
-        (status = 200, description = "配对码 + 有效期", body = fluxdown_protocol::daemon::LinkCodeResponse),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "配对码 + 有效期", body = rinadown_protocol::daemon::LinkCodeResponse),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -767,8 +767,8 @@ pub(crate) async fn api_link_generate_code(
 #[utoipa::path(delete, path = "/api/v1/link/code", tag = "link",
     description = "停止 mDNS 广播（撤销「可被发现」状态）；配对码本身未过期仍可用，只是不再出现在局域网扫描里。**需 management token**。",
     responses(
-        (status = 200, description = "已停止", body = fluxdown_protocol::daemon::LinkOkResponse),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已停止", body = rinadown_protocol::daemon::LinkOkResponse),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -795,9 +795,9 @@ pub(crate) async fn api_link_stop_advertising(
     description = "本地设备发现开关：`start` 幂等且清空发现快照，`stop` 停止 mDNS 浏览。**需 management token**。",
     request_body = LinkDiscoveryRequest,
     responses(
-        (status = 200, description = "已切换", body = fluxdown_protocol::daemon::LinkOkResponse),
-        (status = 400, description = "action 非法", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已切换", body = rinadown_protocol::daemon::LinkOkResponse),
+        (status = 400, description = "action 非法", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -840,8 +840,8 @@ pub(crate) async fn api_link_discovery(
 #[utoipa::path(get, path = "/api/v1/link/discovered", tag = "link",
     description = "当前发现快照（发起方侧 UI 轮询）。**需 management token**。",
     responses(
-        (status = 200, description = "发现到的对端列表", body = fluxdown_protocol::daemon::LinkDiscoveredResponse),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "发现到的对端列表", body = rinadown_protocol::daemon::LinkDiscoveredResponse),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -863,10 +863,10 @@ pub(crate) async fn api_link_discovered(
     description = "手动地址探测（mDNS 失效兜底）；结果不入发现快照，直接返回给调用方。**需 management token**。",
     request_body = LinkProbeRequest,
     responses(
-        (status = 200, description = "探测到的对端信息", body = fluxdown_protocol::daemon::LinkDiscoveredPeer),
-        (status = 400, description = "载荷非法", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 503, description = "对端不可达", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "探测到的对端信息", body = rinadown_protocol::daemon::LinkDiscoveredPeer),
+        (status = 400, description = "载荷非法", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 503, description = "对端不可达", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -900,10 +900,10 @@ pub(crate) async fn api_link_probe(
     description = "发起配对：向 `host:port` 发送 hello（带配对码），返回待确认令牌 + SAS，供 UI 展示核对后调用 pair/finish。**需 management token**。",
     request_body = LinkPairBeginRequest,
     responses(
-        (status = 200, description = "待确认令牌 + SAS + 对端信息", body = fluxdown_protocol::daemon::LinkPairBeginResponse),
-        (status = 400, description = "配对码错误，或载荷非法", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 503, description = "对端不可达，或本机待确认配对已达上限", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "待确认令牌 + SAS + 对端信息", body = rinadown_protocol::daemon::LinkPairBeginResponse),
+        (status = 400, description = "配对码错误，或载荷非法", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 503, description = "对端不可达，或本机待确认配对已达上限", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -940,9 +940,9 @@ pub(crate) async fn api_link_pair_begin(
     description = "SAS 核对后确认/拒绝配对（管理面视角，区别于响应方内部 `pair/confirm`）。**需 management token**。",
     request_body = LinkPairFinishRequest,
     responses(
-        (status = 200, description = "`paired=false` 表示对端拒绝，此时 device 省略", body = fluxdown_protocol::daemon::LinkPairFinishResponse),
-        (status = 400, description = "令牌不存在/已过期，或载荷非法", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "`paired=false` 表示对端拒绝，此时 device 省略", body = rinadown_protocol::daemon::LinkPairFinishResponse),
+        (status = 400, description = "令牌不存在/已过期，或载荷非法", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -980,9 +980,9 @@ pub(crate) async fn api_link_pair_finish(
     description = "批准/拒绝一次入站配对核验（响应本机收到的 `IncomingPairing` 通知；区别于发起方视角、核对 SAS 后调用的 pair/finish）。**需 management token**。",
     request_body = LinkPairApproveRequest,
     responses(
-        (status = 200, description = "已处理", body = fluxdown_protocol::daemon::LinkOkResponse),
-        (status = 400, description = "会话不存在/已过期，或载荷非法", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已处理", body = rinadown_protocol::daemon::LinkOkResponse),
+        (status = 400, description = "会话不存在/已过期，或载荷非法", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1018,8 +1018,8 @@ pub(crate) async fn api_link_pair_approve(
 #[utoipa::path(get, path = "/api/v1/link/devices", tag = "link",
     description = "已配对设备列表（含并发在线探测）。**需 management token**。",
     responses(
-        (status = 200, description = "设备列表", body = fluxdown_protocol::daemon::LinkDevicesResponse),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "设备列表", body = rinadown_protocol::daemon::LinkDevicesResponse),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1041,9 +1041,9 @@ pub(crate) async fn api_link_devices(
     description = "解除配对（删除设备记录及双方链路密钥）。**需 management token**。",
     params(("fingerprint" = String, Path, description = "设备指纹")),
     responses(
-        (status = 200, description = "已解除", body = fluxdown_protocol::daemon::LinkOkResponse),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 404, description = "设备不存在", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已解除", body = rinadown_protocol::daemon::LinkOkResponse),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 404, description = "设备不存在", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1069,9 +1069,9 @@ pub(crate) async fn api_link_remove_device(
     params(("fingerprint" = String, Path, description = "目标设备指纹")),
     request_body = LinkDeviceTaskRequest,
     responses(
-        (status = 200, description = "创建成功", body = fluxdown_protocol::daemon::CreatedTask),
-        (status = 400, description = "载荷非法", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效，或目标设备不存在/未配对", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "创建成功", body = rinadown_protocol::daemon::CreatedTask),
+        (status = 400, description = "载荷非法", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效，或目标设备不存在/未配对", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1118,10 +1118,10 @@ pub(crate) async fn api_link_device_tasks(
 #[utoipa::path(post, path = "/download", tag = "takeover",
     request_body = DownloadRequest,
     responses(
-        (status = 200, description = "已受理，进入快速下载确认流程", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 400, description = "载荷非法或缺少 url", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 403, description = "缺少 X-FluxDown-Client 头", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已受理，进入快速下载确认流程", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 400, description = "载荷非法或缺少 url", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 403, description = "缺少 X-RinaDown-Client 头", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("tokenHeader" = []))
 )]
@@ -1150,8 +1150,8 @@ pub(crate) async fn takeover_download(
 /// 合并为单次确认。鉴权与 `/download` 相同。
 #[utoipa::path(post, path = "/download/batch", tag = "takeover",
     responses(
-        (status = 200, description = "已受理", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 400, description = "载荷非法", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已受理", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 400, description = "载荷非法", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("tokenHeader" = []))
 )]
@@ -1194,7 +1194,7 @@ fn status_from(code: u16) -> StatusCode {
 
 /// aria2 客户端约定：HTTP 层始终 200，错误在 JSON-RPC envelope 内表达。
 #[utoipa::path(post, path = "/jsonrpc", tag = "aria2",
-    responses((status = 200, description = "JSON-RPC 响应（错误在 envelope 内表达）。支持方法：aria2.addUri / aria2.getVersion / aria2.getGlobalStat / system.multicall / system.listMethods；token 可经 X-FluxDown-Token 头或 params[0]=\"token:xxx\" 传递")),
+    responses((status = 200, description = "JSON-RPC 响应（错误在 envelope 内表达）。支持方法：aria2.addUri / aria2.getVersion / aria2.getGlobalStat / system.multicall / system.listMethods；token 可经 X-RinaDown-Token 头或 params[0]=\"token:xxx\" 传递")),
     security(("tokenHeader" = []))
 )]
 pub(crate) async fn jsonrpc(
@@ -1226,14 +1226,14 @@ pub(crate) async fn jsonrpc_ws(State(state): State<AppState>, ws: WebSocketUpgra
 // ---------------------------------------------------------------------------
 
 /// MCP（Model Context Protocol）端点。强制 token 鉴权（Bearer /
-/// X-FluxDown-Token，复用管理 API 门禁）。请求返回 `200 application/json`
+/// X-RinaDown-Token，复用管理 API 门禁）。请求返回 `200 application/json`
 /// JSON-RPC 响应；通知（无 `id`）返回 `202 Accepted` 空体。
 #[utoipa::path(post, path = "/mcp", tag = "mcp",
     responses(
         (status = 200, description = "JSON-RPC 响应（initialize / tools/list / tools/call / ping）"),
         (status = 202, description = "通知已接受（无响应体）"),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 403, description = "服务端未配置 token", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 403, description = "服务端未配置 token", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1265,9 +1265,9 @@ fn guard(state: &AppState, headers: &HeaderMap) -> Result<(), Box<Response>> {
 /// 应用信息（名称与版本号）。
 #[utoipa::path(get, path = "/api/v1/info", tag = "management",
     responses(
-        (status = 200, description = "应用信息", body = fluxdown_protocol::daemon::ApiInfo),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 403, description = "服务端未配置 token", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "应用信息", body = rinadown_protocol::daemon::ApiInfo),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 403, description = "服务端未配置 token", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1275,8 +1275,8 @@ pub(crate) async fn api_info(State(state): State<AppState>, headers: HeaderMap) 
     if let Err(resp) = guard(&state, &headers) {
         return *resp;
     }
-    Json(fluxdown_protocol::daemon::ApiInfo {
-        name: "FluxDown".to_string(),
+    Json(rinadown_protocol::daemon::ApiInfo {
+        name: "RinaDown".to_string(),
         version: state.config.app_version.clone(),
     })
     .into_response()
@@ -1292,8 +1292,8 @@ pub(crate) struct TaskListQuery {
 #[utoipa::path(get, path = "/api/v1/tasks", tag = "management",
     params(TaskListQuery),
     responses(
-        (status = 200, description = "任务列表", body = Vec<fluxdown_protocol::daemon::TaskDto>),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "任务列表", body = Vec<rinadown_protocol::daemon::TaskDto>),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1320,10 +1320,10 @@ pub(crate) async fn api_list_tasks(
 #[utoipa::path(post, path = "/api/v1/tasks", tag = "management",
     request_body = CreateTaskRequest,
     responses(
-        (status = 200, description = "创建成功", body = fluxdown_protocol::daemon::CreatedTask),
-        (status = 400, description = "载荷非法或缺少 url", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 503, description = "应用关闭中", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "创建成功", body = rinadown_protocol::daemon::CreatedTask),
+        (status = 400, description = "载荷非法或缺少 url", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 503, description = "应用关闭中", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1358,9 +1358,9 @@ pub(crate) async fn api_create_task(
 #[utoipa::path(get, path = "/api/v1/tasks/{id}", tag = "management",
     params(("id" = String, Path, description = "任务 ID（UUID）")),
     responses(
-        (status = 200, description = "任务信息", body = fluxdown_protocol::daemon::TaskDto),
-        (status = 404, description = "任务不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "任务信息", body = rinadown_protocol::daemon::TaskDto),
+        (status = 404, description = "任务不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1391,9 +1391,9 @@ pub(crate) struct DeleteTaskQuery {
 #[utoipa::path(delete, path = "/api/v1/tasks/{id}", tag = "management",
     params(("id" = String, Path, description = "任务 ID（UUID）"), DeleteTaskQuery),
     responses(
-        (status = 200, description = "已删除", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 404, description = "任务不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已删除", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 404, description = "任务不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1413,9 +1413,9 @@ pub(crate) async fn api_delete_task(
 #[utoipa::path(put, path = "/api/v1/tasks/{id}/pause", tag = "management",
     params(("id" = String, Path, description = "任务 ID（UUID）")),
     responses(
-        (status = 200, description = "已暂停", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 404, description = "任务不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已暂停", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 404, description = "任务不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1434,9 +1434,9 @@ pub(crate) async fn api_pause_task(
 #[utoipa::path(put, path = "/api/v1/tasks/{id}/continue", tag = "management",
     params(("id" = String, Path, description = "任务 ID（UUID）")),
     responses(
-        (status = 200, description = "已恢复", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 404, description = "任务不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已恢复", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 404, description = "任务不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1454,13 +1454,13 @@ pub(crate) async fn api_continue_task(
 /// 重命名任务文件。
 #[utoipa::path(post, path = "/api/v1/tasks/{id}/rename", tag = "management",
     params(("id" = String, Path, description = "任务 ID（UUID）")),
-    request_body = fluxdown_protocol::daemon::RenameTaskRequest,
+    request_body = rinadown_protocol::daemon::RenameTaskRequest,
     responses(
-        (status = 200, description = "已重命名", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 400, description = "文件名非法（message 为错误码 `invalid-name`）", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 404, description = "任务不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 409, description = "业务拒绝（message 为错误码 `task-active` / `bt-unsupported` / `target-exists`）", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已重命名", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 400, description = "文件名非法（message 为错误码 `invalid-name`）", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 404, description = "任务不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 409, description = "业务拒绝（message 为错误码 `task-active` / `bt-unsupported` / `target-exists`）", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1473,7 +1473,7 @@ pub(crate) async fn api_rename_task(
     if let Err(resp) = guard(&state, &headers) {
         return *resp;
     }
-    let req: fluxdown_protocol::daemon::RenameTaskRequest = match serde_json::from_slice(&body) {
+    let req: rinadown_protocol::daemon::RenameTaskRequest = match serde_json::from_slice(&body) {
         Ok(r) => r,
         Err(e) => {
             return result_response(
@@ -1489,8 +1489,8 @@ pub(crate) async fn api_rename_task(
 /// 暂停全部活跃任务（pending / downloading / preparing）。
 #[utoipa::path(put, path = "/api/v1/tasks/pause", tag = "management",
     responses(
-        (status = 200, description = "已全部暂停", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已全部暂停", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1504,8 +1504,8 @@ pub(crate) async fn api_pause_all(State(state): State<AppState>, headers: Header
 /// 恢复全部已暂停任务。
 #[utoipa::path(put, path = "/api/v1/tasks/continue", tag = "management",
     responses(
-        (status = 200, description = "已全部恢复", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已全部恢复", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1522,8 +1522,8 @@ pub(crate) async fn api_continue_all(
 /// 列出全部命名队列。
 #[utoipa::path(get, path = "/api/v1/queues", tag = "management",
     responses(
-        (status = 200, description = "队列列表", body = Vec<fluxdown_protocol::daemon::QueueDto>),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "队列列表", body = Vec<rinadown_protocol::daemon::QueueDto>),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1547,9 +1547,9 @@ pub(crate) async fn api_list_queues(State(state): State<AppState>, headers: Head
 #[utoipa::path(post, path = "/api/v1/resolve/preview", tag = "groups",
     request_body = ResolvePreviewRequest,
     responses(
-        (status = 200, description = "预解析结果（items 为空且 error 为空 = 插件未返回清单）", body = fluxdown_protocol::daemon::ResolvePreviewResponse),
-        (status = 400, description = "载荷非法或缺少 url", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "预解析结果（items 为空且 error 为空 = 插件未返回清单）", body = rinadown_protocol::daemon::ResolvePreviewResponse),
+        (status = 400, description = "载荷非法或缺少 url", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1583,8 +1583,8 @@ pub(crate) async fn api_resolve_preview(
 /// 列出全部任务组。
 #[utoipa::path(get, path = "/api/v1/groups", tag = "groups",
     responses(
-        (status = 200, description = "任务组列表", body = Vec<fluxdown_protocol::daemon::GroupDto>),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "任务组列表", body = Vec<rinadown_protocol::daemon::GroupDto>),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1603,9 +1603,9 @@ pub(crate) async fn api_list_groups(State(state): State<AppState>, headers: Head
     request_body = CreateGroupRequest,
     responses(
         (status = 200, description = "创建成功", body = CreateGroupResponse),
-        (status = 400, description = "载荷非法或 items 为空", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 503, description = "应用关闭中", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 400, description = "载荷非法或 items 为空", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 503, description = "应用关闭中", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1648,9 +1648,9 @@ pub(crate) struct DeleteGroupQuery {
 #[utoipa::path(delete, path = "/api/v1/groups/{id}", tag = "groups",
     params(("id" = String, Path, description = "任务组 ID（UUID）"), DeleteGroupQuery),
     responses(
-        (status = 200, description = "已删除", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 404, description = "任务组不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已删除", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 404, description = "任务组不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1670,9 +1670,9 @@ pub(crate) async fn api_delete_group(
 #[utoipa::path(put, path = "/api/v1/groups/{id}/pause", tag = "groups",
     params(("id" = String, Path, description = "任务组 ID（UUID）")),
     responses(
-        (status = 200, description = "已暂停", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 404, description = "任务组不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已暂停", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 404, description = "任务组不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1691,9 +1691,9 @@ pub(crate) async fn api_group_pause(
 #[utoipa::path(put, path = "/api/v1/groups/{id}/continue", tag = "groups",
     params(("id" = String, Path, description = "任务组 ID（UUID）")),
     responses(
-        (status = 200, description = "已恢复", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 404, description = "任务组不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已恢复", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 404, description = "任务组不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1715,8 +1715,8 @@ pub(crate) async fn api_group_continue(
 /// 列出全部 RSS 订阅。
 #[utoipa::path(get, path = "/api/v1/rss", tag = "rss",
     responses(
-        (status = 200, description = "订阅列表", body = Vec<fluxdown_protocol::daemon::RssSourceDto>),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "订阅列表", body = Vec<rinadown_protocol::daemon::RssSourceDto>),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1738,8 +1738,8 @@ pub(crate) async fn api_list_rss_sources(
     request_body = RssSourceDto,
     responses(
         (status = 200, description = "创建成功，`{sourceId}`"),
-        (status = 400, description = "载荷非法或缺少 url", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 400, description = "载荷非法或缺少 url", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1775,10 +1775,10 @@ pub(crate) async fn api_create_rss_source(
     params(("id" = String, Path, description = "订阅 ID（UUID）")),
     request_body = RssSourceDto,
     responses(
-        (status = 200, description = "已更新", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 400, description = "载荷非法", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 404, description = "订阅不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已更新", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 400, description = "载荷非法", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 404, description = "订阅不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1809,9 +1809,9 @@ pub(crate) async fn api_update_rss_source(
 #[utoipa::path(delete, path = "/api/v1/rss/{id}", tag = "rss",
     params(("id" = String, Path, description = "订阅 ID（UUID）")),
     responses(
-        (status = 200, description = "已删除", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 404, description = "订阅不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已删除", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 404, description = "订阅不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1831,9 +1831,9 @@ pub(crate) async fn api_delete_rss_source(
 #[utoipa::path(post, path = "/api/v1/rss/{id}/refresh", tag = "rss",
     params(("id" = String, Path, description = "订阅 ID（UUID）")),
     responses(
-        (status = 200, description = "已派发抓取", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 404, description = "订阅不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已派发抓取", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 404, description = "订阅不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1852,9 +1852,9 @@ pub(crate) async fn api_refresh_rss_source(
 #[utoipa::path(get, path = "/api/v1/rss/{id}/items", tag = "rss",
     params(("id" = String, Path, description = "订阅 ID（UUID）")),
     responses(
-        (status = 200, description = "条目列表", body = Vec<fluxdown_protocol::daemon::RssItemDto>),
-        (status = 404, description = "订阅不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "条目列表", body = Vec<rinadown_protocol::daemon::RssItemDto>),
+        (status = 404, description = "订阅不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1878,10 +1878,10 @@ pub(crate) async fn api_list_rss_items(
     params(("id" = String, Path, description = "订阅 ID（UUID）")),
     request_body = RssItemActionRequest,
     responses(
-        (status = 200, description = "已执行", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 400, description = "载荷非法或 action 未知", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 404, description = "订阅或条目不存在", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已执行", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 400, description = "载荷非法或 action 未知", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 404, description = "订阅或条目不存在", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1912,9 +1912,9 @@ pub(crate) async fn api_rss_item_action(
 #[utoipa::path(post, path = "/api/v1/rss/validate", tag = "rss",
     request_body = RssValidateRequest,
     responses(
-        (status = 200, description = "验证结果（`error` 非空 = 抓取失败）", body = fluxdown_protocol::daemon::RssValidateResponse),
-        (status = 400, description = "载荷非法或缺少 url", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "验证结果（`error` 非空 = 抓取失败）", body = rinadown_protocol::daemon::RssValidateResponse),
+        (status = 400, description = "载荷非法或缺少 url", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1955,8 +1955,8 @@ const MAX_PLUGIN_ZIP: usize = 10 * 1024 * 1024;
 /// 列出全部已安装插件。
 #[utoipa::path(get, path = "/api/v1/plugins", tag = "plugins",
     responses(
-        (status = 200, description = "插件列表", body = Vec<fluxdown_protocol::daemon::PluginDto>),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "插件列表", body = Vec<rinadown_protocol::daemon::PluginDto>),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -1976,9 +1976,9 @@ pub(crate) async fn api_list_plugins(
 /// 从 zip 安装插件（≤10MB）。
 #[utoipa::path(post, path = "/api/v1/plugins/install", tag = "plugins",
     responses(
-        (status = 200, description = "安装成功", body = fluxdown_protocol::daemon::InstalledPlugin),
-        (status = 400, description = "zip 非法或超限", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "安装成功", body = rinadown_protocol::daemon::InstalledPlugin),
+        (status = 400, description = "zip 非法或超限", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -2005,11 +2005,11 @@ pub(crate) async fn api_install_plugin(
 
 /// dev 安装插件（引用目录，不拷贝）。
 #[utoipa::path(post, path = "/api/v1/plugins/install-dev", tag = "plugins",
-    request_body = fluxdown_protocol::daemon::InstallPluginDevRequest,
+    request_body = rinadown_protocol::daemon::InstallPluginDevRequest,
     responses(
-        (status = 200, description = "安装成功", body = fluxdown_protocol::daemon::InstalledPlugin),
-        (status = 400, description = "路径非法", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "安装成功", body = rinadown_protocol::daemon::InstalledPlugin),
+        (status = 400, description = "路径非法", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -2021,7 +2021,7 @@ pub(crate) async fn api_install_plugin_dev(
     if let Err(resp) = guard(&state, &headers) {
         return *resp;
     }
-    let req: fluxdown_protocol::daemon::InstallPluginDevRequest =
+    let req: rinadown_protocol::daemon::InstallPluginDevRequest =
         match serde_json::from_slice(&body) {
             Ok(r) => r,
             Err(e) => {
@@ -2041,10 +2041,10 @@ pub(crate) async fn api_install_plugin_dev(
 /// 启用/禁用插件。
 #[utoipa::path(put, path = "/api/v1/plugins/{identity}/enabled", tag = "plugins",
     params(("identity" = String, Path, description = "插件 identity")),
-    request_body = fluxdown_protocol::daemon::SetPluginEnabledRequest,
+    request_body = rinadown_protocol::daemon::SetPluginEnabledRequest,
     responses(
-        (status = 200, description = "已更新", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已更新", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -2057,7 +2057,7 @@ pub(crate) async fn api_set_plugin_enabled(
     if let Err(resp) = guard(&state, &headers) {
         return *resp;
     }
-    let req: fluxdown_protocol::daemon::SetPluginEnabledRequest =
+    let req: rinadown_protocol::daemon::SetPluginEnabledRequest =
         match serde_json::from_slice(&body) {
             Ok(r) => r,
             Err(e) => {
@@ -2075,9 +2075,9 @@ pub(crate) async fn api_set_plugin_enabled(
 #[utoipa::path(put, path = "/api/v1/plugins/{identity}/settings", tag = "plugins",
     params(("identity" = String, Path, description = "插件 identity")),
     responses(
-        (status = 200, description = "已保存", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 400, description = "设置校验失败", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已保存", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 400, description = "设置校验失败", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -2107,8 +2107,8 @@ pub(crate) async fn api_update_plugin_settings(
 #[utoipa::path(delete, path = "/api/v1/plugins/{identity}", tag = "plugins",
     params(("identity" = String, Path, description = "插件 identity")),
     responses(
-        (status = 200, description = "已卸载", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已卸载", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -2127,8 +2127,8 @@ pub(crate) async fn api_uninstall_plugin(
 #[utoipa::path(post, path = "/api/v1/tasks/{id}/ignore-plugin-retry", tag = "plugins",
     params(("id" = String, Path, description = "任务 ID")),
     responses(
-        (status = 200, description = "已按原始链接重跑", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "已按原始链接重跑", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -2146,8 +2146,8 @@ pub(crate) async fn api_ignore_plugin_retry(
 /// 拉取去中心化插件市场索引。
 #[utoipa::path(get, path = "/api/v1/market", tag = "plugins",
     responses(
-        (status = 200, description = "市场索引条目", body = Vec<fluxdown_protocol::daemon::MarketEntryDto>),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "市场索引条目", body = Vec<rinadown_protocol::daemon::MarketEntryDto>),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -2163,11 +2163,11 @@ pub(crate) async fn api_market_list(State(state): State<AppState>, headers: Head
 
 /// 从市场安装某插件最新版。
 #[utoipa::path(post, path = "/api/v1/market/install", tag = "plugins",
-    request_body = fluxdown_protocol::daemon::MarketInstallRequest,
+    request_body = rinadown_protocol::daemon::MarketInstallRequest,
     responses(
-        (status = 200, description = "安装成功", body = fluxdown_protocol::daemon::InstalledPlugin),
-        (status = 400, description = "下载/校验/安装失败", body = fluxdown_protocol::daemon::ResultMessage),
-        (status = 401, description = "token 无效", body = fluxdown_protocol::daemon::ResultMessage),
+        (status = 200, description = "安装成功", body = rinadown_protocol::daemon::InstalledPlugin),
+        (status = 400, description = "下载/校验/安装失败", body = rinadown_protocol::daemon::ResultMessage),
+        (status = 401, description = "token 无效", body = rinadown_protocol::daemon::ResultMessage),
     ),
     security(("bearerAuth" = []), ("tokenHeader" = []))
 )]
@@ -2179,7 +2179,7 @@ pub(crate) async fn api_market_install(
     if let Err(resp) = guard(&state, &headers) {
         return *resp;
     }
-    let req: fluxdown_protocol::daemon::MarketInstallRequest = match serde_json::from_slice(&body) {
+    let req: rinadown_protocol::daemon::MarketInstallRequest = match serde_json::from_slice(&body) {
         Ok(r) => r,
         Err(e) => {
             return result_response(
@@ -2196,10 +2196,10 @@ pub(crate) async fn api_market_install(
 }
 
 /// 安装成功统一返回体：回填缺失基础组件列表（提醒式依赖检查，见
-/// [`fluxdown_protocol::daemon::InstalledPlugin`]）。
+/// [`rinadown_protocol::daemon::InstalledPlugin`]）。
 async fn installed_response(state: &AppState, identity: String) -> Response {
     let missing_components = state.host.plugin_missing_components(&identity).await;
-    Json(fluxdown_protocol::daemon::InstalledPlugin {
+    Json(rinadown_protocol::daemon::InstalledPlugin {
         identity,
         missing_components,
     })

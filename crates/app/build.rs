@@ -19,14 +19,14 @@ fn main() -> std::io::Result<()> {
 fn embed_windows_resources() -> std::io::Result<()> {
     let mut resources = winresource::WindowsResource::new();
     resources.set_icon(WINDOWS_APP_ICON);
-    resources.set("CompanyName", "FluxDown");
-    resources.set("ProductName", "FluxDown");
-    resources.set("FileDescription", "FluxDown");
-    resources.set("InternalName", "com.fluxdown.app");
-    resources.set("OriginalFilename", "fluxdown-desktop.exe");
+    resources.set("CompanyName", "RinaDown");
+    resources.set("ProductName", "RinaDown");
+    resources.set("FileDescription", "RinaDown");
+    resources.set("InternalName", "com.rinadown.app");
+    resources.set("OriginalFilename", "rinadown-desktop.exe");
     resources.set(
         "LegalCopyright",
-        "Copyright (C) 2026 FluxDown. All rights reserved.",
+        "Copyright (C) 2026 RinaDown. All rights reserved.",
     );
     resources.compile()
 }

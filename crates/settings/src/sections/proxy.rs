@@ -1,8 +1,8 @@
 //! 代理：模式、手动服务器、连通性测试、站点凭据。
 
-use fluxdown_protocol::method;
-use fluxdown_ui_components::{ButtonVariant, button};
-use fluxdown_ui_theme::active_theme;
+use rinadown_protocol::method;
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_theme::active_theme;
 use gpui::{App, ParentElement, SharedString, Styled, div};
 use gpui_component::{
     Icon, IconName, h_flex,

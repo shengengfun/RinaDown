@@ -1,5 +1,5 @@
 // FloatingBallPanel.swift
-// 悬浮球原生层（macOS）— MethodChannel `com.fluxdown/floating_ball`。
+// 悬浮球原生层（macOS）— MethodChannel `com.rinadown/floating_ball`。
 //
 // 设计原则（方案评审硬性约束，勿改）：
 // - 本文件是"哑"窗口：只贴位图 + 转发输入，不含任何业务逻辑（下载/托盘/设置一律留在 Dart）。
@@ -65,7 +65,7 @@ final class FloatingBallPanel: NSObject {
     /// 由 MainFlutterWindow.awakeFromNib 调用一次，完成 channel 注册。
     func register(with messenger: FlutterBinaryMessenger) {
         let channel = FlutterMethodChannel(
-            name: "com.fluxdown/floating_ball",
+            name: "com.rinadown/floating_ball",
             binaryMessenger: messenger
         )
         channel.setMethodCallHandler { [weak self] call, result in

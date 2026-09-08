@@ -301,11 +301,11 @@ pub fn default_tracker_list() -> String {
 // ---------------------------------------------------------------------------
 // BT configuration — user-settable via the Settings page
 // ---------------------------------------------------------------------------
-/// FluxDown-owned MSE policy. Keeping this type at the engine boundary avoids
+/// RinaDown-owned MSE policy. Keeping this type at the engine boundary avoids
 /// exposing the concrete BitTorrent backend to host crates.
 ///
 /// ```
-/// use fluxdown_engine::bt_downloader::BtMseMode;
+/// use rinadown_engine::bt_downloader::BtMseMode;
 ///
 /// assert_eq!(BtMseMode::from("forced"), BtMseMode::Forced);
 /// ```
@@ -446,7 +446,7 @@ impl Default for BtConfig {
 ///
 /// Why (BUG-BT-RESUME-FROM-ZERO — "BT 任务暂停后继续会从零开始"):
 ///
-/// FluxDown manages task state in SQLite and re-adds torrents itself on
+/// RinaDown manages task state in SQLite and re-adds torrents itself on
 /// resume; librqbit's own session restore is not only redundant but
 /// actively harmful:
 ///
@@ -613,7 +613,7 @@ impl SharedBtSession {
         let upload_bps = NonZeroU32::new(upload_limit_bps.min(u32::MAX as u64) as u32);
 
         // Persistence folder: store session.json + {hash}.bitv + {hash}.torrent
-        // in the app data directory (next to flux_down.db), NOT in the user's
+        // in the app data directory (next to rina_down.db), NOT in the user's
         // download folder. This matches how professional tools (qBittorrent,
         // Thunder, etc.) keep internal data out of user-visible directories.
         let persistence_folder = PathBuf::from(app_data_dir).join("bt_session");
@@ -2085,7 +2085,7 @@ struct CompletionLayout {
 ///
 /// Layout decisions:
 /// - **All-selected multi-file torrent** → preserve rqbit's default
-///   `save_dir/<torrent name>/...` layout even though FluxDown downloads into
+///   `save_dir/<torrent name>/...` layout even though RinaDown downloads into
 ///   a task-scoped staging dir.  The torrent root is always the outer final
 ///   container; selected relative paths remain the content paths inside it.
 /// - **Single file (partial or otherwise)** → single-file flat move (basename
@@ -2172,7 +2172,7 @@ fn compute_completion_layout(input: CompletionLayoutInput<'_>) -> Option<Complet
     };
 
     // Rqbit's default CLI/session behavior places all-selected multi-file
-    // torrents under `<torrent name>/`. FluxDown overrides rqbit's
+    // torrents under `<torrent name>/`. RinaDown overrides rqbit's
     // output_folder with a hidden staging dir, so we recreate that outer root
     // here and preserve every torrent-relative path below it. If a valid
     // torrent happens to contain an inner directory with the same name as the
@@ -5356,7 +5356,7 @@ mod tests {
         // their flat destinations collide and must be deduped as
         // "file.txt" + "file (1).txt", not "_file.txt".
         let tmp = std::env::temp_dir().join(format!(
-            "fluxdown_bt_test_{}",
+            "rinadown_bt_test_{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_nanos())
@@ -5689,7 +5689,7 @@ mod tests {
     #[test]
     fn clear_stale_session_state_keeps_fastresume_files() {
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_bt_session_test_{}_{}",
+            "rinadown_bt_session_test_{}_{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -5725,7 +5725,7 @@ mod tests {
     fn clear_stale_session_state_tolerates_missing_files() {
         // Folder without session.json (first launch) — must not panic.
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_bt_session_test_missing_{}",
+            "rinadown_bt_session_test_missing_{}",
             std::process::id()
         ));
         let _ = std::fs::create_dir_all(&dir);
@@ -5741,7 +5741,7 @@ mod tests {
 
     fn unique_test_dir(tag: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!(
-            "fluxdown_bt_stage_test_{tag}_{}_{}",
+            "rinadown_bt_stage_test_{tag}_{}_{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

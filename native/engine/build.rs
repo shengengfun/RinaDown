@@ -1,5 +1,5 @@
-//! 构建脚本：从仓库根 pubspec.yaml 读取应用版本号，注入 `FLUXDOWN_APP_VERSION`
-//! 编译期环境变量，供 downloader.rs 拼出 aria2 风格的默认 UA（`FluxDown/<版本>`）。
+//! 构建脚本：从仓库根 pubspec.yaml 读取应用版本号，注入 `RINADOWN_APP_VERSION`
+//! 编译期环境变量，供 downloader.rs 拼出 aria2 风格的默认 UA（`RinaDown/<版本>`）。
 //!
 //! 读取失败（独立打包 engine crate 等场景）时回退 "1.0"。
 
@@ -26,5 +26,5 @@ fn main() {
             })
         })
         .unwrap_or_else(|| "1.0".to_string());
-    println!("cargo:rustc-env=FLUXDOWN_APP_VERSION={version}");
+    println!("cargo:rustc-env=RINADOWN_APP_VERSION={version}");
 }

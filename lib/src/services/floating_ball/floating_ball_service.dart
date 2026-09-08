@@ -7,7 +7,7 @@
 ///   其他本地文件 → 丢弃并 logInfo
 /// - 挂起/唤醒：Dart 心跳 Timer 检测墙钟跳变 >30s → 全量重绘 + 坐标校验
 ///
-/// ## MethodChannel 协议（A6，`com.fluxdown/floating_ball`）
+/// ## MethodChannel 协议（A6，`com.rinadown/floating_ball`）
 /// Dart→原生：pushBitmap / showBall / hideBall / destroyBall / registerDropTarget
 /// 原生→Dart：onDropPayload / onBallClicked / onBallMoved / onCapability
 library;
@@ -46,7 +46,7 @@ class FloatingBallService {
   FloatingBallService._();
   static final instance = FloatingBallService._();
 
-  static const _channel = MethodChannel('com.fluxdown/floating_ball');
+  static const _channel = MethodChannel('com.rinadown/floating_ball');
 
   SettingsProvider? _settings;
   ThemeProvider? _theme;

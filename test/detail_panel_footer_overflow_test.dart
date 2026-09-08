@@ -11,12 +11,12 @@
 // Flexible，在 FittedBox 无界测量下会断言崩溃——同样必须零异常）。
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/i18n/locale_provider.dart';
-import 'package:flux_down/src/models/download_task.dart';
-import 'package:flux_down/src/theme/app_theme.dart';
-import 'package:flux_down/src/theme/flux_theme_tokens.dart';
-import 'package:flux_down/src/widgets/detail_panel.dart';
-import 'package:flux_down/src/widgets/group_detail_panel.dart';
+import 'package:rina_down/src/i18n/locale_provider.dart';
+import 'package:rina_down/src/models/download_task.dart';
+import 'package:rina_down/src/theme/app_theme.dart';
+import 'package:rina_down/src/theme/flux_theme_tokens.dart';
+import 'package:rina_down/src/widgets/detail_panel.dart';
+import 'package:rina_down/src/widgets/group_detail_panel.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 Widget _harness(Widget home) {

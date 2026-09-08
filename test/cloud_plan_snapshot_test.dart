@@ -1,4 +1,4 @@
-// 套餐目录本地快照契约（账户页 cloud_plans_catalog / web fluxdown.cloud.plansCatalog）：
+// 套餐目录本地快照契约（账户页 cloud_plans_catalog / web rinadown.cloud.plansCatalog）：
 // CloudPlan.toJson 必须与 fromJson 互逆，否则冷启动从快照恢复的徽标会与
 // 上次网络拉取渲染的不一致（错样式/丢编号），违背「上次最终显示的 UI」承诺。
 
@@ -6,7 +6,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flux_down/src/services/cloud/cloud_models.dart';
+import 'package:rina_down/src/services/cloud/cloud_models.dart';
 
 void main() {
   test('CloudPlan 快照经 jsonEncode/Decode 往返后徽标与价格字段逐项一致', () {

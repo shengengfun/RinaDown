@@ -2,24 +2,24 @@
 //!
 //! | 环境变量 | 含义 | 默认 |
 //! |---|---|---|
-//! | `FLUXDOWN_DATA_DIR` | 数据目录（DB/日志） | 平台自动探测 |
-//! | `FLUXDOWN_DATABASE_URL` | 数据库连接 URL（`sqlite:`/`postgres:`） | 数据目录下 SQLite |
-//! | `FLUXDOWN_BIND` | HTTP 监听地址 | `0.0.0.0:17800` |
-//! | `FLUXDOWN_WEBROOT` | 覆盖内嵌 Web UI，改从该磁盘目录托管 SPA | 未设置（用二进制内嵌的前端） |
-//! | `FLUXDOWN_TOKEN` | 预置管理访问密钥（仅在库中尚未设置时采纳） | 未设置（走 Web 向导） |
-//! | `FLUXDOWN_DEMO` | 演示模式：仅允许下载内置本地演示文件 | 未设置（关闭） |
-//! | `FLUXDOWN_DEMO_URL` | 演示模式：仅允许下载该 URL（覆盖内置） | 未设置（关闭） |
-//! | `FLUXDOWN_LANG` | Web UI 默认语言（`en`/`zh`），设置页保存过语言后以保存值为准 | 未设置（回退浏览器语言） |
+//! | `RINADOWN_DATA_DIR` | 数据目录（DB/日志） | 平台自动探测 |
+//! | `RINADOWN_DATABASE_URL` | 数据库连接 URL（`sqlite:`/`postgres:`） | 数据目录下 SQLite |
+//! | `RINADOWN_BIND` | HTTP 监听地址 | `0.0.0.0:17800` |
+//! | `RINADOWN_WEBROOT` | 覆盖内嵌 Web UI，改从该磁盘目录托管 SPA | 未设置（用二进制内嵌的前端） |
+//! | `RINADOWN_TOKEN` | 预置管理访问密钥（仅在库中尚未设置时采纳） | 未设置（走 Web 向导） |
+//! | `RINADOWN_DEMO` | 演示模式：仅允许下载内置本地演示文件 | 未设置（关闭） |
+//! | `RINADOWN_DEMO_URL` | 演示模式：仅允许下载该 URL（覆盖内置） | 未设置（关闭） |
+//! | `RINADOWN_LANG` | Web UI 默认语言（`en`/`zh`），设置页保存过语言后以保存值为准 | 未设置（回退浏览器语言） |
 //!
 //! **访问密钥不再自动生成**：NAS（群晖/QNAP/Unraid）用户看不到容器 stderr，
 //! 一次性打印的密钥等于把人锁在门外。库中无密钥时服务器进入「待设置」状态
 //! （管理 API 全线 403），由 Web 首次运行向导 `POST /api/v1/setup` 落定；
-//! 无人值守部署用 `FLUXDOWN_TOKEN` 预置。
+//! 无人值守部署用 `RINADOWN_TOKEN` 预置。
 
 use std::path::PathBuf;
 
-use fluxdown_engine::db::Db;
-use fluxdown_engine::log_info;
+use rinadown_engine::db::Db;
+use rinadown_engine::log_info;
 
 /// 服务器进程级配置（全部来自环境变量）。
 pub struct ServerConfig {
@@ -27,7 +27,7 @@ pub struct ServerConfig {
     pub data_dir_override: Option<PathBuf>,
     pub database_url: Option<String>,
     /// SPA 托管目录覆盖。`None` = 用二进制内嵌的 Web UI（常态）；`Some` 仅在
-    /// 显式设置 `FLUXDOWN_WEBROOT` 时出现，用于自定义/调试前端。
+    /// 显式设置 `RINADOWN_WEBROOT` 时出现，用于自定义/调试前端。
     /// **不做「二进制同级 ./web」的隐式探测**——旧版本残留的 web/ 目录会让
     /// 升级后的服务器配上过期 SPA，静默出现前后端契约不匹配。
     pub webroot: Option<PathBuf>,
@@ -42,24 +42,24 @@ pub struct ServerConfig {
 
 impl ServerConfig {
     pub fn from_env() -> Self {
-        let bind = std::env::var("FLUXDOWN_BIND").unwrap_or_else(|_| "0.0.0.0:17800".to_string());
-        let data_dir_override = std::env::var_os("FLUXDOWN_DATA_DIR").map(PathBuf::from);
-        let database_url = std::env::var("FLUXDOWN_DATABASE_URL")
+        let bind = std::env::var("RINADOWN_BIND").unwrap_or_else(|_| "0.0.0.0:17800".to_string());
+        let data_dir_override = std::env::var_os("RINADOWN_DATA_DIR").map(PathBuf::from);
+        let database_url = std::env::var("RINADOWN_DATABASE_URL")
             .ok()
             .filter(|s| !s.trim().is_empty());
-        let webroot = std::env::var_os("FLUXDOWN_WEBROOT")
+        let webroot = std::env::var_os("RINADOWN_WEBROOT")
             .map(PathBuf::from)
             .filter(|p| !p.as_os_str().is_empty());
-        let demo_url = std::env::var("FLUXDOWN_DEMO_URL")
+        let demo_url = std::env::var("RINADOWN_DEMO_URL")
             .ok()
             .as_deref()
             .and_then(parse_demo_url)
             .or_else(|| demo_flag_enabled().then(|| builtin_demo_url(&bind)));
-        let language = match std::env::var("FLUXDOWN_LANG") {
+        let language = match std::env::var("RINADOWN_LANG") {
             Ok(raw) => {
                 let lang = parse_lang(&raw);
                 if lang.is_none() && !raw.trim().is_empty() {
-                    eprintln!("FLUXDOWN_LANG 无法识别（支持 en / zh），已忽略：{raw}");
+                    eprintln!("RINADOWN_LANG 无法识别（支持 en / zh），已忽略：{raw}");
                 }
                 lang
             }
@@ -76,7 +76,7 @@ impl ServerConfig {
     }
 }
 
-/// 归一化 `FLUXDOWN_LANG`：剥首尾空白与包裹引号后取 BCP 47 主语言子标签
+/// 归一化 `RINADOWN_LANG`：剥首尾空白与包裹引号后取 BCP 47 主语言子标签
 /// （`zh-CN`/`zh_TW` → `zh`，`en-US` → `en`，忽略大小写），映射到 Web UI
 /// 支持的语言；无法识别视为未设置。
 fn parse_lang(raw: &str) -> Option<String> {
@@ -94,7 +94,7 @@ fn parse_lang(raw: &str) -> Option<String> {
     matches!(primary.as_str(), "en" | "zh").then_some(primary)
 }
 
-/// 归一化 `FLUXDOWN_DEMO_URL`：去掉首尾空白与误带的包裹引号
+/// 归一化 `RINADOWN_DEMO_URL`：去掉首尾空白与误带的包裹引号
 /// （Windows cmd 的 `set X="v" && …` 会把引号和尾部空格一并写进值），
 /// 归一化后为空视为未开启。
 fn parse_demo_url(raw: &str) -> Option<String> {
@@ -107,9 +107,9 @@ fn parse_demo_url(raw: &str) -> Option<String> {
     (!s.is_empty()).then(|| s.to_string())
 }
 
-/// `FLUXDOWN_DEMO` 是否为真值（`1`/`true`/`yes`/`on`，忽略大小写）。
+/// `RINADOWN_DEMO` 是否为真值（`1`/`true`/`yes`/`on`，忽略大小写）。
 fn demo_flag_enabled() -> bool {
-    std::env::var("FLUXDOWN_DEMO")
+    std::env::var("RINADOWN_DEMO")
         .map(|v| flag_truthy(&v))
         .unwrap_or(false)
 }
@@ -134,7 +134,7 @@ fn builtin_demo_url(bind: &str) -> String {
 /// 平台默认下载目录（与 App 侧 `download_actor::default_save_dir` 同源：
 /// 走系统 API 解析，不做 `$HOME/Downloads` 拼接）。
 pub fn default_save_dir() -> String {
-    fluxdown_engine::user_dirs::download_dir_or_cwd()
+    rinadown_engine::user_dirs::download_dir_or_cwd()
 }
 
 /// 访问密钥最短长度。
@@ -182,13 +182,13 @@ pub fn generate_access_key() -> String {
 /// 首次运行初始化：强制开启管理 API；返回生效的管理 token（**可能为空**）。
 ///
 /// 空 token = 尚未完成首次设置。此时管理 API 全线 403（见
-/// [`fluxdown_api::auth::check_management_auth`]），Web 界面会进入
+/// [`rinadown_api::auth::check_management_auth`]），Web 界面会进入
 /// 「设置访问密钥」向导（`POST /api/v1/setup`）。
 ///
 /// 不再自动生成 token 并打印到 stderr：NAS（群晖/QNAP/Unraid）用户拿不到
 /// 容器/套件的 stderr，一次性打印的密钥等于永久锁在门外。无人值守部署
-/// （docker-compose / k8s / CI）可用 `FLUXDOWN_TOKEN` 预置密钥跳过向导。
-pub async fn ensure_server_config(db: &Db) -> Result<String, fluxdown_engine::db::DbError> {
+/// （docker-compose / k8s / CI）可用 `RINADOWN_TOKEN` 预置密钥跳过向导。
+pub async fn ensure_server_config(db: &Db) -> Result<String, rinadown_engine::db::DbError> {
     // headless 服务器的存在意义就是远程管理——管理 API 恒开。
     db.set_config("local_server_api_enabled", "true").await?;
 
@@ -205,7 +205,7 @@ pub async fn ensure_server_config(db: &Db) -> Result<String, fluxdown_engine::db
         return Ok(token);
     }
 
-    let Some(preset) = std::env::var("FLUXDOWN_TOKEN")
+    let Some(preset) = std::env::var("RINADOWN_TOKEN")
         .ok()
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
@@ -213,12 +213,12 @@ pub async fn ensure_server_config(db: &Db) -> Result<String, fluxdown_engine::db
         return Ok(String::new());
     };
     if let Err(why) = validate_access_key(&preset) {
-        log_info!("[server] FLUXDOWN_TOKEN rejected: {}", why);
-        eprintln!("FLUXDOWN_TOKEN 不符合密钥要求（{why}），已忽略；请在 Web 界面完成首次设置。");
+        log_info!("[server] RINADOWN_TOKEN rejected: {}", why);
+        eprintln!("RINADOWN_TOKEN 不符合密钥要求（{why}），已忽略；请在 Web 界面完成首次设置。");
         return Ok(String::new());
     }
     db.set_config("local_server_token", &preset).await?;
-    log_info!("[server] management token adopted from FLUXDOWN_TOKEN");
+    log_info!("[server] management token adopted from RINADOWN_TOKEN");
     Ok(preset)
 }
 
@@ -228,11 +228,11 @@ pub async fn ensure_server_config(db: &Db) -> Result<String, fluxdown_engine::db
 pub fn print_setup_banner(bind: &str) {
     let port = bind.rsplit(':').next().unwrap_or("17800");
     eprintln!("==============================================================");
-    eprintln!("  FluxDown Server: first run — no access key is set yet.");
+    eprintln!("  RinaDown Server: first run — no access key is set yet.");
     eprintln!("  Open the Web UI and create one:");
     eprintln!("    http://<server-ip>:{port}/");
     eprintln!("  Requirements: 8+ characters, letters and digits.");
-    eprintln!("  Unattended deploys can preset it via FLUXDOWN_TOKEN.");
+    eprintln!("  Unattended deploys can preset it via RINADOWN_TOKEN.");
     eprintln!("  ---");
     eprintln!("  首次运行：尚未设置访问密钥。请打开上面的 Web 界面自行设置");
     eprintln!("  （至少 8 位，必须同时包含字母和数字）。");

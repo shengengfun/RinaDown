@@ -107,9 +107,9 @@ pub fn cf_to_string(cf: CFStringRef) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// 当前进程所在 `.app` 的 bundle id（如 `com.fluxdown.app`）。
+/// 当前进程所在 `.app` 的 bundle id（如 `com.rinadown.app`）。
 ///
-/// agent 与 `fluxdown-desktop` 同处 `FluxDown.app/Contents/MacOS/`，Core
+/// agent 与 `rinadown-desktop` 同处 `RinaDown.app/Contents/MacOS/`，Core
 /// Foundation 会从可执行文件路径向上解析出外层 bundle；在 bundle 之外运行
 /// （如 `target/release`）时没有 Info.plist，返回 `None`，此时 Launch Services
 /// 注册不可用。

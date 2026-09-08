@@ -1,4 +1,4 @@
-//! [`ServerApiHost`] —— `fluxdown_api::service::ApiHost` 的 headless 实现。
+//! [`ServerApiHost`] —— `rinadown_api::service::ApiHost` 的 headless 实现。
 //!
 //! 读操作直查 [`Db`]（Clone）；写操作打包 [`ActorCmd`] + oneshot 经 mpsc
 //! 进 actor 事件循环串行执行（照抄 `hub/src/api_host.rs` 的读写分离）。
@@ -17,13 +17,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use fluxdown_api::service::{ApiError, ApiHost, LiveSpeed, TaskEvent};
-use fluxdown_engine::db::Db;
-use fluxdown_engine::download_manager::{CreateGroupSpec, GroupItemSpec};
-use fluxdown_engine::link::{DiscoveredPeer, DiscoveryKind, LinkError, LinkManager, WireHello};
-use fluxdown_engine::plugin::{MarketClient, PluginManager};
-use fluxdown_engine::rss::MAX_ITEMS_PER_SOURCE;
-use fluxdown_protocol::daemon::{
+use rinadown_api::service::{ApiError, ApiHost, LiveSpeed, TaskEvent};
+use rinadown_engine::db::Db;
+use rinadown_engine::download_manager::{CreateGroupSpec, GroupItemSpec};
+use rinadown_engine::link::{DiscoveredPeer, DiscoveryKind, LinkError, LinkManager, WireHello};
+use rinadown_engine::plugin::{MarketClient, PluginManager};
+use rinadown_engine::rss::MAX_ITEMS_PER_SOURCE;
+use rinadown_protocol::daemon::{
     CreateGroupRequest, CreateTaskRequest, DownloadRequest, GroupDto, LinkAuth, LinkCodeResponse,
     LinkDeviceInfo, LinkDiscoveredPeer, LinkPairBeginResponse, LinkPairConfirmOutcome,
     LinkPairConfirmRequest, LinkPairHelloRequest, LinkPairHelloResponse, LinkPingInfo,
@@ -36,7 +36,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use crate::actor::ActorCmd;
 use crate::config::default_save_dir;
 use crate::ws_hub::WsHub;
-use fluxdown_protocol::daemon::WsServerMsg;
+use rinadown_protocol::daemon::WsServerMsg;
 
 /// headless 服务器的 API 宿主。
 #[derive(Clone)]
@@ -45,9 +45,9 @@ pub struct ServerApiHost {
     cmd_tx: mpsc::Sender<ActorCmd>,
     /// WS 广播中枢：借其内维护的实时速率缓存实现 [`ApiHost::live_speeds`]。
     hub: Arc<WsHub>,
-    /// 演示模式：`Some(url)` 时仅允许下载该 URL（`FLUXDOWN_DEMO_URL`）。
+    /// 演示模式：`Some(url)` 时仅允许下载该 URL（`RINADOWN_DEMO_URL`）。
     demo_url: Option<String>,
-    /// 部署级默认 Web UI 语言（`FLUXDOWN_LANG`）。仅作 [`ApiHost::web_language`]
+    /// 部署级默认 Web UI 语言（`RINADOWN_LANG`）。仅作 [`ApiHost::web_language`]
     /// 的回退值，不写库——设置页保存过的 `web_language` 永远优先。
     default_language: Option<String>,
     /// 插件管理器（Arc 共享）。`Engine::new` 在 `plugins` feature 下总会注入，
@@ -155,7 +155,7 @@ impl ApiHost for ServerApiHost {
             .map(|tasks| {
                 tasks
                     .into_iter()
-                    .map(fluxdown_engine_protocol::task_info_to_dto)
+                    .map(rinadown_engine_protocol::task_info_to_dto)
                     .collect()
             })
             .map_err(|e| ApiError::Internal(e.to_string()))
@@ -165,7 +165,7 @@ impl ApiHost for ServerApiHost {
         self.db
             .load_task_by_id(task_id)
             .await
-            .map(|t| t.map(fluxdown_engine_protocol::task_info_to_dto))
+            .map(|t| t.map(rinadown_engine_protocol::task_info_to_dto))
             .map_err(|e| ApiError::Internal(e.to_string()))
     }
 
@@ -240,7 +240,7 @@ impl ApiHost for ServerApiHost {
             .await
             .map(|qs| {
                 qs.into_iter()
-                    .map(fluxdown_engine_protocol::queue_info_to_dto)
+                    .map(rinadown_engine_protocol::queue_info_to_dto)
                     .collect()
             })
             .map_err(|e| ApiError::Internal(e.to_string()))
@@ -320,7 +320,7 @@ impl ApiHost for ServerApiHost {
     }
 
     /// aria2 `getGlobalOption` 兼容入口：直查配置表快照
-    /// （FluxDown 原生 key，aria2 选项名翻译在 jsonrpc 层完成）。
+    /// （RinaDown 原生 key，aria2 选项名翻译在 jsonrpc 层完成）。
     async fn get_config(&self) -> Result<HashMap<String, String>, ApiError> {
         self.db
             .get_all_config()
@@ -329,7 +329,7 @@ impl ApiHost for ServerApiHost {
     }
 
     /// Web UI 语言实时求值：设置页保存的 `web_language` 优先，未保存（或空白）
-    /// 时回退 `FLUXDOWN_LANG`。每次请求现读 DB，语言变更无需重启即生效。
+    /// 时回退 `RINADOWN_LANG`。每次请求现读 DB，语言变更无需重启即生效。
     async fn web_language(&self) -> Option<String> {
         match self.db.get_config("web_language").await {
             Ok(Some(v)) if !v.trim().is_empty() => Some(v),
@@ -371,7 +371,7 @@ impl ApiHost for ServerApiHost {
             .list()
             .await
             .into_iter()
-            .map(fluxdown_engine_protocol::plugin_info_to_dto)
+            .map(rinadown_engine_protocol::plugin_info_to_dto)
             .collect())
     }
 
@@ -451,7 +451,7 @@ impl ApiHost for ServerApiHost {
         Ok(idx
             .entries
             .into_iter()
-            .map(fluxdown_engine_protocol::market_entry_to_dto)
+            .map(rinadown_engine_protocol::market_entry_to_dto)
             .collect())
     }
 
@@ -472,7 +472,7 @@ impl ApiHost for ServerApiHost {
             return Vec::new();
         };
         let perms = pm.permissions_of(identity).await;
-        fluxdown_engine::plugin::dependencies::missing_components(&self.db, &self.data_dir, &perms)
+        rinadown_engine::plugin::dependencies::missing_components(&self.db, &self.data_dir, &perms)
             .await
     }
 
@@ -573,7 +573,7 @@ impl ApiHost for ServerApiHost {
             .map(|groups| {
                 groups
                     .into_iter()
-                    .map(fluxdown_engine_protocol::group_info_to_dto)
+                    .map(rinadown_engine_protocol::group_info_to_dto)
                     .collect()
             })
             .map_err(|e| ApiError::Internal(e.to_string()))
@@ -616,7 +616,7 @@ impl ApiHost for ServerApiHost {
             .map(|sources| {
                 sources
                     .into_iter()
-                    .map(fluxdown_engine_protocol::rss_source_info_to_dto)
+                    .map(rinadown_engine_protocol::rss_source_info_to_dto)
                     .collect()
             })
             .map_err(|e| ApiError::Internal(e.to_string()))
@@ -626,7 +626,7 @@ impl ApiHost for ServerApiHost {
     /// 内完成；拿不到 ID 只有一种可能——url 为空。
     async fn create_rss_source(&self, req: RssSourceDto) -> Result<String, ApiError> {
         self.send_cmd(|ack| ActorCmd::RssCreate {
-            source: Box::new(fluxdown_engine_protocol::rss_source_dto_to_engine(req)),
+            source: Box::new(rinadown_engine_protocol::rss_source_dto_to_engine(req)),
             ack,
         })
         .await?
@@ -636,7 +636,7 @@ impl ApiHost for ServerApiHost {
     /// 更新订阅配置。路径段是权威 ID——请求体里的 `sourceId` 一律被它覆盖，
     /// 否则一次笔误就能拿 A 的 URL 覆写 B 的订阅。
     async fn update_rss_source(&self, source_id: &str, req: RssSourceDto) -> Result<(), ApiError> {
-        let mut source = fluxdown_engine_protocol::rss_source_dto_to_engine(req);
+        let mut source = rinadown_engine_protocol::rss_source_dto_to_engine(req);
         source.source_id = source_id.to_string();
         let ok = self
             .send_cmd(|ack| ActorCmd::RssUpdate {
@@ -679,7 +679,7 @@ impl ApiHost for ServerApiHost {
             .map(|items| {
                 items
                     .into_iter()
-                    .map(fluxdown_engine_protocol::rss_item_info_to_dto)
+                    .map(rinadown_engine_protocol::rss_item_info_to_dto)
                     .collect()
             })
             .map_err(|e| ApiError::Internal(e.to_string()))
@@ -720,7 +720,7 @@ impl ApiHost for ServerApiHost {
             items: outcome
                 .items
                 .into_iter()
-                .map(fluxdown_engine_protocol::rss_item_info_to_dto)
+                .map(rinadown_engine_protocol::rss_item_info_to_dto)
                 .collect(),
             error: outcome.error,
         })
@@ -961,11 +961,11 @@ fn opt_str(s: String) -> Option<String> {
 }
 
 /// 引擎 [`PairConfirmOutcome`] → API [`LinkPairConfirmOutcome`]。两者字段一致但分属
-/// 两个 crate（`fluxdown_api` 不依赖引擎的可选 link 模块），这里做一次显式搬运。
+/// 两个 crate（`rinadown_api` 不依赖引擎的可选 link 模块），这里做一次显式搬运。
 fn map_confirm_outcome(
-    outcome: fluxdown_engine::link::PairConfirmOutcome,
+    outcome: rinadown_engine::link::PairConfirmOutcome,
 ) -> LinkPairConfirmOutcome {
-    use fluxdown_engine::link::PairConfirmOutcome as E;
+    use rinadown_engine::link::PairConfirmOutcome as E;
     match outcome {
         E::Paired => LinkPairConfirmOutcome::Paired,
         E::Declined => LinkPairConfirmOutcome::Declined,
@@ -994,22 +994,22 @@ fn map_link_err(e: LinkError) -> ApiError {
 
 /// `self.link` 为 `None`（本宿主未启用/未初始化设备互联）时的统一错误。
 ///
-/// 复用 [`fluxdown_api::service::link_unsupported`] 的稳定契约 message
+/// 复用 [`rinadown_api::service::link_unsupported`] 的稳定契约 message
 /// （`"device link not supported by this host"`）——不能改用
 /// `ApiError::Unavailable`（固定文案 `"app shutting down"`，语义是宿主
 /// 正在关闭/命令通道已断，牛头不对马嘴）。Web 侧 `isLinkUnsupportedError()`
 /// 靠逐字比对这条 message 识别「宿主不支持设备互联」并展示专用提示，
 /// 文案用错就等于把这条 UX 分支废掉。
 fn link_disabled() -> ApiError {
-    fluxdown_api::service::link_unsupported()
+    rinadown_api::service::link_unsupported()
 }
 
 /// 把插件清单条目转换为 REST 预解析响应 DTO（`server` 侧 wire↔engine
 /// 转换，见 [`ServerApiHost::resolve_preview`]）。
 fn manifest_item_to_preview_dto(
-    item: fluxdown_engine::model::ManifestItemInfo,
-) -> fluxdown_protocol::daemon::PreviewItemDto {
-    fluxdown_protocol::daemon::PreviewItemDto {
+    item: rinadown_engine::model::ManifestItemInfo,
+) -> rinadown_protocol::daemon::PreviewItemDto {
+    rinadown_protocol::daemon::PreviewItemDto {
         id: item.id,
         name: item.name,
         path: item.path,
@@ -1017,7 +1017,7 @@ fn manifest_item_to_preview_dto(
         variants: item
             .variants
             .into_iter()
-            .map(|v| fluxdown_protocol::daemon::PreviewVariantDto {
+            .map(|v| rinadown_protocol::daemon::PreviewVariantDto {
                 id: v.id,
                 label: v.label,
                 size: v.size,
@@ -1030,7 +1030,7 @@ fn manifest_item_to_preview_dto(
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use fluxdown_protocol::daemon::GroupItemRequest;
+    use rinadown_protocol::daemon::GroupItemRequest;
 
     const DEMO: &str = "https://example.com/demo.bin";
 
@@ -1097,7 +1097,7 @@ mod tests {
             None,
         );
 
-        // 设置页未保存过语言 → 回退 FLUXDOWN_LANG
+        // 设置页未保存过语言 → 回退 RINADOWN_LANG
         assert_eq!(host.web_language().await.as_deref(), Some("zh"));
 
         // 设置页保存后 → 保存值实时优先（无需重启）
@@ -1111,7 +1111,7 @@ mod tests {
 
     #[tokio::test]
     async fn subscribe_task_events_delegates_to_the_shared_ws_hub() {
-        use fluxdown_engine::events::{EngineEvent, EventSink};
+        use rinadown_engine::events::{EngineEvent, EventSink};
 
         use crate::ws_hub::EngineEventSink;
 
@@ -1156,7 +1156,7 @@ mod tests {
 
         let ev = rx.recv().await.expect("task event");
         assert_eq!(ev.task_id, "t1");
-        assert_eq!(ev.kind, fluxdown_api::service::TaskEventKind::Start);
+        assert_eq!(ev.kind, rinadown_api::service::TaskEventKind::Start);
     }
 
     #[tokio::test]
@@ -1274,8 +1274,8 @@ mod tests {
             );
             Db::connect(&url).await.expect("mem db")
         }
-        fn info(name: &str) -> fluxdown_engine::link::SelfInfo {
-            fluxdown_engine::link::SelfInfo {
+        fn info(name: &str) -> rinadown_engine::link::SelfInfo {
+            rinadown_engine::link::SelfInfo {
                 name: name.to_string(),
                 platform: Some("linux".to_string()),
                 app_version: None,
@@ -1284,7 +1284,7 @@ mod tests {
 
         // 响应方（被添加设备）+ 真实 HTTP 服务器。
         let db_r = mem_db("resp").await;
-        let (tx_r, rx_r) = mpsc::channel::<fluxdown_engine::link::LinkEngineEvent>(16);
+        let (tx_r, rx_r) = mpsc::channel::<rinadown_engine::link::LinkEngineEvent>(16);
         let responder = LinkManager::load(db_r.clone(), info("NAS"), 17800, tx_r)
             .await
             .expect("responder link");
@@ -1301,13 +1301,13 @@ mod tests {
             std::env::temp_dir(),
             Some(responder.clone()),
         ));
-        let cfg = fluxdown_api::server::ApiServerConfig::from_config_map(
+        let cfg = rinadown_api::server::ApiServerConfig::from_config_map(
             &std::collections::HashMap::new(),
             "test",
         );
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
         let addr = listener.local_addr().expect("addr");
-        let app = fluxdown_api::server::api_router(host, cfg);
+        let app = rinadown_api::server::api_router(host, cfg);
         tokio::spawn(async move {
             let _ = axum::serve(
                 listener,
@@ -1318,7 +1318,7 @@ mod tests {
 
         // 发起方（添加设备）。
         let db_i = mem_db("init").await;
-        let (tx_i, _rx_i) = mpsc::channel::<fluxdown_engine::link::LinkEngineEvent>(16);
+        let (tx_i, _rx_i) = mpsc::channel::<rinadown_engine::link::LinkEngineEvent>(16);
         let initiator = LinkManager::load(db_i, info("Laptop"), 0, tx_i)
             .await
             .expect("initiator link");
@@ -1330,7 +1330,7 @@ mod tests {
         tokio::spawn(async move {
             let mut rx = rx_r;
             while let Some(ev) = rx.recv().await {
-                if let fluxdown_engine::link::LinkEngineEvent::IncomingPairing {
+                if let rinadown_engine::link::LinkEngineEvent::IncomingPairing {
                     session_id, ..
                 } = ev
                 {
@@ -1387,8 +1387,8 @@ mod tests {
             );
             Db::connect(&url).await.expect("mem db")
         }
-        fn info(name: &str) -> fluxdown_engine::link::SelfInfo {
-            fluxdown_engine::link::SelfInfo {
+        fn info(name: &str) -> rinadown_engine::link::SelfInfo {
+            rinadown_engine::link::SelfInfo {
                 name: name.to_string(),
                 platform: Some("linux".to_string()),
                 app_version: None,
@@ -1414,10 +1414,10 @@ mod tests {
             let mut map = HashMap::new();
             map.insert("local_server_api_enabled".to_string(), "true".to_string());
             map.insert("local_server_token".to_string(), mgmt_token.to_string());
-            let cfg = fluxdown_api::server::ApiServerConfig::from_config_map(&map, "test");
+            let cfg = rinadown_api::server::ApiServerConfig::from_config_map(&map, "test");
             let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
             let addr = listener.local_addr().expect("addr");
-            let app = fluxdown_api::server::api_router(host, cfg);
+            let app = rinadown_api::server::api_router(host, cfg);
             tokio::spawn(async move {
                 let _ = axum::serve(
                     listener,
@@ -1431,7 +1431,7 @@ mod tests {
         // 响应方：真实 HTTP 服务器，承载既有数据面端点（pair/hello、pair/confirm，
         // 无 token 鉴权）——发起方管理面 handler 内部会向它发真实 HTTP 请求。
         let db_r = mem_db("resp").await;
-        let (tx_r, rx_r) = mpsc::channel::<fluxdown_engine::link::LinkEngineEvent>(16);
+        let (tx_r, rx_r) = mpsc::channel::<rinadown_engine::link::LinkEngineEvent>(16);
         let responder = LinkManager::load(db_r.clone(), info("NAS"), 17800, tx_r)
             .await
             .expect("responder link");
@@ -1442,7 +1442,7 @@ mod tests {
         tokio::spawn(async move {
             let mut rx = rx_r;
             while let Some(ev) = rx.recv().await {
-                if let fluxdown_engine::link::LinkEngineEvent::IncomingPairing {
+                if let rinadown_engine::link::LinkEngineEvent::IncomingPairing {
                     session_id, ..
                 } = ev
                 {
@@ -1455,7 +1455,7 @@ mod tests {
         // 发起方：本测试实际驱动的对象——经其新管理面路由完成 begin/finish/
         // devices/delete，而非直调引擎方法。
         let db_i = mem_db("init").await;
-        let (tx_i, _rx_i) = mpsc::channel::<fluxdown_engine::link::LinkEngineEvent>(16);
+        let (tx_i, _rx_i) = mpsc::channel::<rinadown_engine::link::LinkEngineEvent>(16);
         let initiator = LinkManager::load(db_i.clone(), info("Laptop"), 0, tx_i)
             .await
             .expect("initiator link");
@@ -1467,7 +1467,7 @@ mod tests {
 
         // begin：管理面 handler → ApiHost::link_pair_begin → LinkManager::begin_pairing
         // （内部对响应方发真实 HTTP hello）。
-        let begin: fluxdown_protocol::daemon::LinkPairBeginResponse = client
+        let begin: rinadown_protocol::daemon::LinkPairBeginResponse = client
             .post(format!("{base}/api/v1/link/pair/begin"))
             .bearer_auth(token)
             .json(&serde_json::json!({
@@ -1485,7 +1485,7 @@ mod tests {
         assert!(!begin.sas.is_empty());
 
         // finish：SAS 核对后确认配对。
-        let finish: fluxdown_protocol::daemon::LinkPairFinishResponse = client
+        let finish: rinadown_protocol::daemon::LinkPairFinishResponse = client
             .post(format!("{base}/api/v1/link/pair/finish"))
             .bearer_auth(token)
             .json(&serde_json::json!({ "token": begin.token, "accept": true }))
@@ -1501,7 +1501,7 @@ mod tests {
         let fingerprint = device.fingerprint;
 
         // devices：列表应含刚配对的一台，且在线（响应方服务器真实存活）。
-        let devices: fluxdown_protocol::daemon::LinkDevicesResponse = client
+        let devices: rinadown_protocol::daemon::LinkDevicesResponse = client
             .get(format!("{base}/api/v1/link/devices"))
             .bearer_auth(token)
             .send()
@@ -1530,11 +1530,11 @@ mod tests {
             .await
             .expect("delete request");
         assert_eq!(del.status(), reqwest::StatusCode::OK);
-        let del_body: fluxdown_protocol::daemon::LinkOkResponse =
+        let del_body: rinadown_protocol::daemon::LinkOkResponse =
             del.json().await.expect("delete json");
         assert!(del_body.ok);
 
-        let devices_after: fluxdown_protocol::daemon::LinkDevicesResponse = client
+        let devices_after: rinadown_protocol::daemon::LinkDevicesResponse = client
             .get(format!("{base}/api/v1/link/devices"))
             .bearer_auth(token)
             .send()
@@ -1574,8 +1574,8 @@ mod tests {
             );
             Db::connect(&url).await.expect("mem db")
         }
-        fn info(name: &str) -> fluxdown_engine::link::SelfInfo {
-            fluxdown_engine::link::SelfInfo {
+        fn info(name: &str) -> rinadown_engine::link::SelfInfo {
+            rinadown_engine::link::SelfInfo {
                 name: name.to_string(),
                 platform: Some("linux".to_string()),
                 app_version: None,
@@ -1583,7 +1583,7 @@ mod tests {
         }
 
         let db_r = mem_db("resp").await;
-        let (tx_r, rx_r) = mpsc::channel::<fluxdown_engine::link::LinkEngineEvent>(16);
+        let (tx_r, rx_r) = mpsc::channel::<rinadown_engine::link::LinkEngineEvent>(16);
         let responder = LinkManager::load(db_r.clone(), info("NAS"), 17800, tx_r)
             .await
             .expect("responder link");
@@ -1594,7 +1594,7 @@ mod tests {
         tokio::spawn(async move {
             let mut rx = rx_r;
             while let Some(ev) = rx.recv().await {
-                if let fluxdown_engine::link::LinkEngineEvent::IncomingPairing {
+                if let rinadown_engine::link::LinkEngineEvent::IncomingPairing {
                     session_id, ..
                 } = ev
                 {
@@ -1614,13 +1614,13 @@ mod tests {
             std::env::temp_dir(),
             Some(responder.clone()),
         ));
-        let cfg = fluxdown_api::server::ApiServerConfig::from_config_map(
+        let cfg = rinadown_api::server::ApiServerConfig::from_config_map(
             &std::collections::HashMap::new(),
             "test",
         );
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind");
         let addr = listener.local_addr().expect("addr");
-        let app = fluxdown_api::server::api_router(host, cfg);
+        let app = rinadown_api::server::api_router(host, cfg);
         tokio::spawn(async move {
             let _ = axum::serve(
                 listener,
@@ -1630,7 +1630,7 @@ mod tests {
         });
 
         let db_i = mem_db("init").await;
-        let (tx_i, _rx_i) = mpsc::channel::<fluxdown_engine::link::LinkEngineEvent>(16);
+        let (tx_i, _rx_i) = mpsc::channel::<rinadown_engine::link::LinkEngineEvent>(16);
         let initiator = LinkManager::load(db_i, info("Laptop"), 0, tx_i)
             .await
             .expect("initiator link");
@@ -1644,7 +1644,7 @@ mod tests {
             .await
             .expect_err("responder rejected, confirm must fail");
         assert!(
-            matches!(err, fluxdown_engine::link::LinkError::RejectedByPeer),
+            matches!(err, rinadown_engine::link::LinkError::RejectedByPeer),
             "期望 RejectedByPeer，实际 {err:?}"
         );
 

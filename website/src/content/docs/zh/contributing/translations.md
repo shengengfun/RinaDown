@@ -1,12 +1,12 @@
 ---
-title: 参与 FluxDown 翻译
+title: 参与 RinaDown 翻译
 description: 通过 GitHub 为应用、Web 界面和官网贡献你的语言翻译。
 section: contributing
 order: 2
 sourceHash: "03eb048d024b"
 ---
 
-FluxDown 的多语言在公开的 [zerx-lab/FluxDown](https://github.com/zerx-lab/FluxDown) 仓库中维护。社区用户通过 GitHub Pull Request 贡献语言更新。
+RinaDown 的多语言在公开的 [zerx-lab/RinaDown](https://github.com/zerx-lab/RinaDown) 仓库中维护。社区用户通过 GitHub Pull Request 贡献语言更新。
 
 ## 可以翻译什么
 
@@ -15,13 +15,13 @@ FluxDown 的多语言在公开的 [zerx-lab/FluxDown](https://github.com/zerx-la
 | --- | --- |
 | **Desktop & Mobile App** | Windows/macOS/Linux 桌面端与移动端应用内的全部字符串 |
 | **Web App** | headless 服务器托管的 Web 管理界面 |
-| **Website** | fluxdown.zerx.dev 官网——首页、FAQ、更新日志 |
+| **Website** | rinadown.zerx.dev 官网——首页、FAQ、更新日志 |
 
 英文是源语言，简体中文由核心团队维护，其余语言等你来开创。
 
 ## 快速开始
 
-1. Fork [zerx-lab/FluxDown](https://github.com/zerx-lab/FluxDown)，从 `main` 创建分支。
+1. Fork [zerx-lab/RinaDown](https://github.com/zerx-lab/RinaDown)，从 `main` 创建分支。
 2. 新增或更新对应部件的翻译文件：
    - **桌面端与移动端应用**：`assets/i18n/`
    - **Web 应用**：`web/src/lib/locales/`

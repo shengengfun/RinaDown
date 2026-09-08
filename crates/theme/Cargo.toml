@@ -1,5 +1,5 @@
 [package]
-name = "fluxdown_ui_theme"
+name = "rinadown_ui_theme"
 version = "0.1.0"
 edition.workspace = true
 

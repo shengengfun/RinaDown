@@ -13,16 +13,16 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/i18n/locale_provider.dart';
-import 'package:flux_down/src/models/download_queue.dart';
-import 'package:flux_down/src/models/webhook_endpoint.dart';
-import 'package:flux_down/src/models/webhook_provider.dart';
-import 'package:flux_down/src/theme/app_theme.dart';
-import 'package:flux_down/src/theme/flux_theme_tokens.dart';
-import 'package:flux_down/src/widgets/webhook_brand_marks.dart';
-import 'package:flux_down/src/widgets/webhook_delivery_panel.dart';
-import 'package:flux_down/src/widgets/webhook_endpoint_dialog.dart';
-import 'package:flux_down/src/widgets/webhook_endpoint_list.dart';
+import 'package:rina_down/src/i18n/locale_provider.dart';
+import 'package:rina_down/src/models/download_queue.dart';
+import 'package:rina_down/src/models/webhook_endpoint.dart';
+import 'package:rina_down/src/models/webhook_provider.dart';
+import 'package:rina_down/src/theme/app_theme.dart';
+import 'package:rina_down/src/theme/flux_theme_tokens.dart';
+import 'package:rina_down/src/widgets/webhook_brand_marks.dart';
+import 'package:rina_down/src/widgets/webhook_delivery_panel.dart';
+import 'package:rina_down/src/widgets/webhook_endpoint_dialog.dart';
+import 'package:rina_down/src/widgets/webhook_endpoint_list.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 List<DownloadQueue> _queues() => const [

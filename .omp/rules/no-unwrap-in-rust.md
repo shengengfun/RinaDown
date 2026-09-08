@@ -6,7 +6,7 @@ repeatMode: after-gap
 repeatGap: 3
 ---
 
-FluxDown 的 clippy 配置将 `unwrap_used` / `expect_used` 设为 deny 级，非测试代码中出现会直接编译失败。
+RinaDown 的 clippy 配置将 `unwrap_used` / `expect_used` 设为 deny 级，非测试代码中出现会直接编译失败。
 
 - 用 `?` 传播错误，错误类型走 `thiserror` 派生（复用 `DownloadError` 等已有类型）。
 - `.expect(...)` 同样禁止。

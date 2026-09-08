@@ -1,7 +1,7 @@
-//! FluxDown 官方客户端本地代理的应用边界。
+//! RinaDown 官方客户端本地代理的应用边界。
 //!
 //! 本 crate 承载账户、云同步、设备协同与 UI Gateway；下载执行和下载任务事实属于
-//! `fluxdown_daemon`。
+//! `rinadown_daemon`。
 
 pub mod analytics;
 pub mod api_host;
@@ -24,10 +24,10 @@ pub mod supervisor;
 pub mod sync;
 pub mod update;
 
-use fluxdown_protocol::{ServiceHello, ServiceRole};
+use rinadown_protocol::{ServiceHello, ServiceRole};
 
 /// 官方客户端本地代理进程名。
-pub const SERVICE_NAME: &str = "fluxdown-agent";
+pub const SERVICE_NAME: &str = "rinadown-agent";
 
 /// 返回本地代理用于协议协商的稳定身份。
 #[must_use]
@@ -43,7 +43,7 @@ pub fn service_hello(instance_id: impl Into<String>, capabilities: Vec<String>) 
 
 #[cfg(test)]
 mod tests {
-    use fluxdown_protocol::{PROTOCOL_VERSION, ServiceRole};
+    use rinadown_protocol::{PROTOCOL_VERSION, ServiceRole};
 
     use super::{SERVICE_NAME, service_hello};
 

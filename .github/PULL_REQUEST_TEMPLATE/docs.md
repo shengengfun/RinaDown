@@ -1,7 +1,7 @@
 <!--
   文档贡献 PR 模板 / Documentation contribution PR template
   在新建 PR 时，于 URL 末尾追加 ?template=docs.md 即可使用本模板，例如：
-  https://github.com/zerx-lab/FluxDown/compare/main...<your-branch>?template=docs.md
+  https://github.com/zerx-lab/RinaDown/compare/main...<your-branch>?template=docs.md
 -->
 
 ## 说明 / Description

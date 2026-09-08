@@ -4,13 +4,13 @@ use std::collections::{BTreeMap, HashMap};
 use std::time::Duration;
 
 use base64::Engine as _;
-use fluxdown_engine::Engine;
-use fluxdown_engine::download_manager::{CreateGroupSpec, NewTaskSpec, TaskDone};
+use rinadown_engine::Engine;
+use rinadown_engine::download_manager::{CreateGroupSpec, NewTaskSpec, TaskDone};
 #[cfg(feature = "plugins")]
-use fluxdown_engine::download_manager::{ResolveOutcome, ResolvePreviewOutcome};
-use fluxdown_engine::rss::RssValidateOutcome;
-use fluxdown_engine::rss::model::RssSourceInfo;
-use fluxdown_protocol::CreateTaskRequest;
+use rinadown_engine::download_manager::{ResolveOutcome, ResolvePreviewOutcome};
+use rinadown_engine::rss::RssValidateOutcome;
+use rinadown_engine::rss::model::RssSourceInfo;
+use rinadown_protocol::CreateTaskRequest;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::MissedTickBehavior;
 use tokio_util::sync::CancellationToken;
@@ -191,20 +191,20 @@ pub enum ActorResult {
     Created(String),
     Boolean(bool),
     ProxyLatency(i64),
-    Config(fluxdown_protocol::DaemonConfigSnapshot),
-    ConnPolicy(fluxdown_protocol::ConnPolicySummaryDto),
-    SiteAuth(Vec<fluxdown_protocol::SiteAuthEntryDto>),
-    CdnLease(Option<fluxdown_protocol::CdnReportLeaseDto>),
-    TrackerRefresh(fluxdown_protocol::TrackerSubRefreshResponse),
-    Ed2kRefresh(fluxdown_protocol::Ed2kServerSubRefreshResponse),
-    LinkMigration(fluxdown_protocol::LinkMigrationExport),
-    GatewayMigration(fluxdown_protocol::GatewayMigrationExport),
+    Config(rinadown_protocol::DaemonConfigSnapshot),
+    ConnPolicy(rinadown_protocol::ConnPolicySummaryDto),
+    SiteAuth(Vec<rinadown_protocol::SiteAuthEntryDto>),
+    CdnLease(Option<rinadown_protocol::CdnReportLeaseDto>),
+    TrackerRefresh(rinadown_protocol::TrackerSubRefreshResponse),
+    Ed2kRefresh(rinadown_protocol::Ed2kServerSubRefreshResponse),
+    LinkMigration(rinadown_protocol::LinkMigrationExport),
+    GatewayMigration(rinadown_protocol::GatewayMigrationExport),
     #[cfg(feature = "plugins")]
     ResolvePreview(ResolvePreviewOutcome),
     RssValidation(Box<RssValidateOutcome>),
-    WebhookDeliveries(Vec<fluxdown_engine::webhook::WebhookDelivery>),
+    WebhookDeliveries(Vec<rinadown_engine::webhook::WebhookDelivery>),
     WebhookSimulation(usize),
-    WebhookTest(Box<fluxdown_engine::webhook::WebhookDelivery>),
+    WebhookTest(Box<rinadown_engine::webhook::WebhookDelivery>),
 }
 
 /// actor 领域错误。
@@ -242,11 +242,11 @@ pub enum PluginEvent {
 /// off-actor 网络抓取回流，数据库提交只在 actor 内执行。
 pub enum MaintenanceEvent {
     Tracker {
-        outcome: fluxdown_engine::tracker_subscription::FetchOutcome,
+        outcome: rinadown_engine::tracker_subscription::FetchOutcome,
         ack: oneshot::Sender<Result<ActorResult, ActorError>>,
     },
     Ed2k {
-        outcome: fluxdown_engine::ed2k::server_subscription::ServerFetchOutcome,
+        outcome: rinadown_engine::ed2k::server_subscription::ServerFetchOutcome,
         ack: oneshot::Sender<Result<ActorResult, ActorError>>,
     },
     Ed2kNodes {
@@ -361,7 +361,7 @@ async fn run_actor(
     queue_schedule.set_missed_tick_behavior(MissedTickBehavior::Delay);
     let mut rss_poll = tokio::time::interval(Duration::from_secs(60));
     rss_poll.set_missed_tick_behavior(MissedTickBehavior::Delay);
-    let mut seeding = tokio::time::interval(fluxdown_engine::bt_seeding::SEEDING_EVAL_INTERVAL);
+    let mut seeding = tokio::time::interval(rinadown_engine::bt_seeding::SEEDING_EVAL_INTERVAL);
     seeding.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
     loop {
@@ -459,6 +459,9 @@ async fn dispatch_operation(
                 referrer,
                 user_agent,
                 extra_headers,
+                // daemon 的 resolve-preview 不区分视频/通用（B2 契约无 video 位），
+                // 走通用 resolver（video=false）。
+                false,
             );
             tokio::spawn(async move {
                 let result = receiver
@@ -481,11 +484,11 @@ async fn dispatch_operation(
             let urls = config
                 .get("bt_tracker_sub_urls")
                 .cloned()
-                .unwrap_or_else(fluxdown_engine::tracker_subscription::default_subscription_urls);
+                .unwrap_or_else(rinadown_engine::tracker_subscription::default_subscription_urls);
             let maintenance_tx = maintenance_tx.clone();
             tokio::spawn(async move {
                 let outcome =
-                    fluxdown_engine::tracker_subscription::fetch_subscriptions(&urls).await;
+                    rinadown_engine::tracker_subscription::fetch_subscriptions(&urls).await;
                 let _ = maintenance_tx.send(MaintenanceEvent::Tracker { outcome, ack });
             });
         }
@@ -498,12 +501,12 @@ async fn dispatch_operation(
                 }
             };
             let urls = config.get("ed2k_server_sub_urls").cloned().unwrap_or_else(
-                fluxdown_engine::ed2k::server_subscription::default_server_met_urls,
+                rinadown_engine::ed2k::server_subscription::default_server_met_urls,
             );
             let maintenance_tx = maintenance_tx.clone();
             tokio::spawn(async move {
                 let outcome =
-                    fluxdown_engine::ed2k::server_subscription::fetch_server_subscriptions(&urls)
+                    rinadown_engine::ed2k::server_subscription::fetch_server_subscriptions(&urls)
                         .await;
                 let _ = maintenance_tx.send(MaintenanceEvent::Ed2k { outcome, ack });
             });
@@ -522,7 +525,7 @@ async fn dispatch_operation(
             };
             let maintenance_tx = maintenance_tx.clone();
             tokio::spawn(async move {
-                let outcome = fluxdown_engine::ed2k::kad::fetch_nodes_dat(&url).await;
+                let outcome = rinadown_engine::ed2k::kad::fetch_nodes_dat(&url).await;
                 let _ = maintenance_tx.send(MaintenanceEvent::Ed2kNodes { outcome, ack });
             });
         }
@@ -543,7 +546,7 @@ async fn dispatch_operation(
             let dispatcher = engine.manager.webhook();
             tokio::spawn(async move {
                 let result =
-                    serde_json::from_str::<fluxdown_engine::webhook::EndpointSpec>(&endpoint_json)
+                    serde_json::from_str::<rinadown_engine::webhook::EndpointSpec>(&endpoint_json)
                         .map_err(|error| ActorError::InvalidArgument(error.to_string()));
                 let result = match result {
                     Ok(spec) => Ok(ActorResult::WebhookTest(Box::new(
@@ -587,7 +590,7 @@ async fn execute_operation(
                     .unwrap_or_default();
             }
             if save_dir.trim().is_empty() {
-                save_dir = fluxdown_engine::user_dirs::download_dir_or_cwd();
+                save_dir = rinadown_engine::user_dirs::download_dir_or_cwd();
             }
             let queue_id = resolve_queue_id(&engine.db, request.queue_id).await?;
             let task_id = engine
@@ -610,7 +613,7 @@ async fn execute_operation(
                     method: request.method,
                     body: request
                         .body
-                        .map(fluxdown_engine_protocol::request_body_to_engine),
+                        .map(rinadown_engine_protocol::request_body_to_engine),
                     audio_url: request.audio_url,
                     start_paused: request.start_paused,
                     http_user: request.http_user,
@@ -875,7 +878,7 @@ async fn execute_operation(
 
 async fn link_migration_export(
     engine: &Engine,
-) -> Result<fluxdown_protocol::LinkMigrationExport, ActorError> {
+) -> Result<rinadown_protocol::LinkMigrationExport, ActorError> {
     ensure_migration_available(engine, "daemon_migration_link_acked").await?;
     let identity = engine
         .db
@@ -902,7 +905,7 @@ async fn link_migration_export(
             })
         })
         .collect();
-    Ok(fluxdown_protocol::LinkMigrationExport {
+    Ok(rinadown_protocol::LinkMigrationExport {
         revision: 1,
         identity,
         roster,
@@ -911,7 +914,7 @@ async fn link_migration_export(
 
 async fn gateway_migration_export(
     engine: &Engine,
-) -> Result<fluxdown_protocol::GatewayMigrationExport, ActorError> {
+) -> Result<rinadown_protocol::GatewayMigrationExport, ActorError> {
     ensure_migration_available(engine, "daemon_migration_gateway_acked").await?;
     let config = engine
         .db
@@ -919,7 +922,7 @@ async fn gateway_migration_export(
         .await
         .map_err(|error| ActorError::Operation(format!("{error:#}")))?;
     let enabled = |key: &str| config.get(key).is_some_and(|value| value == "true");
-    Ok(fluxdown_protocol::GatewayMigrationExport {
+    Ok(rinadown_protocol::GatewayMigrationExport {
         revision: 1,
         takeover_enabled: enabled("local_server_takeover_enabled"),
         jsonrpc_enabled: enabled("local_server_jsonrpc_enabled"),
@@ -1005,9 +1008,9 @@ async fn commit_ed2k_nodes(
 }
 
 async fn commit_tracker_refresh(
-    outcome: fluxdown_engine::tracker_subscription::FetchOutcome,
+    outcome: rinadown_engine::tracker_subscription::FetchOutcome,
     engine: &mut Engine,
-) -> Result<fluxdown_protocol::TrackerSubRefreshResponse, ActorError> {
+) -> Result<rinadown_protocol::TrackerSubRefreshResponse, ActorError> {
     let mut updated_at = engine
         .db
         .get_config("bt_tracker_sub_updated_at")
@@ -1042,7 +1045,7 @@ async fn commit_tracker_refresh(
             .set_bt_config(crate::config::bt_config_from_map(&all));
         engine.manager.invalidate_bt_session().await;
     }
-    Ok(fluxdown_protocol::TrackerSubRefreshResponse {
+    Ok(rinadown_protocol::TrackerSubRefreshResponse {
         success: outcome.is_success(),
         tracker_count: outcome.trackers.len() as i64,
         ok_sources: outcome.ok_sources as i64,
@@ -1053,9 +1056,9 @@ async fn commit_tracker_refresh(
 }
 
 async fn commit_ed2k_refresh(
-    outcome: fluxdown_engine::ed2k::server_subscription::ServerFetchOutcome,
+    outcome: rinadown_engine::ed2k::server_subscription::ServerFetchOutcome,
     engine: &mut Engine,
-) -> Result<fluxdown_protocol::Ed2kServerSubRefreshResponse, ActorError> {
+) -> Result<rinadown_protocol::Ed2kServerSubRefreshResponse, ActorError> {
     let mut updated_at = engine
         .db
         .get_config("ed2k_server_sub_updated_at")
@@ -1076,7 +1079,7 @@ async fn commit_ed2k_refresh(
             ),
             (
                 "ed2k_server_sub_cache_version".to_owned(),
-                fluxdown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION.to_string(),
+                rinadown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION.to_string(),
             ),
         ]);
         engine
@@ -1085,7 +1088,7 @@ async fn commit_ed2k_refresh(
             .await
             .map_err(|error| ActorError::Operation(format!("{error:#}")))?;
     }
-    Ok(fluxdown_protocol::Ed2kServerSubRefreshResponse {
+    Ok(rinadown_protocol::Ed2kServerSubRefreshResponse {
         success: outcome.is_success(),
         server_count: outcome.servers.len() as i64,
         ok_sources: outcome.ok_sources as i64,
@@ -1109,11 +1112,11 @@ async fn cdn_reports_peek(engine: &mut Engine) -> Result<ActorResult, ActorError
         .map_err(|error| ActorError::Operation(format!("{error:#}")))?
         .filter(|value| !value.trim().is_empty())
     {
-        let lease = serde_json::from_str::<fluxdown_protocol::CdnReportLeaseDto>(&raw)
+        let lease = serde_json::from_str::<rinadown_protocol::CdnReportLeaseDto>(&raw)
             .map_err(|error| ActorError::Operation(format!("{error:#}")))?;
         return Ok(ActorResult::CdnLease(Some(lease)));
     }
-    let samples = fluxdown_engine::cdn::telemetry::take_all();
+    let samples = rinadown_engine::cdn::telemetry::take_all();
     if samples.is_empty() {
         return Ok(ActorResult::CdnLease(None));
     }
@@ -1122,7 +1125,7 @@ async fn cdn_reports_peek(engine: &mut Engine) -> Result<ActorResult, ActorError
         .map(serde_json::to_value)
         .collect::<Result<Vec<_>, _>>()
         .map_err(|error| ActorError::Operation(error.to_string()))?;
-    let lease = fluxdown_protocol::CdnReportLeaseDto {
+    let lease = rinadown_protocol::CdnReportLeaseDto {
         batch_id: uuid::Uuid::new_v4().to_string(),
         samples: sample_values,
     };
@@ -1131,14 +1134,14 @@ async fn cdn_reports_peek(engine: &mut Engine) -> Result<ActorResult, ActorError
     let stored = match engine.db.lease_cdn_reports(&lease_json).await {
         Ok(stored) => stored,
         Err(error) => {
-            fluxdown_engine::cdn::telemetry::restore_front(samples);
+            rinadown_engine::cdn::telemetry::restore_front(samples);
             return Err(ActorError::Operation(format!("{error:#}")));
         }
     };
-    let stored_lease = serde_json::from_str::<fluxdown_protocol::CdnReportLeaseDto>(&stored)
+    let stored_lease = serde_json::from_str::<rinadown_protocol::CdnReportLeaseDto>(&stored)
         .map_err(|error| ActorError::Operation(format!("{error:#}")))?;
     if stored_lease.batch_id != lease.batch_id {
-        fluxdown_engine::cdn::telemetry::restore_front(samples);
+        rinadown_engine::cdn::telemetry::restore_front(samples);
     }
     Ok(ActorResult::CdnLease(Some(stored_lease)))
 }
@@ -1179,7 +1182,7 @@ async fn patch_config(
     events: &crate::event_hub::DaemonEventHub,
     expected_revision: u64,
     values: BTreeMap<String, String>,
-) -> Result<fluxdown_protocol::DaemonConfigSnapshot, ActorError> {
+) -> Result<rinadown_protocol::DaemonConfigSnapshot, ActorError> {
     let mut merged = engine
         .db
         .get_all_config()
@@ -1191,8 +1194,8 @@ async fn patch_config(
             .map(|(key, value)| (key.clone(), value.clone())),
     );
     if values.keys().any(|key| key.starts_with("proxy_")) {
-        let proxy = fluxdown_engine::proxy_config::ProxyConfig::from_config_map(&merged);
-        fluxdown_engine::downloader::build_client(&proxy, "")
+        let proxy = rinadown_engine::proxy_config::ProxyConfig::from_config_map(&merged);
+        rinadown_engine::downloader::build_client(&proxy, "")
             .map_err(|error| ActorError::InvalidArgument(format!("{error:#}")))?;
     }
     let revision = engine
@@ -1200,17 +1203,17 @@ async fn patch_config(
         .apply_config_patch_atomic(expected_revision, &values)
         .await
         .map_err(|error| match error {
-            fluxdown_engine::db::ConfigPatchError::RevisionConflict { current, .. } => {
+            rinadown_engine::db::ConfigPatchError::RevisionConflict { current, .. } => {
                 ActorError::RevisionConflict { current }
             }
             other => ActorError::Operation(format!("{other:#}")),
         })?;
     apply_live_config(engine, &merged, values.keys()).await?;
-    let snapshot = fluxdown_protocol::DaemonConfigSnapshot {
+    let snapshot = rinadown_protocol::DaemonConfigSnapshot {
         revision,
         values: crate::config::public_config_values(&merged),
     };
-    events.publish(fluxdown_protocol::DaemonEvent::ConfigChanged(
+    events.publish(rinadown_protocol::DaemonEvent::ConfigChanged(
         snapshot.clone(),
     ));
     Ok(snapshot)
@@ -1222,7 +1225,7 @@ async fn patch_config(
 async fn clear_conn_policy(
     engine: &mut Engine,
     events: &crate::event_hub::DaemonEventHub,
-) -> Result<fluxdown_protocol::ConnPolicySummaryDto, ActorError> {
+) -> Result<rinadown_protocol::ConnPolicySummaryDto, ActorError> {
     engine.manager.clear_domain_conn_caps();
     engine
         .db
@@ -1236,8 +1239,8 @@ async fn clear_conn_policy(
         .map_err(|error| ActorError::Operation(format!("{error:#}")))?;
     // 引擎的落盘是 fire-and-forget，快照以刚写入的空值为准。
     all.insert(DOMAIN_CONN_CAPS_KEY.to_owned(), String::new());
-    events.publish(fluxdown_protocol::DaemonEvent::ConfigChanged(
-        fluxdown_protocol::DaemonConfigSnapshot {
+    events.publish(rinadown_protocol::DaemonEvent::ConfigChanged(
+        rinadown_protocol::DaemonConfigSnapshot {
             revision: all
                 .get("daemon_config_revision")
                 .and_then(|value| value.parse::<u64>().ok())
@@ -1245,7 +1248,7 @@ async fn clear_conn_policy(
             values: crate::config::public_config_values(&all),
         },
     ));
-    Ok(fluxdown_protocol::ConnPolicySummaryDto { domain_count: 0 })
+    Ok(rinadown_protocol::ConnPolicySummaryDto { domain_count: 0 })
 }
 
 /// 引擎持久化域名连接策略的 config 键（引擎侧 `segment_coordinator` 私有常量）。
@@ -1253,15 +1256,15 @@ const DOMAIN_CONN_CAPS_KEY: &str = "domain_conn_caps";
 
 /// 删除单个站点凭据；站点不存在返回 [`ActorError::NotFound`]。
 async fn delete_site_auth(
-    db: &fluxdown_engine::db::Db,
+    db: &rinadown_engine::db::Db,
     site: &str,
-) -> Result<Vec<fluxdown_protocol::SiteAuthEntryDto>, ActorError> {
+) -> Result<Vec<rinadown_protocol::SiteAuthEntryDto>, ActorError> {
     let json = db
-        .get_config(fluxdown_engine::site_auth::SITE_AUTH_CONFIG_KEY)
+        .get_config(rinadown_engine::site_auth::SITE_AUTH_CONFIG_KEY)
         .await
         .map_err(|error| ActorError::Operation(format!("{error:#}")))?
         .unwrap_or_default();
-    let mut store = fluxdown_engine::site_auth::parse_store(&json);
+    let mut store = rinadown_engine::site_auth::parse_store(&json);
     if store.remove(site).is_none() {
         return Err(ActorError::NotFound);
     }
@@ -1271,12 +1274,12 @@ async fn delete_site_auth(
 /// 写回站点凭据表（与引擎 `apply_site_auth` 同一 `set_config` 路径：该键
 /// 不属用户配置目录，不触碰 revision），返回脱敏后的列表。
 async fn save_site_auth(
-    db: &fluxdown_engine::db::Db,
-    store: &BTreeMap<String, fluxdown_engine::site_auth::SiteCredential>,
-) -> Result<Vec<fluxdown_protocol::SiteAuthEntryDto>, ActorError> {
+    db: &rinadown_engine::db::Db,
+    store: &BTreeMap<String, rinadown_engine::site_auth::SiteCredential>,
+) -> Result<Vec<rinadown_protocol::SiteAuthEntryDto>, ActorError> {
     db.set_config(
-        fluxdown_engine::site_auth::SITE_AUTH_CONFIG_KEY,
-        &fluxdown_engine::site_auth::serialize_store(store),
+        rinadown_engine::site_auth::SITE_AUTH_CONFIG_KEY,
+        &rinadown_engine::site_auth::serialize_store(store),
     )
     .await
     .map_err(|error| ActorError::Operation(format!("{error:#}")))?;
@@ -1285,11 +1288,11 @@ async fn save_site_auth(
 
 /// 站点凭据表的脱敏投影（只含站点键与用户名，密码永不出 daemon）。
 pub fn site_auth_entries(
-    store: &BTreeMap<String, fluxdown_engine::site_auth::SiteCredential>,
-) -> Vec<fluxdown_protocol::SiteAuthEntryDto> {
+    store: &BTreeMap<String, rinadown_engine::site_auth::SiteCredential>,
+) -> Vec<rinadown_protocol::SiteAuthEntryDto> {
     store
         .iter()
-        .map(|(site, credential)| fluxdown_protocol::SiteAuthEntryDto {
+        .map(|(site, credential)| rinadown_protocol::SiteAuthEntryDto {
             site: site.clone(),
             user: credential.user.clone(),
         })
@@ -1300,7 +1303,7 @@ pub fn site_auth_entries(
 /// 预选默认队列同义）；默认队列为空或已被删除时保持空串，由引擎归入
 /// 内置主队列。
 async fn resolve_queue_id(
-    db: &fluxdown_engine::db::Db,
+    db: &rinadown_engine::db::Db,
     requested: String,
 ) -> Result<String, ActorError> {
     if !requested.is_empty() {
@@ -1314,7 +1317,7 @@ async fn resolve_queue_id(
     else {
         return Ok(requested);
     };
-    if fluxdown_engine::model::is_builtin_queue(&preferred) {
+    if rinadown_engine::model::is_builtin_queue(&preferred) {
         return Ok(preferred);
     }
     let exists = db
@@ -1428,7 +1431,7 @@ async fn apply_live_config<'a>(
     if keys.iter().any(|key| key.starts_with("proxy_")) {
         engine
             .manager
-            .set_proxy_config(fluxdown_engine::proxy_config::ProxyConfig::from_config_map(
+            .set_proxy_config(rinadown_engine::proxy_config::ProxyConfig::from_config_map(
                 all,
             ))
             .map_err(|error| ActorError::Operation(format!("{error:#}")))?;
@@ -1471,7 +1474,7 @@ fn decode_torrent_b64(value: Option<&str>) -> Result<Vec<u8>, ActorError> {
 }
 
 async fn task_ids_by_status(
-    db: &fluxdown_engine::db::Db,
+    db: &rinadown_engine::db::Db,
     statuses: &[i32],
 ) -> Result<Vec<String>, ActorError> {
     Ok(db
@@ -1485,8 +1488,8 @@ async fn task_ids_by_status(
 }
 
 async fn receive_rss_event(
-    receiver: &mut Option<mpsc::UnboundedReceiver<fluxdown_engine::rss::RssEvent>>,
-) -> Option<fluxdown_engine::rss::RssEvent> {
+    receiver: &mut Option<mpsc::UnboundedReceiver<rinadown_engine::rss::RssEvent>>,
+) -> Option<rinadown_engine::rss::RssEvent> {
     match receiver {
         Some(receiver) => receiver.recv().await,
         None => std::future::pending().await,
@@ -1497,20 +1500,20 @@ async fn receive_rss_event(
 mod tests {
     use std::collections::BTreeMap;
 
-    use fluxdown_engine::site_auth::{SITE_AUTH_CONFIG_KEY, SiteCredential, serialize_store};
+    use rinadown_engine::site_auth::{SITE_AUTH_CONFIG_KEY, SiteCredential, serialize_store};
 
     use super::{ActorError, delete_site_auth, resolve_queue_id, save_site_auth};
 
-    async fn open_db() -> (fluxdown_engine::db::Db, std::path::PathBuf) {
+    async fn open_db() -> (rinadown_engine::db::Db, std::path::PathBuf) {
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_daemon_actor_{}_{}",
+            "rinadown_daemon_actor_{}_{}",
             std::process::id(),
             uuid::Uuid::new_v4()
         ));
         tokio::fs::create_dir_all(&dir)
             .await
             .expect("create actor test dir");
-        let db = fluxdown_engine::db::Db::open(&dir)
+        let db = rinadown_engine::db::Db::open(&dir)
             .await
             .expect("open actor test db");
         (db, dir)
@@ -1532,7 +1535,7 @@ mod tests {
             resolve_queue_id(&db, String::new())
                 .await
                 .expect("builtin default"),
-            fluxdown_engine::model::MAIN_QUEUE_ID
+            rinadown_engine::model::MAIN_QUEUE_ID
         );
 
         db.insert_queue("custom", "Custom", 0, 0, 0, "", 5, 0, "")

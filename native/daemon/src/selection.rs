@@ -3,7 +3,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     DaemonEvent, SelectionKind, SelectionOutcome, SelectionRequestDto, SelectionResolutionDto,
 };
 use tokio::sync::oneshot;
@@ -204,13 +204,13 @@ impl DaemonSelection {
 const DEFAULT_BT_SELECTION_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 #[async_trait::async_trait]
-impl fluxdown_engine::selection::HostSelection for DaemonSelection {
+impl rinadown_engine::selection::HostSelection for DaemonSelection {
     async fn select_hls_quality(
         &self,
         task_id: &str,
-        options: &[fluxdown_engine::model::HlsQualityOption],
+        options: &[rinadown_engine::model::HlsQualityOption],
         timeout: std::time::Duration,
-    ) -> fluxdown_engine::selection::SelectionOutcome<i32> {
+    ) -> rinadown_engine::selection::SelectionOutcome<i32> {
         let default_index = options
             .iter()
             .enumerate()
@@ -224,7 +224,7 @@ impl fluxdown_engine::selection::HostSelection for DaemonSelection {
                 options: options
                     .iter()
                     .cloned()
-                    .map(fluxdown_engine_protocol::hls_quality_option_to_dto)
+                    .map(rinadown_engine_protocol::hls_quality_option_to_dto)
                     .collect(),
             },
             default_choice: SelectionOutcome::Hls {
@@ -234,16 +234,16 @@ impl fluxdown_engine::selection::HostSelection for DaemonSelection {
         };
         match self.begin(request) {
             SelectionWait::Immediate(_) => {
-                fluxdown_engine::selection::SelectionOutcome::NoSelectorConfigured(default_index)
+                rinadown_engine::selection::SelectionOutcome::NoSelectorConfigured(default_index)
             }
             SelectionWait::Pending(receiver) => match tokio::time::timeout(timeout, receiver).await
             {
                 Ok(Ok(SelectionOutcome::Hls { index })) => {
-                    fluxdown_engine::selection::SelectionOutcome::UserChose(index)
+                    rinadown_engine::selection::SelectionOutcome::UserChose(index)
                 }
                 _ => {
                     let _ = self.timeout(&request_id);
-                    fluxdown_engine::selection::SelectionOutcome::TimedOutDefaulted(default_index)
+                    rinadown_engine::selection::SelectionOutcome::TimedOutDefaulted(default_index)
                 }
             },
         }
@@ -252,9 +252,9 @@ impl fluxdown_engine::selection::HostSelection for DaemonSelection {
     async fn select_bt_files(
         &self,
         task_id: &str,
-        files: &[fluxdown_engine::model::BtFileEntry],
+        files: &[rinadown_engine::model::BtFileEntry],
         timeout: Option<std::time::Duration>,
-    ) -> fluxdown_engine::selection::SelectionOutcome<Vec<i32>> {
+    ) -> rinadown_engine::selection::SelectionOutcome<Vec<i32>> {
         let effective_timeout = timeout.unwrap_or(DEFAULT_BT_SELECTION_TIMEOUT);
         let request_id = uuid::Uuid::new_v4().to_string();
         let request = SelectionRequestDto {
@@ -264,7 +264,7 @@ impl fluxdown_engine::selection::HostSelection for DaemonSelection {
                 files: files
                     .iter()
                     .cloned()
-                    .map(fluxdown_engine_protocol::bt_file_entry_to_dto)
+                    .map(rinadown_engine_protocol::bt_file_entry_to_dto)
                     .collect(),
             },
             default_choice: SelectionOutcome::Bt {
@@ -274,19 +274,19 @@ impl fluxdown_engine::selection::HostSelection for DaemonSelection {
         };
         match self.begin(request) {
             SelectionWait::Immediate(_) => {
-                fluxdown_engine::selection::SelectionOutcome::NoSelectorConfigured(Vec::new())
+                rinadown_engine::selection::SelectionOutcome::NoSelectorConfigured(Vec::new())
             }
             SelectionWait::Pending(receiver) => {
                 match tokio::time::timeout(effective_timeout, receiver).await {
                     Ok(Ok(SelectionOutcome::Bt { indices })) => {
-                        fluxdown_engine::selection::SelectionOutcome::UserChose(indices)
+                        rinadown_engine::selection::SelectionOutcome::UserChose(indices)
                     }
                     Ok(Ok(SelectionOutcome::Cancelled)) => {
-                        fluxdown_engine::selection::SelectionOutcome::UserChose(vec![-1])
+                        rinadown_engine::selection::SelectionOutcome::UserChose(vec![-1])
                     }
                     _ => {
                         let _ = self.timeout(&request_id);
-                        fluxdown_engine::selection::SelectionOutcome::TimedOutDefaulted(Vec::new())
+                        rinadown_engine::selection::SelectionOutcome::TimedOutDefaulted(Vec::new())
                     }
                 }
             }
@@ -296,10 +296,10 @@ impl fluxdown_engine::selection::HostSelection for DaemonSelection {
     async fn select_resolve_variant(
         &self,
         task_id: &str,
-        options: &[fluxdown_engine::model::ResolveVariantOption],
+        options: &[rinadown_engine::model::ResolveVariantOption],
         default_index: i32,
         timeout: std::time::Duration,
-    ) -> fluxdown_engine::selection::SelectionOutcome<i32> {
+    ) -> rinadown_engine::selection::SelectionOutcome<i32> {
         let request_id = uuid::Uuid::new_v4().to_string();
         let request = SelectionRequestDto {
             request_id: request_id.clone(),
@@ -308,7 +308,7 @@ impl fluxdown_engine::selection::HostSelection for DaemonSelection {
                 options: options
                     .iter()
                     .cloned()
-                    .map(fluxdown_engine_protocol::resolve_variant_option_to_dto)
+                    .map(rinadown_engine_protocol::resolve_variant_option_to_dto)
                     .collect(),
             },
             default_choice: SelectionOutcome::Variant {
@@ -318,19 +318,19 @@ impl fluxdown_engine::selection::HostSelection for DaemonSelection {
         };
         match self.begin(request) {
             SelectionWait::Immediate(_) => {
-                fluxdown_engine::selection::SelectionOutcome::NoSelectorConfigured(default_index)
+                rinadown_engine::selection::SelectionOutcome::NoSelectorConfigured(default_index)
             }
             SelectionWait::Pending(receiver) => match tokio::time::timeout(timeout, receiver).await
             {
                 Ok(Ok(SelectionOutcome::Variant { index })) => {
-                    fluxdown_engine::selection::SelectionOutcome::UserChose(index)
+                    rinadown_engine::selection::SelectionOutcome::UserChose(index)
                 }
                 Ok(Ok(SelectionOutcome::Cancelled)) => {
-                    fluxdown_engine::selection::SelectionOutcome::UserChose(-1)
+                    rinadown_engine::selection::SelectionOutcome::UserChose(-1)
                 }
                 _ => {
                     let _ = self.timeout(&request_id);
-                    fluxdown_engine::selection::SelectionOutcome::TimedOutDefaulted(default_index)
+                    rinadown_engine::selection::SelectionOutcome::TimedOutDefaulted(default_index)
                 }
             },
         }
@@ -412,7 +412,7 @@ fn lock_or_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use fluxdown_protocol::{
+    use rinadown_protocol::{
         DaemonSnapshot, SelectionKind, SelectionOutcome, SelectionRequestDto,
         SelectionResolutionDto,
     };

@@ -1,5 +1,5 @@
 // 直连设备（link）：无需登录任何账号，与同一局域网内、或经自建内网穿透/组网（地址可达
-// 即可）的另一台 FluxDown 直接配对——与云账户（CloudAccountSettings 的云中转设备）完全
+// 即可）的另一台 RinaDown 直接配对——与云账户（CloudAccountSettings 的云中转设备）完全
 // 独立。作为账户设置页内嵌的一个 section 渲染（见 CloudAccountSettings.tsx），不是独立
 // 设置分类：已配对名册（在线圆点/平台图标/移除确认）+ 显示本机配对码（POST /link/code）+
 // 添加设备入口（弹窗见 add-local-device.tsx）。宿主未启用/不支持互联时整节退化为一条

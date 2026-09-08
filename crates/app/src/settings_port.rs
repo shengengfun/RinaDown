@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use fluxdown_ui_settings::{PortFuture, SettingsPort};
+use rinadown_ui_settings::{PortFuture, SettingsPort};
 
 use crate::agent_client::AgentClient;
 

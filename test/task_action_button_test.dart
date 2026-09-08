@@ -8,10 +8,10 @@ library;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/i18n/locale_provider.dart';
-import 'package:flux_down/src/theme/app_theme.dart';
-import 'package:flux_down/src/theme/flux_theme_tokens.dart';
-import 'package:flux_down/src/widgets/task_list_item.dart';
+import 'package:rina_down/src/i18n/locale_provider.dart';
+import 'package:rina_down/src/theme/app_theme.dart';
+import 'package:rina_down/src/theme/flux_theme_tokens.dart';
+import 'package:rina_down/src/widgets/task_list_item.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 Widget _wrap(Widget child) {

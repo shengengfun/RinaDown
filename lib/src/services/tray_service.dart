@@ -17,11 +17,11 @@ import 'log_service.dart';
 const _tag = 'TrayService';
 
 /// macOS 主窗口恢复通道（对应 macos/Runner/MainFlutterWindow.swift）。
-const _macWindowChannel = MethodChannel('com.fluxdown/window');
+const _macWindowChannel = MethodChannel('com.rinadown/window');
 
 /// 从托盘/最小化/关闭到托盘恢复主窗口并置于前台。
 ///
-/// macOS：走原生 `com.fluxdown/window` → AppDelegate.restoreMainWindow，
+/// macOS：走原生 `com.rinadown/window` → AppDelegate.restoreMainWindow，
 /// 与点击 Dock 图标相同的可靠激活序列（ignoringOtherApps: true）。
 /// window_manager 的 show()/focus() 在 App 非前台时用
 /// ignoringOtherApps: false，macOS 13+ 常无法把窗口带到前台，
@@ -48,7 +48,7 @@ Future<void> restoreMainWindow() async {
 /// macOS 应用菜单原生动作（Hide/Hide Others/Show All/Zoom/前置/全屏）。
 ///
 /// Flutter 的 `PlatformMenuItem` 无法绑定 AppKit 标准 selector，
-/// 统一经 `com.fluxdown/window` 通道转发到
+/// 统一经 `com.rinadown/window` 通道转发到
 /// macos/Runner/MainFlutterWindow.swift 执行等效原生调用。
 Future<void> macMenuAction(String method) async {
   try {
@@ -80,11 +80,11 @@ class TrayService with TrayListener {
   // 固定用系统模板图（HIG 惯例，随亮暗色自动着色）。
   String? _customIconPath;
 
-  /// 应用退出回调 — 由外部（如 _FluxDownAppState）设置以实现优雅退出。
+  /// 应用退出回调 — 由外部（如 _RinaDownAppState）设置以实现优雅退出。
   /// 回调中应等待待处理通知、销毁托盘、再销毁窗口。
   Future<void> Function()? onExitApp;
 
-  /// 托盘「新建下载…」回调 — 由外部（_FluxDownAppState）注入：恢复主窗并
+  /// 托盘「新建下载…」回调 — 由外部（_RinaDownAppState）注入：恢复主窗并
   /// 弹出新建下载对话框。
   VoidCallback? onNewDownload;
 
@@ -111,7 +111,7 @@ class TrayService with TrayListener {
       //   tray_win_dark.ico  = 白色箭头（深色任务栏）
       //   tray_win_light.ico = 深蓝色箭头（浅色任务栏）
       // CMakeLists.txt 已将两个文件复制到 exe 同级目录
-      // 初始值使用系统亮度；启动后由 _FluxDownAppState 通过 setIsDark() 修正为 app 主题
+      // 初始值使用系统亮度；启动后由 _RinaDownAppState 通过 setIsDark() 修正为 app 主题
       _winTrayDarkPath = p.join(exeDir, 'tray_win_dark.ico');
       _winTrayLightPath = p.join(exeDir, 'tray_win_light.ico');
       _isDark =
@@ -132,7 +132,7 @@ class TrayService with TrayListener {
         'flutter_assets',
         'assets',
         'logo',
-        'fluxdown_logo.png',
+        'rinadown_logo.png',
       );
       iconPath = _effectiveTrayIconPath();
       isTemplate = false;
@@ -142,7 +142,7 @@ class TrayService with TrayListener {
     await trayManager.setIcon(iconPath, isTemplate: isTemplate);
     // setToolTip is not implemented on Linux
     if (!Platform.isLinux) {
-      await trayManager.setToolTip('FluxDown');
+      await trayManager.setToolTip('RinaDown');
     }
 
     await _applyContextMenu();
@@ -261,7 +261,7 @@ class TrayService with TrayListener {
     return _linuxDefaultTrayIconPath ?? '';
   }
 
-  /// 由外部（_FluxDownAppState）在应用主题或系统亮度变化时调用，
+  /// 由外部（_RinaDownAppState）在应用主题或系统亮度变化时调用，
   /// 将托盘图标切换为与 app 当前生效主题一致的深/浅色版本。
   Future<void> setIsDark(bool isDark) async {
     if (!Platform.isWindows) return;

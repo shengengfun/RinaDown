@@ -15,10 +15,10 @@
 import { Store, useStore } from '../ws'
 import type { AuthResponse, CloudUser } from './types'
 
-const ACCESS_TOKEN_KEY = 'fluxdown.cloud.accessToken'
-const REFRESH_TOKEN_KEY = 'fluxdown.cloud.refreshToken'
-const USER_KEY = 'fluxdown.cloud.user'
-const DEVICE_ID_KEY = 'fluxdown.cloud.deviceId'
+const ACCESS_TOKEN_KEY = 'rinadown.cloud.accessToken'
+const REFRESH_TOKEN_KEY = 'rinadown.cloud.refreshToken'
+const USER_KEY = 'rinadown.cloud.user'
+const DEVICE_ID_KEY = 'rinadown.cloud.deviceId'
 
 export interface CloudSessionState {
   status: 'authenticated' | 'unauthenticated'

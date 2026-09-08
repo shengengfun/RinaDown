@@ -4,13 +4,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 
-import 'package:flux_down/src/bindings/bindings.dart';
-import 'package:flux_down/src/models/settings_provider.dart';
+import 'package:rina_down/src/bindings/bindings.dart';
+import 'package:rina_down/src/models/settings_provider.dart';
 
 /// The "Associate ed2k links" toggle shares the opt-out mechanism of the
 /// .torrent association (see torrent_assoc_toggle_test.dart): on Linux the
 /// live `xdg-mime query default x-scheme-handler/ed2k` still resolves
-/// FluxDown after the per-user override is dropped whenever FluxDown is the
+/// RinaDown after the per-user override is dropped whenever RinaDown is the
 /// only installed app declaring the handler, so a user-requested OFF must
 /// win over the status Rust reports back.
 void main() {
@@ -19,7 +19,7 @@ void main() {
   // SettingsProvider's constructor syncs auto-startup state over the
   // `launch_at_startup` method channel; mock it so the async sync completes.
   launchAtStartup.setup(
-    appName: 'FluxDownTest',
+    appName: 'RinaDownTest',
     appPath: Platform.resolvedExecutable,
   );
   binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -56,7 +56,7 @@ void main() {
       settings.ed2kProtocolAssociated,
       isFalse,
       reason: 'a user-requested OFF must not be clobbered by a live query '
-          'that resolves back to FluxDown',
+          'that resolves back to RinaDown',
     );
   });
 

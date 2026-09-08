@@ -42,7 +42,7 @@
 //      取舍，已在此处明确记录。
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/models/custom_category.dart';
+import 'package:rina_down/src/models/custom_category.dart';
 
 /// 镜像 SettingsProvider._fileNameFromUrl（settings_provider.dart 约
 /// 255-265 行）的文档化契约：取 URL 路径最后一段，URL 解码后若含 '.' 则

@@ -14,13 +14,13 @@ use std::sync::OnceLock;
 use serde_json::{Map, Value, json};
 
 use crate::service::{LiveSpeed, TaskEventKind};
-use fluxdown_protocol::daemon::{CreateTaskRequest, TaskDto};
+use rinadown_protocol::daemon::{CreateTaskRequest, TaskDto};
 
 // ---------------------------------------------------------------------------
 // GID：task_id ↔ GID 编解码与反查
 // ---------------------------------------------------------------------------
 
-/// FluxDown `task_id`（UUID v4 字符串）→ aria2 兼容 GID：
+/// RinaDown `task_id`（UUID v4 字符串）→ aria2 兼容 GID：
 /// 去除连字符、转小写后取前 16 个十六进制字符。
 ///
 /// 无状态、重启安全：GID 可随时由 `task_id` 重新推导，不需要额外映射表。
@@ -70,7 +70,7 @@ pub(crate) fn resolve_gid<'a>(tasks: &'a [TaskDto], gid: &str) -> Result<&'a Tas
 // status 映射
 // ---------------------------------------------------------------------------
 
-/// FluxDown `TaskDto.status` → aria2 `status` 字符串。
+/// RinaDown `TaskDto.status` → aria2 `status` 字符串。
 ///
 /// `0=pending→waiting, 1=downloading→active, 2=paused→paused,
 /// 3=completed→complete, 4=error→error, 5=preparing→active`。
@@ -109,7 +109,7 @@ pub(crate) fn is_stopped_status(status: i32) -> bool {
 /// `tellStopped` 共用）。
 ///
 /// `connections`/`numPieces`/`pieceLength`/`uploadLength` 恒为 `"0"`——
-/// FluxDown 引擎不是按 piece 调度、不做逐连接计数、HTTP 任务不统计上传
+/// RinaDown 引擎不是按 piece 调度、不做逐连接计数、HTTP 任务不统计上传
 /// 字节，如实反映「不可用」而非伪造非零值。`errorCode`/`errorMessage`
 /// 仅在已停止（complete/error）任务上输出，与 aria2 行为一致。
 pub(crate) fn build_status_object(task: &TaskDto, speed: LiveSpeed) -> Value {
@@ -161,7 +161,7 @@ pub(crate) fn build_status_object(task: &TaskDto, speed: LiveSpeed) -> Value {
     Value::Object(obj)
 }
 
-/// 单文件条目（`getFiles`/`tellStatus.files`）：FluxDown 任务恒单文件，
+/// 单文件条目（`getFiles`/`tellStatus.files`）：RinaDown 任务恒单文件，
 /// 因此恒返回一个 `index="1"`、`selected="true"` 的条目。
 pub(crate) fn build_file_entry(task: &TaskDto) -> Value {
     let path = std::path::Path::new(&task.save_dir)
@@ -178,7 +178,7 @@ pub(crate) fn build_file_entry(task: &TaskDto) -> Value {
     })
 }
 
-/// `getUris`/`files[].uris`：FluxDown 只跟踪单一 URL，非空时返回一个
+/// `getUris`/`files[].uris`：RinaDown 只跟踪单一 URL，非空时返回一个
 /// `status="used"` 条目；`url` 为空（如种子任务）时返回空数组。
 pub(crate) fn build_uris_array(task: &TaskDto) -> Value {
     if task.url.trim().is_empty() {
@@ -470,7 +470,7 @@ pub(crate) fn build_create_task_request(
 // 全局选项映射（getGlobalOption / changeGlobalOption）
 // ---------------------------------------------------------------------------
 
-/// 一条 aria2 全局选项 ↔ FluxDown config key 的映射规则。
+/// 一条 aria2 全局选项 ↔ RinaDown config key 的映射规则。
 struct GlobalOptionMapping {
     aria2_key: &'static str,
     config_key: &'static str,
@@ -513,7 +513,7 @@ fn to_native_bool(s: &str) -> Result<String, String> {
     }
 }
 
-/// 契约表：`local://aria2_compat_contract.md` §「aria2 全局选项 ↔ FluxDown
+/// 契约表：`local://aria2_compat_contract.md` §「aria2 全局选项 ↔ RinaDown
 /// config key 映射」。
 const GLOBAL_OPTION_MAPPINGS: &[GlobalOptionMapping] = &[
     GlobalOptionMapping {
@@ -560,7 +560,7 @@ const GLOBAL_OPTION_MAPPINGS: &[GlobalOptionMapping] = &[
     },
 ];
 
-/// AriaNg 等客户端常探测、但 FluxDown 无对应可写配置的选项：给出 aria2
+/// AriaNg 等客户端常探测、但 RinaDown 无对应可写配置的选项：给出 aria2
 /// 出厂默认值（纯静态展示，不可通过 `changeGlobalOption` 改变）。
 const STATIC_GLOBAL_OPTION_DEFAULTS: &[(&str, &str)] = &[
     ("max-connection-per-server", "1"),
@@ -641,7 +641,7 @@ pub(crate) fn parse_aria2_unit_bytes(s: &str) -> Result<i64, String> {
 pub(crate) const ARIA2_VERSION: &str = "1.37.0";
 
 /// `getVersion.enabledFeatures`：如实反映已支持的能力，移除
-/// FluxDown 不支持的 `Metalink`/`XML-RPC`/`Firefox3 Cookie`。
+/// RinaDown 不支持的 `Metalink`/`XML-RPC`/`Firefox3 Cookie`。
 pub(crate) const ENABLED_FEATURES: &[&str] =
     &["Async DNS", "BitTorrent", "GZip", "HTTPS", "Message Digest"];
 
@@ -770,9 +770,9 @@ pub(crate) fn err_integer_ge(index: usize, min: i64) -> String {
     )
 }
 
-/// 降级拒绝方法的统一文案：FluxDown 明确不支持该 aria2 能力。
+/// 降级拒绝方法的统一文案：RinaDown 明确不支持该 aria2 能力。
 pub(crate) fn err_unsupported(method: &str) -> String {
-    format!("{method} is not supported by FluxDown.")
+    format!("{method} is not supported by RinaDown.")
 }
 
 #[cfg(test)]
@@ -1379,7 +1379,7 @@ mod tests {
         );
         assert_eq!(
             err_unsupported("aria2.shutdown"),
-            "aria2.shutdown is not supported by FluxDown."
+            "aria2.shutdown is not supported by RinaDown."
         );
     }
 }

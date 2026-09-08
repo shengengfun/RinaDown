@@ -2,7 +2,7 @@
 <resources>
     <!-- MainActivity 仅做无界面路由，不创建窗口或 FlutterEngine。 -->
     <style name="RouterTheme" parent="@android:style/Theme.NoDisplay" />
-    <!-- FluxdownMainActivity（主界面）：窗口一创建即不透明，避免冷启动先透出壁纸的闪屏。
+    <!-- RinadownMainActivity（主界面）：窗口一创建即不透明，避免冷启动先透出壁纸的闪屏。
          背景用 launch_background（白/壁纸色）作为 splash。 -->
     <style name="MainTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">@drawable/launch_background</item>

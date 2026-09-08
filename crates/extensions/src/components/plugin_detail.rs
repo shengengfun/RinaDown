@@ -2,8 +2,8 @@
 
 use std::rc::Rc;
 
-use fluxdown_protocol::{MarketEntryDto, PluginDto};
-use fluxdown_ui_i18n::Translator;
+use rinadown_protocol::{MarketEntryDto, PluginDto};
+use rinadown_ui_i18n::Translator;
 use gpui::{App, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
 use gpui_component::{
     ActiveTheme as _, StyledExt as _, WindowExt as _, h_flex, link::Link, tag::Tag, v_flex,

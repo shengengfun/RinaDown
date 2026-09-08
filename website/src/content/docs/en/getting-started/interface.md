@@ -1,11 +1,11 @@
 ---
 title: Interface Overview
-description: A tour of FluxDown's three-panel layout, sidebar, top bar, task list, detail panel, status bar, shortcuts, and tray.
+description: A tour of RinaDown's three-panel layout, sidebar, top bar, task list, detail panel, status bar, shortcuts, and tray.
 section: getting-started
 order: 3
 ---
 
-FluxDown's main window is a three-panel layout: a resizable **sidebar** on the left, the **task list** in the center, and an optional **detail panel** on the right that opens when you select a task.
+RinaDown's main window is a three-panel layout: a resizable **sidebar** on the left, the **task list** in the center, and an optional **detail panel** on the right that opens when you select a task.
 
 <!-- TODO(screenshot): 主窗口整体布局,展示侧边栏+任务列表+详情面板三栏结构 -->
 
@@ -50,7 +50,7 @@ The column header shows File Name / Progress / Speed / ETA / Status, with a mana
 Click a task to open it. From top to bottom:
 
 - **File info** — icon, extension, and full file name.
-- **Progress** — a large percentage readout, a segmented progress bar, and (once segment data exists) an IDM-style pixel grid where each cell reflects how full that byte range is, plus a legend listing each segment's number and percentage. When FluxDown proactively or reactively splits a slow segment, a running split count and the most recent split's byte range are shown alongside the progress bar.
+- **Progress** — a large percentage readout, a segmented progress bar, and (once segment data exists) an IDM-style pixel grid where each cell reflects how full that byte range is, plus a legend listing each segment's number and percentage. When RinaDown proactively or reactively splits a slow segment, a running split count and the most recent split's byte range are shown alongside the progress bar.
 - **Info table** — Size, Downloaded, Speed, Remaining (ETA), Status, Threads (while active), Path, URL (with a one-click copy button), and an Error message row if the task failed.
 - **Actions** — a Pause/Resume button, and a destructive Delete Task & File button.
 
@@ -76,8 +76,8 @@ These work anywhere in the main window (not while Settings or a dialog is open):
 
 ## System Tray
 
-FluxDown keeps a tray icon running while the window is minimized or closed to tray. Right-click it for:
+RinaDown keeps a tray icon running while the window is minimized or closed to tray. Right-click it for:
 
 - **Show Window** — bring the main window back to front.
 - **Show Floating Ball** (checkbox) — an always-on-top desktop widget showing live speed and progress; you can drop URLs or torrent files onto it to start a download. Unavailable on Wayland — the tray falls back to showing live speed, and copied links are auto-filled into the download dialog when you reopen the main window.
-- **Exit** — quits FluxDown.
+- **Exit** — quits RinaDown.

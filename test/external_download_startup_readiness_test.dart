@@ -6,21 +6,21 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 
-import 'package:flux_down/src/bindings/bindings.dart';
-import 'package:flux_down/src/models/download_controller.dart';
-import 'package:flux_down/src/models/settings_provider.dart';
-import 'package:flux_down/src/services/external_download_service.dart';
-import 'package:flux_down/src/services/popup_window_service.dart';
-import 'package:flux_down/src/theme/theme_provider.dart';
+import 'package:rina_down/src/bindings/bindings.dart';
+import 'package:rina_down/src/models/download_controller.dart';
+import 'package:rina_down/src/models/settings_provider.dart';
+import 'package:rina_down/src/services/external_download_service.dart';
+import 'package:rina_down/src/services/popup_window_service.dart';
+import 'package:rina_down/src/theme/theme_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   launchAtStartup.setup(
-    appName: 'FluxDownTest',
+    appName: 'RinaDownTest',
     appPath: Platform.resolvedExecutable,
   );
 
-  const channel = MethodChannel('fluxdown/popup_host');
+  const channel = MethodChannel('rinadown/popup_host');
 
   testWidgets(
     'cold-start request waits for config and the first queue snapshot',

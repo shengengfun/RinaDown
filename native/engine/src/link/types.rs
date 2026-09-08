@@ -1,7 +1,7 @@
 //! 设备互联领域类型。
 //!
 //! 这些类型是子系统内部的领域模型（非 wire 契约）。HTTP wire 类型定义在
-//! `fluxdown_protocol::daemon`；Dart↔Rust 信号类型定义在 `hub::signals`。
+//! `rinadown_protocol::daemon`；Dart↔Rust 信号类型定义在 `hub::signals`。
 //! 本模块只描述引擎内部如何表达发现设备、已配对设备和传输候选。
 
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// 发现层 [`crate::link::discovery::Discovery`] 的实现互不影响。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DiscoveryKind {
-    /// mDNS 局域网自动发现（`_fluxdown._tcp.local.`）。
+    /// mDNS 局域网自动发现（`_rinadown._tcp.local.`）。
     Mdns,
     /// 用户手动输入地址后 `/ping` 探测。
     Manual,
@@ -58,7 +58,7 @@ pub struct DiscoveredPeer {
     pub platform: Option<String>,
     /// 可达地址（IPv4/IPv6 字符串）。
     pub host: String,
-    /// 对端 fluxdown API 端口。
+    /// 对端 rinadown API 端口。
     pub port: u16,
     /// 对端客户端版本（`/ping` 透出）。
     pub app_version: Option<String>,

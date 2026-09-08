@@ -1,15 +1,15 @@
-//! Typed HTTP 客户端 —— 复用 [`fluxdown_api`] 的路径常量与 wire 类型，
+//! Typed HTTP 客户端 —— 复用 [`rinadown_api`] 的路径常量与 wire 类型，
 //! 保证请求地址/JSON 结构与服务端永不漂移。
 //!
-//! 面向运行中的 FluxDown App（本机 API 服务，默认 `127.0.0.1:17800`）或
+//! 面向运行中的 RinaDown App（本机 API 服务，默认 `127.0.0.1:17800`）或
 //! headless server。所有管理 API 强制 token 鉴权。
 
 use std::time::Duration;
 
-use fluxdown_api::auth::TOKEN_HEADER;
-use fluxdown_api::routes;
-use fluxdown_api::service::UNKNOWN_ENDPOINT_MESSAGE;
-use fluxdown_protocol::daemon::{
+use rinadown_api::auth::TOKEN_HEADER;
+use rinadown_api::routes;
+use rinadown_api::service::UNKNOWN_ENDPOINT_MESSAGE;
+use rinadown_protocol::daemon::{
     ApiInfo, CreateTaskRequest, CreatedTask, QueueDto, RssItemDto, RssSourceDto, TaskDto,
 };
 use reqwest::{Client, Method, StatusCode};
@@ -31,8 +31,8 @@ impl ClientError {
     /// # Examples
     ///
     /// ```
-    /// use fluxdown_cli::client::ClientError;
-    /// use fluxdown_cli::exit::ExitCode;
+    /// use rinadown_cli::client::ClientError;
+    /// use rinadown_cli::exit::ExitCode;
     ///
     /// let e = ClientError::new("boom", ExitCode::Unknown);
     /// assert_eq!(e.message, "boom");
@@ -72,7 +72,7 @@ struct CreatedRssSource {
 /// 裸 `None` 推断不出类型。
 const NO_BODY: Option<&()> = None;
 
-/// FluxDown 管理 API 客户端。
+/// RinaDown 管理 API 客户端。
 pub struct ApiClient {
     http: Client,
     base: String,
@@ -83,7 +83,7 @@ impl ApiClient {
     /// 构造客户端。
     ///
     /// - `base`：服务基址（如 `http://127.0.0.1:17800`），尾部斜杠自动去除。
-    /// - `token`：管理 API token（`FLUXDOWN_TOKEN`）。
+    /// - `token`：管理 API token（`RINADOWN_TOKEN`）。
     /// - `timeout`：单请求超时。
     pub fn new(base: &str, token: &str, timeout: Duration) -> Result<Self, ClientError> {
         let http = Client::builder()
@@ -117,7 +117,7 @@ impl ApiClient {
             )
         } else if e.is_connect() {
             ClientError::new(
-                format!("cannot connect to {} — is FluxDown running?", self.base),
+                format!("cannot connect to {} — is RinaDown running?", self.base),
                 ExitCode::Network,
             )
         } else {
@@ -141,7 +141,7 @@ impl ApiClient {
                 format!(
                     "management API is not enabled on {} — turn on \
                      the Management API in the desktop app (Settings → Local API Service), \
-                     or run a headless server (where it is always on), then set FLUXDOWN_TOKEN",
+                     or run a headless server (where it is always on), then set RINADOWN_TOKEN",
                     self.base
                 ),
                 ExitCode::NotFound,

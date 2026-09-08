@@ -5,7 +5,7 @@ section: getting-started
 order: 2
 ---
 
-This walks through the full flow of creating a download in FluxDown, controlling it while it runs, and organizing tasks with queues and speed limits. See [Installation](/docs/en/getting-started/installation/) if you haven't set up FluxDown yet, and [Interface Overview](/docs/en/getting-started/interface/) for a tour of every panel mentioned here.
+This walks through the full flow of creating a download in RinaDown, controlling it while it runs, and organizing tasks with queues and speed limits. See [Installation](/docs/en/getting-started/installation/) if you haven't set up RinaDown yet, and [Interface Overview](/docs/en/getting-started/interface/) for a tour of every panel mentioned here.
 
 ## Create Your First Download
 
@@ -13,9 +13,9 @@ Click **New Download** in the top bar (or press <kbd>Ctrl</kbd>/<kbd>Cmd</kbd>+<
 
 | Field | What it does |
 |---|---|
-| **Download URL** | A multi-line box — paste one URL per line to queue a batch download (magnet and `ed2k://` links work too), or a single URL for one task. FluxDown shows a live count of parsed URLs. Use **Open .torrent file** to pick a local `.torrent`, or **Import TXT file** to load a list of URLs from a text file. |
+| **Download URL** | A multi-line box — paste one URL per line to queue a batch download (magnet and `ed2k://` links work too), or a single URL for one task. RinaDown shows a live count of parsed URLs. Use **Open .torrent file** to pick a local `.torrent`, or **Import TXT file** to load a list of URLs from a text file. |
 | **Save Directory** | Where the file lands. Defaults to your global save directory (**Settings → Download**), or your last-used folder if **Remember Last Save Location** is on. |
-| **Threads** | Segments to split the download into: **Auto** (FluxDown picks based on file size and CPU count), a fixed preset (4/8/16/32/64), or a custom value from 1–256. Hidden for magnet links and `.torrent` files, since BitTorrent manages its own connections. |
+| **Threads** | Segments to split the download into: **Auto** (RinaDown picks based on file size and CPU count), a fixed preset (4/8/16/32/64), or a custom value from 1–256. Hidden for magnet links and `.torrent` files, since BitTorrent manages its own connections. |
 | **Rename (optional)** | Override the detected filename. Only shown for a single URL — batch downloads and torrents always use the detected/embedded name. |
 
 Click **Advanced Options** to reveal per-task overrides that default to your global settings when left empty:
@@ -25,7 +25,7 @@ Click **Advanced Options** to reveal per-task overrides that default to your glo
 | **Task Proxy** | A proxy just for this task, e.g. `socks5://127.0.0.1:1080` or `http://host:port`. Leave empty to use the global proxy. Doesn't apply to BitTorrent downloads. |
 | **User-Agent** | Pick a preset (Chrome, Firefox, Edge, Safari) or type a custom string. |
 | **Cookie** | Raw `name=value; name2=value2` pairs, for downloads that require you to be logged in. |
-| **Hash Verification** | Pick an algorithm (MD5/SHA-1/SHA-256/SHA-512) and paste the expected hash. FluxDown verifies the file after download and flags a mismatch. Leave blank to skip. |
+| **Hash Verification** | Pick an algorithm (MD5/SHA-1/SHA-256/SHA-512) and paste the expected hash. RinaDown verifies the file after download and flags a mismatch. Leave blank to skip. |
 | **Custom Headers** | Extra HTTP headers as key/value rows (use **+ Add header** for more). Use the Cookie field above for cookies rather than a `Cookie` header here. |
 
 Two action buttons submit the form, each with a queue picker on its arrow:
@@ -84,7 +84,7 @@ Each queue can start and/or stop itself automatically. The queue manager's **Sch
 - A daily **start time** and **stop time** (`HH:MM`, picked from a time grid). You can fill either one or both — an empty side simply isn't scheduled.
 - The **weekdays** the schedule applies to.
 
-When the clock crosses a scheduled time on an active day, the queue starts or stops exactly as if you'd clicked the button; each edge fires at most once per day, and an edge that already passed earlier the same day is caught up when FluxDown launches. Queues with an active schedule show a small alarm-clock icon in the sidebar.
+When the clock crosses a scheduled time on an active day, the queue starts or stops exactly as if you'd clicked the button; each edge fires at most once per day, and an edge that already passed earlier the same day is caught up when RinaDown launches. Queues with an active schedule show a small alarm-clock icon in the sidebar.
 
 ### Task order within a queue
 
@@ -96,8 +96,8 @@ The global **Max Concurrent Downloads** cap (default 5) lives in **Settings → 
 
 ## Boost: Prioritize a Download
 
-Need one file now? Right-click any task that isn't finished yet and choose **Boost Download**. FluxDown pauses every other active task and gives the boosted one full bandwidth; a banner appears at the top of the task list showing how many tasks will automatically resume once it completes, with a **Cancel** link to stop early. The boosted row also gets a small lightning-bolt badge. Right-click it again and choose **Cancel Boost** to release it manually.
+Need one file now? Right-click any task that isn't finished yet and choose **Boost Download**. RinaDown pauses every other active task and gives the boosted one full bandwidth; a banner appears at the top of the task list showing how many tasks will automatically resume once it completes, with a **Cancel** link to stop early. The boosted row also gets a small lightning-bolt badge. Right-click it again and choose **Cancel Boost** to release it manually.
 
 ## After a Download Completes
 
-By default (**Settings → General → Completion Notifications**), FluxDown shows a system notification with **Open File** / **Open Folder** actions — a floating toast in the bottom-right corner on Windows, or a native notification on macOS/Linux. Notifications for multiple near-simultaneous completions are batched together automatically. You can also just double-click the finished task, or right-click it for Open File / Open Folder at any time.
+By default (**Settings → General → Completion Notifications**), RinaDown shows a system notification with **Open File** / **Open Folder** actions — a floating toast in the bottom-right corner on Windows, or a native notification on macOS/Linux. Notifications for multiple near-simultaneous completions are batched together automatically. You can also just double-click the finished task, or right-click it for Open File / Open Folder at any time.

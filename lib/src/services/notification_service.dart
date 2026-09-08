@@ -48,7 +48,7 @@ class NotificationService {
   NotificationService._();
   static final instance = NotificationService._();
 
-  static const _appUserModelId = 'Com.FluxDown.App';
+  static const _appUserModelId = 'Com.RinaDown.App';
   static const _appGuid = '4b648ba5-0b80-4bdb-b2a0-7f3b68c8e2b1';
 
   /// 防抖窗口：收集短时间内密集完成的任务
@@ -199,8 +199,8 @@ class NotificationService {
   }
 
   /// macOS 通知类别 ID（含动作按钮，initialize 时注册）
-  static const _categorySingle = 'fluxdown_download_complete';
-  static const _categoryBatch = 'fluxdown_batch_complete';
+  static const _categorySingle = 'rinadown_download_complete';
+  static const _categoryBatch = 'rinadown_batch_complete';
 
   /// Android 通知渠道 ID 必须稳定，变更会新建渠道。
   static const _androidChannelId = 'download_complete';
@@ -321,7 +321,7 @@ class NotificationService {
         // Windows 字段保留默认配置：Windows 路径不会走到 initialize，
         // 但插件要求所有桌面平台配置齐全时才可安全调用。
         windows: const WindowsInitializationSettings(
-          appName: 'FluxDown',
+          appName: 'RinaDown',
           appUserModelId: _appUserModelId,
           guid: _appGuid,
         ),

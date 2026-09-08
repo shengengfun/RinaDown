@@ -239,8 +239,8 @@ impl CloudApi {
     pub async fn persist_profile(
         &self,
         value: Value,
-    ) -> Result<fluxdown_protocol::AgentSessionDto, CloudError> {
-        let profile = serde_json::from_value::<fluxdown_protocol::CloudProfile>(value)
+    ) -> Result<rinadown_protocol::AgentSessionDto, CloudError> {
+        let profile = serde_json::from_value::<rinadown_protocol::CloudProfile>(value)
             .map_err(|error| CloudError::invalid_response(error.to_string()))?;
         self.client.persist_profile(profile).await
     }

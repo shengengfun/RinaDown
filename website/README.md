@@ -1,4 +1,4 @@
-# FluxDown 官网
+# RinaDown 官网
 
 基于 Astro + React + Tailwind CSS 构建，部署到 Vercel。
 

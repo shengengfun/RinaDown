@@ -1,5 +1,5 @@
-use fluxdown_ui_components::sidebar_navigation_button;
-use fluxdown_ui_theme::active_theme;
+use rinadown_ui_components::sidebar_navigation_button;
+use rinadown_ui_theme::active_theme;
 use gpui::{
     App, Context, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement,
     SharedString, StatefulInteractiveElement as _, Styled, Window, div, percentage,
@@ -128,7 +128,7 @@ impl DownloadView {
                 self.table_state.update(cx, |table, cx| {
                     table
                         .delegate_mut()
-                        .set_queue_filter(fluxdown_protocol::MAIN_QUEUE_ID);
+                        .set_queue_filter(rinadown_protocol::MAIN_QUEUE_ID);
                     table.refresh(cx);
                 });
             }
@@ -136,7 +136,7 @@ impl DownloadView {
                 self.table_state.update(cx, |table, cx| {
                     table
                         .delegate_mut()
-                        .set_queue_filter(fluxdown_protocol::LATER_QUEUE_ID);
+                        .set_queue_filter(rinadown_protocol::LATER_QUEUE_ID);
                     table.refresh(cx);
                 });
             }
@@ -478,7 +478,7 @@ impl DownloadView {
                                 SidebarSelection::MainQueue,
                                 self.strings.main_queue.clone(),
                                 IconName::GalleryVerticalEnd,
-                                (self.queue_count(fluxdown_protocol::MAIN_QUEUE_ID, cx), true),
+                                (self.queue_count(rinadown_protocol::MAIN_QUEUE_ID, cx), true),
                                 cx,
                             ))
                             .child(self.nav_item(
@@ -487,7 +487,7 @@ impl DownloadView {
                                 self.strings.later_queue.clone(),
                                 IconName::Pause,
                                 (
-                                    self.queue_count(fluxdown_protocol::LATER_QUEUE_ID, cx),
+                                    self.queue_count(rinadown_protocol::LATER_QUEUE_ID, cx),
                                     true,
                                 ),
                                 cx,

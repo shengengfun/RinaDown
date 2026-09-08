@@ -598,12 +598,12 @@ pub struct FissionSpec {
 }
 
 impl Db {
-    /// 在 `dir` 目录下打开（不存在则创建）SQLite 数据库 `flux_down.db`。
+    /// 在 `dir` 目录下打开（不存在则创建）SQLite 数据库 `rina_down.db`。
     ///
     /// 桌面 App 的默认持久化路径；服务器端可改用 [`Db::connect`] 按 URL
     /// 连接 SQLite 或 PostgreSQL。
     pub async fn open(dir: &Path) -> Result<Self, DbError> {
-        let db_path = dir.join("flux_down.db");
+        let db_path = dir.join("rina_down.db");
         let url = sqlite_url(&db_path);
         Self::connect(&url).await
     }
@@ -611,7 +611,7 @@ impl Db {
     /// 打开 SQLite 数据库并在任何连接或 schema 变更前获取唯一写入者文件租约。
     pub async fn open_exclusive(dir: &Path) -> Result<(Self, EngineWriteGuard), DbError> {
         let guard = acquire_engine_file_lease(dir)?;
-        let db_path = dir.join("flux_down.db");
+        let db_path = dir.join("rina_down.db");
         let url = sqlite_url(&db_path);
         let db = Self::connect_uninitialized(&url).await?;
         db.init_schema().await?;
@@ -1086,8 +1086,8 @@ impl Db {
     /// # Examples
     ///
     /// ```no_run
-    /// # async fn run() -> Result<(), fluxdown_engine::db::DbError> {
-    /// use fluxdown_engine::db::Db;
+    /// # async fn run() -> Result<(), rinadown_engine::db::DbError> {
+    /// use rinadown_engine::db::Db;
     /// let db = Db::connect("sqlite::memory:").await?;
     /// db.update_tasks_status_batch(&["a".to_string(), "b".to_string()], 2)
     ///     .await?;
@@ -1139,8 +1139,8 @@ impl Db {
     /// # Examples
     ///
     /// ```no_run
-    /// # async fn run() -> Result<(), fluxdown_engine::db::DbError> {
-    /// use fluxdown_engine::db::Db;
+    /// # async fn run() -> Result<(), rinadown_engine::db::DbError> {
+    /// use rinadown_engine::db::Db;
     /// let db = Db::connect("sqlite::memory:").await?;
     /// let changed = db.update_task_file_missing("task-1", true).await?;
     /// assert!(!changed); // 无此任务 → 未更新
@@ -3009,8 +3009,8 @@ impl Db {
     /// # Examples
     ///
     /// ```no_run
-    /// # async fn run() -> Result<(), fluxdown_engine::db::DbError> {
-    /// use fluxdown_engine::db::Db;
+    /// # async fn run() -> Result<(), rinadown_engine::db::DbError> {
+    /// use rinadown_engine::db::Db;
     /// let db = Db::connect("sqlite::memory:").await?;
     /// db.insert_group("g1", "我的相册", "https://pan.example.com/s/x", "/tmp/我的相册").await?;
     /// assert_eq!(db.load_all_groups().await?.len(), 1);
@@ -3149,8 +3149,8 @@ impl Db {
     /// # Examples
     ///
     /// ```no_run
-    /// # async fn run() -> Result<(), fluxdown_engine::db::DbError> {
-    /// use fluxdown_engine::db::Db;
+    /// # async fn run() -> Result<(), rinadown_engine::db::DbError> {
+    /// use rinadown_engine::db::Db;
     /// let db = Db::connect("sqlite::memory:").await?;
     /// let deleted = db.gc_empty_groups().await?;
     /// assert_eq!(deleted, 0); // 没有任务组时是无操作
@@ -3395,9 +3395,9 @@ impl Db {
     /// # Examples
     ///
     /// ```no_run
-    /// # async fn run() -> Result<(), fluxdown_engine::db::DbError> {
-    /// use fluxdown_engine::db::Db;
-    /// use fluxdown_engine::rss::model::RssSourceInfo;
+    /// # async fn run() -> Result<(), rinadown_engine::db::DbError> {
+    /// use rinadown_engine::db::Db;
+    /// use rinadown_engine::rss::model::RssSourceInfo;
     ///
     /// let db = Db::connect("sqlite::memory:").await?;
     /// db.insert_rss_source(&RssSourceInfo {
@@ -4057,7 +4057,7 @@ mod tests {
             .unwrap_or_default()
             .as_nanos();
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_test_{}_{}_{}",
+            "rinadown_test_{}_{}_{}",
             std::process::id(),
             nanos,
             n
@@ -4669,7 +4669,7 @@ mod tests {
     // -----------------------------------------------------------------------
     // Performance benchmark: expose the N×WAL-checkpoint bottleneck
     //
-    // Run with:  cargo test -p fluxdown_engine -- --nocapture delete_benchmark
+    // Run with:  cargo test -p rinadown_engine -- --nocapture delete_benchmark
     // -----------------------------------------------------------------------
 
     /// Insert N completed tasks (no active handles) and delete them one by one.
@@ -5275,7 +5275,7 @@ mod tests {
     async fn reopen_same_dir_is_idempotent() {
         let n = TEST_COUNTER.fetch_add(1, Ordering::Relaxed);
         let dir =
-            std::env::temp_dir().join(format!("fluxdown_reopen_{}_{}", std::process::id(), n));
+            std::env::temp_dir().join(format!("rinadown_reopen_{}_{}", std::process::id(), n));
         std::fs::create_dir_all(&dir).expect("create temp dir");
         {
             let db = Db::open(&dir).await.expect("first open");
@@ -5296,7 +5296,7 @@ mod tests {
 
     /// PostgreSQL 冒烟（需要本地 pg 实例）：
     /// `PG_TEST_URL=postgres://postgres:pw@localhost/postgres \
-    ///  cargo test -p fluxdown_engine -- --ignored pg_smoke`
+    ///  cargo test -p rinadown_engine -- --ignored pg_smoke`
     #[tokio::test]
     #[ignore = "requires a running PostgreSQL instance (set PG_TEST_URL)"]
     async fn pg_smoke_roundtrip() {
@@ -5358,7 +5358,7 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // 文件跟踪（FluxDown #11）：update_task_file_missing / file_missing 读回一致性
+    // 文件跟踪（RinaDown #11）：update_task_file_missing / file_missing 读回一致性
     // -----------------------------------------------------------------------
 
     /// 对 completed(status=3) 任务落库 file_missing=true 必须成功（返回
@@ -5909,7 +5909,7 @@ mod tests {
     #[tokio::test]
     async fn exclusive_open_rejects_second_writer_until_guard_drops() {
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_writer_{}_{}",
+            "rinadown_writer_{}_{}",
             std::process::id(),
             uuid::Uuid::new_v4()
         ));

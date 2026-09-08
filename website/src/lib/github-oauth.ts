@@ -11,8 +11,8 @@ import {
   GITHUB_OAUTH_CLIENT_SECRET,
 } from "astro:env/server";
 
-export const SESSION_COOKIE = "fluxdown_gh_session";
-export const STATE_COOKIE = "fluxdown_gh_oauth_state";
+export const SESSION_COOKIE = "rinadown_gh_session";
+export const STATE_COOKIE = "rinadown_gh_oauth_state";
 
 const SESSION_TTL_S = 30 * 24 * 3600; // 30 days
 

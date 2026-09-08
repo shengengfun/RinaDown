@@ -4,9 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 
-import 'package:flux_down/src/bindings/bindings.dart';
-import 'package:flux_down/src/models/custom_category.dart';
-import 'package:flux_down/src/models/settings_provider.dart';
+import 'package:rina_down/src/bindings/bindings.dart';
+import 'package:rina_down/src/models/custom_category.dart';
+import 'package:rina_down/src/models/settings_provider.dart';
 
 /// Repro: deleting built-in categories gets undone on the next startup.
 ///
@@ -22,7 +22,7 @@ void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
 
   launchAtStartup.setup(
-    appName: 'FluxDownTest',
+    appName: 'RinaDownTest',
     appPath: Platform.resolvedExecutable,
   );
   binding.defaultBinaryMessenger.setMockMethodCallHandler(

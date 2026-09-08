@@ -1,9 +1,9 @@
 {
-  "identity": "fluxdown@manifest-playground",
+  "identity": "rinadown@manifest-playground",
   "name": "Manifest Playground (测试)",
   "version": "1.0.0",
   "description": "多嵌套文件夹/多文件清单测试插件：拦截 *://manifest.test/* 链接，初段返回覆盖全部边界形态的清单（8 级深链单链合并、逐级带文件的分叉目录、根级散件、大小未知、超长文件名、规格变体、千项压测），二段按设置的直链前缀返回真实下载地址。用于验证新建任务的清单选择弹窗、任务组创建与二段惰性解析。",
-  "homepage": "https://fluxdown.zerx.dev",
+  "homepage": "https://rinadown.zerx.dev",
   "minAppVersion": "0.1.44",
   "resolvers": [
     {

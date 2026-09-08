@@ -1,5 +1,5 @@
 [package]
-name = "fluxdown_api"
+name = "rinadown_api"
 version = "0.1.0"
 edition = "2024"
 
@@ -11,7 +11,7 @@ wildcard_imports = "deny"
 [dependencies]
 async-trait = "0.1.89"
 axum = { version = "0.8.9", features = ["ws"] }
-fluxdown_protocol = { version = "0.1.0", path = "../protocol", features = ["openapi"] }
+rinadown_protocol = { version = "0.1.0", path = "../protocol", features = ["openapi"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 thiserror = "2.0.18"

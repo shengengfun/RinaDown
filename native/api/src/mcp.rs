@@ -1,6 +1,6 @@
 //! MCP（Model Context Protocol）兼容端点（`POST /mcp`）。
 //!
-//! 让 AI 客户端（Claude Desktop / Cursor / Cline 等）把 FluxDown 当作 MCP
+//! 让 AI 客户端（Claude Desktop / Cursor / Cline 等）把 RinaDown 当作 MCP
 //! server：以自然语言驱动「新建下载 / 查询任务 / 暂停恢复 / 删除 / 列队列 /
 //! 管理 RSS 订阅」。
 //!
@@ -16,7 +16,7 @@
 //! # 鉴权
 //!
 //! 由 HTTP 层用 [`crate::auth::check_management_auth`] 强制 token
-//! （`Authorization: Bearer <token>` 或 `X-FluxDown-Token`）。规范允许内部
+//! （`Authorization: Bearer <token>` 或 `X-RinaDown-Token`）。规范允许内部
 //! 部署用静态 Bearer token 代替 OAuth 2.1，与管理 API 同一把 token。
 //!
 //! # 与 [`crate::jsonrpc`] 的关系
@@ -28,7 +28,7 @@
 use serde_json::{Value, json};
 
 use crate::service::ApiHost;
-use fluxdown_protocol::daemon::{CreateTaskRequest, RssSourceDto};
+use rinadown_protocol::daemon::{CreateTaskRequest, RssSourceDto};
 
 /// 服务端声明支持的 MCP 协议版本（初始化时若客户端未指定则回退到此值）。
 const PROTOCOL_VERSION: &str = "2025-06-18";
@@ -85,7 +85,7 @@ fn initialize_result(params: &Value, app_version: &str) -> Value {
     json!({
         "protocolVersion": version,
         "capabilities": { "tools": { "listChanged": false } },
-        "serverInfo": { "name": "FluxDown", "version": app_version },
+        "serverInfo": { "name": "RinaDown", "version": app_version },
     })
 }
 
@@ -378,7 +378,7 @@ mod tests {
     use super::*;
     use crate::service::{ApiError, ApiHost};
     use async_trait::async_trait;
-    use fluxdown_protocol::daemon::{DownloadRequest, QueueDto, TaskDto};
+    use rinadown_protocol::daemon::{DownloadRequest, QueueDto, TaskDto};
     use std::sync::Mutex;
 
     /// 记录调用的假宿主。
@@ -507,7 +507,7 @@ mod tests {
         .unwrap();
         let result = &resp["result"];
         assert_eq!(result["protocolVersion"], "2025-03-26");
-        assert_eq!(result["serverInfo"]["name"], "FluxDown");
+        assert_eq!(result["serverInfo"]["name"], "RinaDown");
         assert_eq!(result["serverInfo"]["version"], "9.9.9");
         assert!(result["capabilities"]["tools"].is_object());
     }

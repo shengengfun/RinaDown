@@ -213,7 +213,7 @@ mod tests {
     #[tokio::test]
     async fn blob_kind_and_single_use_are_enforced() {
         let root = std::env::temp_dir().join(format!(
-            "fluxdown_blob_test_{}_{}",
+            "rinadown_blob_test_{}_{}",
             std::process::id(),
             uuid::Uuid::new_v4()
         ));

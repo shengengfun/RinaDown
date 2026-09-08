@@ -1,14 +1,14 @@
 ---
 title: API Overview
-description: The FluxDown HTTP API — route groups, authentication, and how it relates to the headless server.
+description: The RinaDown HTTP API — route groups, authentication, and how it relates to the headless server.
 section: api
 order: 1
 ---
 
-FluxDown ships a small HTTP API — used by browser extensions, userscripts, aria2 clients, and automation — built into two places:
+RinaDown ships a small HTTP API — used by browser extensions, userscripts, aria2 clients, and automation — built into two places:
 
 - **The desktop app**, on `http://127.0.0.1:17800` (port configurable, address hardcoded to loopback: it is never reachable from the network). It's off by default for the management group and on by default for the other groups; see the desktop client's local API settings.
-- **The [headless server](/docs/en/headless-server/setup/)**, on whatever address `FLUXDOWN_BIND` is set to (`0.0.0.0:17800` by default — reachable over the network by design, since remote management is the point). The management API is always enabled there, and it adds a handful of server-specific endpoints (queues, config, file retrieval, WebSocket, filesystem browsing) beyond what the desktop app exposes.
+- **The [headless server](/docs/en/headless-server/setup/)**, on whatever address `RINADOWN_BIND` is set to (`0.0.0.0:17800` by default — reachable over the network by design, since remote management is the point). The management API is always enabled there, and it adds a handful of server-specific endpoints (queues, config, file retrieval, WebSocket, filesystem browsing) beyond what the desktop app exposes.
 
 Both share the same underlying route constants, request/response JSON contracts, and auth rules — only which routes are enabled, and what host implements them, differs.
 
@@ -17,7 +17,7 @@ Both share the same underlying route constants, request/response JSON contracts,
 | Group | Endpoints | Enabled by | Authentication |
 |---|---|---|---|
 | Health check | `GET /ping` | always on | none |
-| Script takeover | `POST /download`, `POST /download/batch` | `local_server_takeover_enabled` (default on) | `X-FluxDown-Client` header required, plus an optional token |
+| Script takeover | `POST /download`, `POST /download/batch` | `local_server_takeover_enabled` (default on) | `X-RinaDown-Client` header required, plus an optional token |
 | aria2-compatible RPC | `POST /jsonrpc` (`aria2.addUri`, `aria2.getVersion`, `aria2.getGlobalStat`, `system.multicall`, `system.listMethods`) | `local_server_jsonrpc_enabled` (default on) | optional token |
 | Management API | `GET /api/v1/info`, `GET/POST /api/v1/tasks`, `GET/DELETE /api/v1/tasks/{id}`, `PUT /api/v1/tasks/{id}/pause\|continue`, `PUT /api/v1/tasks/pause\|continue`, `GET /api/v1/queues` | `local_server_api_enabled` (default off on desktop, always on for the headless server) | **required** token |
 | MCP | `POST /mcp` (`initialize`, `tools/list`, `tools/call`, `ping`) | `local_server_mcp_enabled` (default off on desktop, always on for the headless server) | **required** token (shared with the management API) |
@@ -32,18 +32,18 @@ There is one configured token (`local_server_token`); how it must be presented d
 
 | Route group | Accepted forms |
 |---|---|
-| Script takeover | `X-FluxDown-Token` header (only if a token is configured — empty token means the group is unauthenticated). The `X-FluxDown-Client` header is always required regardless of token, as a CORS-based gate against arbitrary web pages. |
-| aria2-compatible RPC | `X-FluxDown-Token` header, **or** aria2's own convention of passing `token:xxx` as `params[0]` in the JSON-RPC call. |
-| Management API (`/api/v1/*`) | `Authorization: Bearer <token>` **or** `X-FluxDown-Token` header. If no token is configured, every management request is rejected (403) — this group cannot run unauthenticated. |
+| Script takeover | `X-RinaDown-Token` header (only if a token is configured — empty token means the group is unauthenticated). The `X-RinaDown-Client` header is always required regardless of token, as a CORS-based gate against arbitrary web pages. |
+| aria2-compatible RPC | `X-RinaDown-Token` header, **or** aria2's own convention of passing `token:xxx` as `params[0]` in the JSON-RPC call. |
+| Management API (`/api/v1/*`) | `Authorization: Bearer <token>` **or** `X-RinaDown-Token` header. If no token is configured, every management request is rejected (403) — this group cannot run unauthenticated. |
 | `/api/v1/ws`, `/api/v1/tasks/{id}/file` | `?token=<token>` query parameter (browser navigation/WebSocket upgrades can't set custom headers). |
 
 Constant-time comparison is used everywhere a token is checked, to avoid timing side-channels.
 
 ### Cross-origin (CORS)
 
-By default the service returns **no** `Access-Control-Allow-Origin` on any request, so a cross-origin `fetch()` from a web page is blocked at the preflight — that is precisely why requiring the `X-FluxDown-Client` header keeps arbitrary web pages out (userscripts use `GM_xmlhttpRequest`, which is not subject to CORS).
+By default the service returns **no** `Access-Control-Allow-Origin` on any request, so a cross-origin `fetch()` from a web page is blocked at the preflight — that is precisely why requiring the `X-RinaDown-Client` header keeps arbitrary web pages out (userscripts use `GM_xmlhttpRequest`, which is not subject to CORS).
 
-The **Allow cross-origin access from any website (CORS)** setting (`local_server_cors_allow_all`, off by default) gives that barrier up: preflight and real responses both carry `Access-Control-Allow-Origin: *`, and the preflight additionally carries `Access-Control-Allow-Private-Network: true` — the equivalent of aria2's `--rpc-allow-origin-all`. Its purpose is to let sites that probe for an aria2 service with a browser `fetch` detect FluxDown; the cost is that any web page can probe this port and submit download links. Still in effect: takeover and aria2 submissions raise the confirmation dialog on the desktop app, and the management API and MCP still require the token.
+The **Allow cross-origin access from any website (CORS)** setting (`local_server_cors_allow_all`, off by default) gives that barrier up: preflight and real responses both carry `Access-Control-Allow-Origin: *`, and the preflight additionally carries `Access-Control-Allow-Private-Network: true` — the equivalent of aria2's `--rpc-allow-origin-all`. Its purpose is to let sites that probe for an aria2 service with a browser `fetch` detect RinaDown; the cost is that any web page can probe this port and submit download links. Still in effect: takeover and aria2 submissions raise the confirmation dialog on the desktop app, and the management API and MCP still require the token.
 
 ## Takeover/aria2 vs. management API: different semantics
 
@@ -89,9 +89,9 @@ curl -X POST http://<host>:17800/jsonrpc \
 
 ## MCP (Model Context Protocol)
 
-FluxDown speaks [MCP](https://modelcontextprotocol.io) over HTTP, so AI clients (Claude Desktop, Cursor, Cline, and any MCP-capable agent) can drive downloads in natural language. It's a single endpoint, `POST /mcp`, protected by the same token as the management API.
+RinaDown speaks [MCP](https://modelcontextprotocol.io) over HTTP, so AI clients (Claude Desktop, Cursor, Cline, and any MCP-capable agent) can drive downloads in natural language. It's a single endpoint, `POST /mcp`, protected by the same token as the management API.
 
-MCP is JSON-RPC 2.0 over one HTTP endpoint (not REST) — every operation is one POST to `/mcp`, distinguished by the `method` in the body, using the stateless subset of the Streamable HTTP transport: requests get an `application/json` response, notifications get `202 Accepted`, and no session id is tracked. Authenticate with `Authorization: Bearer <token>` (or `X-FluxDown-Token`); the spec permits a static bearer token for internal deployments in place of OAuth 2.1.
+MCP is JSON-RPC 2.0 over one HTTP endpoint (not REST) — every operation is one POST to `/mcp`, distinguished by the `method` in the body, using the stateless subset of the Streamable HTTP transport: requests get an `application/json` response, notifications get `202 Accepted`, and no session id is tracked. Authenticate with `Authorization: Bearer <token>` (or `X-RinaDown-Token`); the spec permits a static bearer token for internal deployments in place of OAuth 2.1.
 
 ### Tools
 
@@ -118,7 +118,7 @@ Point your MCP client at the endpoint with a bearer token, e.g. in an `mcp.json`
 ```json
 {
   "mcpServers": {
-    "fluxdown": {
+    "rinadown": {
       "url": "http://<host>:17800/mcp",
       "headers": { "Authorization": "Bearer <token>" }
     }
@@ -137,27 +137,27 @@ curl -X POST http://<host>:17800/mcp \
                  "arguments":{"url":"https://example.com/file.zip","segments":8}}}'
 ```
 
-## The fluxdown:// URL protocol
+## The rinadown:// URL protocol
 
-Alongside the HTTP API, FluxDown registers a custom URL protocol that any web page, script, or third-party app can use to hand a download off — no local HTTP call required:
+Alongside the HTTP API, RinaDown registers a custom URL protocol that any web page, script, or third-party app can use to hand a download off — no local HTTP call required:
 
 ```text
-fluxdown://download?url=<percent-encoded URL>&filename=<optional name>
+rinadown://download?url=<percent-encoded URL>&filename=<optional name>
 ```
 
-- `url` — required. The address to download, percent-encoded (`http`/`https`/`ftp` direct links or a `magnet:` link). A `fluxdown://` URL with a missing or empty `url` parameter is silently ignored.
+- `url` — required. The address to download, percent-encoded (`http`/`https`/`ftp` direct links or a `magnet:` link). A `rinadown://` URL with a missing or empty `url` parameter is silently ignored.
 - `filename` — optional. A suggested file name, pre-filled for the user to keep or change. Useful when the real name only exists in a `Content-Disposition` header the receiving app will never see.
 
 Who answers it depends on the platform:
 
-- **Desktop (Windows, macOS, Linux)** — the app registers the protocol handler (Windows registry on every startup; a `CFBundleURLTypes` declaration on macOS; an `x-scheme-handler` entry in the `.desktop` file on Linux). Opening a `fluxdown://` URL launches the app (or forwards to the already-running instance) and routes the request into the same external-download flow as browser-extension requests: a quick-download confirmation by default, silent task creation if the user enabled no-prompt downloads. On Android and in restricted desktop environments, the browser extension itself can deliver through this protocol — see [the fluxdown:// protocol mode](/docs/en/browser-extension/usage/).
+- **Desktop (Windows, macOS, Linux)** — the app registers the protocol handler (Windows registry on every startup; a `CFBundleURLTypes` declaration on macOS; an `x-scheme-handler` entry in the `.desktop` file on Linux). Opening a `rinadown://` URL launches the app (or forwards to the already-running instance) and routes the request into the same external-download flow as browser-extension requests: a quick-download confirmation by default, silent task creation if the user enabled no-prompt downloads. On Android and in restricted desktop environments, the browser extension itself can deliver through this protocol — see [the rinadown:// protocol mode](/docs/en/browser-extension/usage/).
 - **Android** — the app declares a VIEW intent-filter for the scheme. Opening the URL wakes the app and shows the new-download sheet with `url` and `filename` pre-filled; the user confirms before anything downloads. Successive protocol URLs arriving while the sheet is open are merged into it as additional lines (this is how the browser extension delivers batch downloads on Android).
 
 A plain HTML link is enough to integrate:
 
 ```html
-<a href="fluxdown://download?url=https%3A%2F%2Fexample.com%2Ffile.zip&filename=file.zip">
-  Download with FluxDown
+<a href="rinadown://download?url=https%3A%2F%2Fexample.com%2Ffile.zip&filename=file.zip">
+  Download with RinaDown
 </a>
 ```
 

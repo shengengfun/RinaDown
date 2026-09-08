@@ -4,7 +4,7 @@
 // 当前宿主上能跑通且结果自洽。
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/services/local_interfaces.dart';
+import 'package:rina_down/src/services/local_interfaces.dart';
 
 LocalInterface iface(String name, String ip) =>
     LocalInterface(name: name, ip: ip);

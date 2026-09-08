@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     DaemonEvent, DaemonSnapshot, EventFrame, ServiceEvent, Snapshot, SnapshotBody, WsServerMsg,
 };
 use tokio::sync::broadcast;
@@ -354,9 +354,9 @@ fn apply_engine_message(snapshot: &mut DaemonSnapshot, message: &WsServerMsg) {
 /// 将引擎事件无阻塞转换并发布到 daemon 事件中心。
 pub struct DaemonEngineEventSink(pub DaemonEventHub);
 
-impl fluxdown_engine::events::EventSink for DaemonEngineEventSink {
-    fn emit(&self, event: fluxdown_engine::events::EngineEvent) {
-        use fluxdown_engine::events::EngineEvent;
+impl rinadown_engine::events::EventSink for DaemonEngineEventSink {
+    fn emit(&self, event: rinadown_engine::events::EngineEvent) {
+        use rinadown_engine::events::EngineEvent;
 
         let message = match event {
             EngineEvent::TaskProgress {
@@ -394,7 +394,7 @@ impl fluxdown_engine::events::EventSink for DaemonEngineEventSink {
             EngineEvent::TasksSnapshot(tasks) => WsServerMsg::TasksSnapshot {
                 tasks: tasks
                     .into_iter()
-                    .map(fluxdown_engine_protocol::task_info_to_dto)
+                    .map(rinadown_engine_protocol::task_info_to_dto)
                     .collect(),
             },
             EngineEvent::SegmentProgress {
@@ -408,7 +408,7 @@ impl fluxdown_engine::events::EventSink for DaemonEngineEventSink {
                 segment_count,
                 segments: segments
                     .into_iter()
-                    .map(fluxdown_engine_protocol::segment_detail_to_dto)
+                    .map(rinadown_engine_protocol::segment_detail_to_dto)
                     .collect(),
             },
             EngineEvent::TaskMetaProbed {
@@ -423,13 +423,13 @@ impl fluxdown_engine::events::EventSink for DaemonEngineEventSink {
             EngineEvent::QueuePositionsChanged(positions) => WsServerMsg::QueuePositionsChanged {
                 positions: positions
                     .into_iter()
-                    .map(fluxdown_engine_protocol::queue_position_to_dto)
+                    .map(rinadown_engine_protocol::queue_position_to_dto)
                     .collect(),
             },
             EngineEvent::QueuesChanged(queues) => WsServerMsg::QueuesChanged {
                 queues: queues
                     .into_iter()
-                    .map(fluxdown_engine_protocol::queue_info_to_dto)
+                    .map(rinadown_engine_protocol::queue_info_to_dto)
                     .collect(),
             },
             EngineEvent::TaskQueueChanged { task_id, queue_id } => {
@@ -481,7 +481,7 @@ impl fluxdown_engine::events::EventSink for DaemonEngineEventSink {
                 host,
                 nodes: nodes
                     .into_iter()
-                    .map(fluxdown_engine_protocol::cdn_node_info_to_dto)
+                    .map(rinadown_engine_protocol::cdn_node_info_to_dto)
                     .collect(),
                 ip,
                 reason,
@@ -515,13 +515,13 @@ impl fluxdown_engine::events::EventSink for DaemonEngineEventSink {
             EngineEvent::GroupsChanged(groups) => WsServerMsg::GroupsChanged {
                 groups: groups
                     .into_iter()
-                    .map(fluxdown_engine_protocol::group_info_to_dto)
+                    .map(rinadown_engine_protocol::group_info_to_dto)
                     .collect(),
             },
             EngineEvent::RssSourcesChanged(sources) => WsServerMsg::RssSourcesChanged {
                 sources: sources
                     .into_iter()
-                    .map(fluxdown_engine_protocol::rss_source_info_to_dto)
+                    .map(rinadown_engine_protocol::rss_source_info_to_dto)
                     .collect(),
             },
             EngineEvent::RssItemsChanged {
@@ -532,7 +532,7 @@ impl fluxdown_engine::events::EventSink for DaemonEngineEventSink {
                 source_id,
                 items: items
                     .into_iter()
-                    .map(fluxdown_engine_protocol::rss_item_info_to_dto)
+                    .map(rinadown_engine_protocol::rss_item_info_to_dto)
                     .collect(),
                 notify_titles,
             },
@@ -548,7 +548,7 @@ impl fluxdown_engine::events::EventSink for DaemonEngineEventSink {
                 feed_title,
                 items: items
                     .into_iter()
-                    .map(fluxdown_engine_protocol::rss_item_info_to_dto)
+                    .map(rinadown_engine_protocol::rss_item_info_to_dto)
                     .collect(),
                 error,
             },
@@ -556,7 +556,7 @@ impl fluxdown_engine::events::EventSink for DaemonEngineEventSink {
                 WsServerMsg::WebhookDeliveriesChanged {
                     deliveries: deliveries
                         .into_iter()
-                        .map(fluxdown_engine_protocol::webhook_delivery_to_dto)
+                        .map(rinadown_engine_protocol::webhook_delivery_to_dto)
                         .collect(),
                 }
             }
@@ -564,7 +564,7 @@ impl fluxdown_engine::events::EventSink for DaemonEngineEventSink {
                 updates: updates
                     .into_iter()
                     .map(
-                        |(task_id, missing)| fluxdown_protocol::FileMissingUpdateDto {
+                        |(task_id, missing)| rinadown_protocol::FileMissingUpdateDto {
                             task_id,
                             missing,
                         },
@@ -596,7 +596,7 @@ fn lock_or_recover<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
 
 #[cfg(test)]
 mod tests {
-    use fluxdown_protocol::{DaemonEvent, DaemonSnapshot, SnapshotBody, TaskDto, WsServerMsg};
+    use rinadown_protocol::{DaemonEvent, DaemonSnapshot, SnapshotBody, TaskDto, WsServerMsg};
 
     use super::DaemonEventHub;
 

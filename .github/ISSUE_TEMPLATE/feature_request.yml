@@ -6,10 +6,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        感谢你的建议！好的想法让 FluxDown 变得更好。
-        Thanks for the suggestion! Great ideas make FluxDown better.
+        感谢你的建议！好的想法让 RinaDown 变得更好。
+        Thanks for the suggestion! Great ideas make RinaDown better.
 
-        > 💡 也可以直接在应用内（状态栏反馈按钮）或[官网反馈页](https://fluxdown.zerx.dev/feedback)提交。
+        > 💡 也可以直接在应用内（状态栏反馈按钮）或[官网反馈页](https://rinadown.zerx.dev/feedback)提交。
   - type: textarea
     id: problem
     attributes:

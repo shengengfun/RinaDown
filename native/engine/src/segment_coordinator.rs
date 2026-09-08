@@ -760,7 +760,7 @@ fn beneficial_hint_scale(proven_scale: usize, beneficial_scale: usize) -> usize 
 /// 此设计是 fast-down 投机执行（Speculative Execution）的实用替代方案。
 /// fast-down 用 AtomicU128 CAS 让多个 worker 竞争同一段的字节范围（零额外
 /// HTTP 请求），但需要重构整个写入路径为 CAS-guarded（放弃 BufWriter、修改
-/// 进度报告/DB 持久化）。尾部微拆分在 FluxDown 架构下以极小改动覆盖了 90%+
+/// 进度报告/DB 持久化）。尾部微拆分在 RinaDown 架构下以极小改动覆盖了 90%+
 /// 的尾延迟场景：段 remaining ≥ 128KB 时拆成两半各 ≥64KB，两个 worker 各发
 /// 独立 Range 请求并行完成。
 ///
@@ -6331,7 +6331,9 @@ mod tests {
         use super::{count_domain_conn_policies, now_unix_secs};
         let now = now_unix_secs();
         let stale = now.saturating_sub(48 * 3600);
-        let raw = format!("v3\nfresh.example\t1\t{now}\t0\t0\nold.example\t1\t{stale}\t0\t0\nhinted.example\t0\t0\t8\t{now}\nbroken\tx\n");
+        let raw = format!(
+            "v3\nfresh.example\t1\t{now}\t0\t0\nold.example\t1\t{stale}\t0\t0\nhinted.example\t0\t0\t8\t{now}\nbroken\tx\n"
+        );
         assert_eq!(count_domain_conn_policies(&raw), 2);
         assert_eq!(count_domain_conn_policies(""), 0);
         assert_eq!(
@@ -6346,7 +6348,7 @@ mod tests {
             CONN_CAP_CONFIG_KEY, ConnPolicyEntry, domain_conn_cap, load_domain_conn_caps,
             now_unix_secs, serialize_conn_caps,
         };
-        let dir = std::env::temp_dir().join(format!("fluxdown_connp_{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("rinadown_connp_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).expect("create temp dir");
         let db = crate::db::Db::open(&dir).await.expect("open db");
 
@@ -6436,7 +6438,7 @@ mod tests {
     async fn legacy_v2_single_connection_cap_is_ignored_on_engine_start() {
         use super::{CONN_CAP_CONFIG_KEY, domain_conn_cap, load_domain_conn_caps, now_unix_secs};
 
-        let dir = std::env::temp_dir().join(format!("fluxdown_connv2_{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("rinadown_connv2_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).expect("create temp dir");
         let db = crate::db::Db::open(&dir).await.expect("open db");
         let host = format!("legacy-v2-{}.example.com", uuid::Uuid::new_v4());
@@ -6553,7 +6555,7 @@ mod tests {
     /// `let _ = std::fs::remove_file(&path);` 清理（失败无需 panic）。
     async fn open_sync_gate_test_file() -> (std::path::PathBuf, tokio::fs::File) {
         let path = std::env::temp_dir().join(format!("fdgate-{}", uuid::Uuid::new_v4()));
-        std::fs::write(&path, b"fluxdown-file-sync-gate-test").expect("write temp file content");
+        std::fs::write(&path, b"rinadown-file-sync-gate-test").expect("write temp file content");
         let file = tokio::fs::OpenOptions::new()
             .read(true)
             .write(true)

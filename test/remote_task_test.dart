@@ -6,7 +6,7 @@
 //   5. ProgressReport 批量上报载荷序列化。
 // 纯数据逻辑，不依赖 rinf FFI，可直接实例化断言（对齐 device_identity_test 策略）。
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/services/cloud/cloud_models.dart';
+import 'package:rina_down/src/services/cloud/cloud_models.dart';
 
 void main() {
   group('RemoteTaskStatus.fromWire', () {

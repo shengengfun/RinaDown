@@ -5,7 +5,7 @@
 // FFI, see scout-dart.md §13).
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/models/task_selection.dart';
+import 'package:rina_down/src/models/task_selection.dart';
 
 void main() {
   group('taskSelectionRange', () {

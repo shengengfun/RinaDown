@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* ===== FluxDown Brand Design Tokens (Dark = default) ===== */
+/* ===== RinaDown Brand Design Tokens (Dark = default) ===== */
 @theme {
   /* Brand Colors (static — same in both themes) */
   --color-brand-sky: #38bdf8;
@@ -41,9 +41,9 @@ html.light {
 
 /* ===== FOUC Prevention ===== */
 /* Hide body until theme is applied by inline script in <head>.
-   The 'fluxdown-loading' class is set on <html> in the markup
+   The 'rinadown-loading' class is set on <html> in the markup
    and removed synchronously by the inline script before first paint. */
-html.fluxdown-loading body {
+html.rinadown-loading body {
   visibility: hidden;
 }
 

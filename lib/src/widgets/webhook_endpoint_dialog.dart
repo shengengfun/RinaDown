@@ -264,7 +264,7 @@ class _WebhookEndpointDialogState extends State<_WebhookEndpointDialog> {
     '{event.title}': 'Download completed',
     '{event.summary}': 'ubuntu-24.04.2-desktop-amd64.iso · 6.0 GB',
     '{timestamp}': '2026-07-17T12:34:56Z',
-    '{instance.app}': 'fluxdown',
+    '{instance.app}': 'rinadown',
     '{instance.version}': '0.1.44',
     '{instance.host}': 'DESKTOP',
     '{task.id}': '00000000-0000-4000-8000-000000000000',
@@ -787,9 +787,9 @@ class _WebhookEndpointDialogState extends State<_WebhookEndpointDialog> {
     final headLines = <String>[
       'POST $url',
       'Content-Type: ${preset?.contentType ?? 'application/json'}',
-      'X-FluxDown-Event: $firstEvent',
-      'X-FluxDown-Delivery: 5f2a91c7-…',
-      if (_signEnabled) 'X-FluxDown-Signature: t=1789647128,v1=9c41f2…',
+      'X-RinaDown-Event: $firstEvent',
+      'X-RinaDown-Delivery: 5f2a91c7-…',
+      if (_signEnabled) 'X-RinaDown-Signature: t=1789647128,v1=9c41f2…',
     ];
     return Padding(
       padding: const EdgeInsets.only(left: 14, top: 6, bottom: 6),

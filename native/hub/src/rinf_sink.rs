@@ -8,7 +8,7 @@
 //! - `ApiHost::live_speeds()` 的实时速率表:活跃状态(pending/downloading/
 //!   preparing)写入当前速率,终态(paused/completed/error)移除条目。
 //! - `ApiHost::subscribe_task_events()` 的任务生命周期事件广播:按
-//!   「前态 → 新状态」的迁移判定(见 [`fluxdown_api::service::task_event_for_transition`])经
+//!   「前态 → 新状态」的迁移判定(见 [`rinadown_api::service::task_event_for_transition`])经
 //!   `broadcast::Sender` 发出 `aria2.onDownloadXxx` 通知源事件,供
 //!   `/jsonrpc` 的 WS 层转译转发。
 //!
@@ -24,8 +24,8 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use fluxdown_api::service::{LiveSpeed, TaskEvent, TaskEventKind, task_event_for_transition};
-use fluxdown_engine::events::{EngineEvent, EventSink};
+use rinadown_api::service::{LiveSpeed, TaskEvent, TaskEventKind, task_event_for_transition};
+use rinadown_engine::events::{EngineEvent, EventSink};
 use rinf::RustSignal;
 use tokio::sync::broadcast;
 
@@ -38,7 +38,7 @@ pub struct RinfEventSink {
     /// (构造点见 `download_actor::run`),供 `ApiHost::live_speeds()` 读取。
     live_speeds: LiveSpeedMap,
     /// `task_id → 上一次已知状态码`,供
-    /// [`fluxdown_api::service::task_event_for_transition`] 判定状态
+    /// [`rinadown_api::service::task_event_for_transition`] 判定状态
     /// 迁移。不对外共享(`HubApiHost` 不需要历史状态),故不必像
     /// `live_speeds` 那样内含 `Arc`——多持有者场景由外层
     /// `Arc<RinfEventSink>` 本身覆盖(构造点见 `download_actor::run`;
@@ -64,7 +64,7 @@ impl RinfEventSink {
     /// `ApiCommand::DeleteTask` 处理点):直接广播 `Stop` 并从前态表移除
     /// 条目,使随后引擎经 `progress_reporter` 补发的终态 `status=4`
     /// `TaskProgress` 因「前态缺失」被
-    /// [`fluxdown_api::service::task_event_for_transition`] 判定为不发,
+    /// [`rinadown_api::service::task_event_for_transition`] 判定为不发,
     /// 不会重复触发一次 `Error`。
     ///
     /// 调用时机要求:必须紧跟在对应的 `delete_task`/`delete_tasks_batch`
@@ -419,8 +419,8 @@ mod tests {
     use std::collections::HashMap;
     use std::sync::Arc;
 
-    use fluxdown_api::service::{LiveSpeed, TaskEventKind};
-    use fluxdown_engine::events::{EngineEvent, EventSink};
+    use rinadown_api::service::{LiveSpeed, TaskEventKind};
+    use rinadown_engine::events::{EngineEvent, EventSink};
     use tokio::sync::broadcast;
 
     use super::{RinfEventSink, apply_task_progress_speed, task_event_for_transition};

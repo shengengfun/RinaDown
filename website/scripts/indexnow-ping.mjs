@@ -16,7 +16,7 @@
  *   跳过:设 INDEXNOW_SKIP=1。
  */
 
-const HOST = "fluxdown.zerx.dev";
+const HOST = "rinadown.zerx.dev";
 const KEY = "1f461e91dce4402097da1e673bb048de";
 const ORIGIN = `https://${HOST}`;
 const SITEMAP_INDEX = `${ORIGIN}/sitemap-index.xml`;
@@ -37,7 +37,7 @@ function extractLocs(xml) {
 }
 
 async function fetchText(url) {
-  const res = await fetch(url, { headers: { "User-Agent": "FluxDown-IndexNow/1" } });
+  const res = await fetch(url, { headers: { "User-Agent": "RinaDown-IndexNow/1" } });
   if (!res.ok) throw new Error(`HTTP ${res.status} @ ${url}`);
   return res.text();
 }

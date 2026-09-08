@@ -3,7 +3,7 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     AgentEvent, CreateTaskRequest, DaemonCreateTaskParams, DownloadRequest, PendingCaptureDto,
 };
 use serde_json::{Value, json};
@@ -132,7 +132,7 @@ impl CaptureService {
         }))?;
         self.daemon
             .call(
-                fluxdown_protocol::method::DAEMON_TASK_CREATE,
+                rinadown_protocol::method::DAEMON_TASK_CREATE,
                 Some(DaemonCreateTaskParams {
                     request: create,
                     torrent_blob_id,
@@ -164,7 +164,7 @@ pub enum CaptureError {
     #[error("capture transaction not found")]
     NotFound,
     #[error("daemon capture create failed: {0:?}")]
-    Daemon(fluxdown_protocol::RpcErrorData),
+    Daemon(rinadown_protocol::RpcErrorData),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]

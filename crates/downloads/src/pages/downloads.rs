@@ -15,7 +15,7 @@ use crate::{
     pages::new_download::{NewDownloadContext, NewDownloadQueue, NewDownloadSubmission},
     strings::DownloadStrings,
 };
-use fluxdown_ui_i18n::Translator;
+use rinadown_ui_i18n::Translator;
 use gpui::{
     App, AppContext as _, Context, Entity, IntoElement, KeyBinding, ParentElement, Render,
     SharedString, Styled, Window, actions, div, px,
@@ -125,10 +125,10 @@ impl DownloadView {
             controller.effective_save_dir()
         };
         let queue_id = match self.selected_item {
-            SidebarSelection::MainQueue => fluxdown_protocol::MAIN_QUEUE_ID,
-            SidebarSelection::LaterQueue => fluxdown_protocol::LATER_QUEUE_ID,
+            SidebarSelection::MainQueue => rinadown_protocol::MAIN_QUEUE_ID,
+            SidebarSelection::LaterQueue => rinadown_protocol::LATER_QUEUE_ID,
             SidebarSelection::Download(_) => match controller.config_str("default_queue_id") {
-                "" => fluxdown_protocol::MAIN_QUEUE_ID,
+                "" => rinadown_protocol::MAIN_QUEUE_ID,
                 configured => configured,
             },
         };
@@ -186,7 +186,7 @@ impl DownloadView {
                     .into_iter()
                     .map(|request| {
                         self.controller.execute(DownloadsCommand::Create(Box::new(
-                            fluxdown_protocol::DaemonCreateTaskParams {
+                            rinadown_protocol::DaemonCreateTaskParams {
                                 request,
                                 torrent_blob_id: None,
                                 unattended: false,
@@ -220,7 +220,7 @@ impl DownloadView {
 
     pub fn replace_snapshot(
         &mut self,
-        snapshot: &fluxdown_protocol::AgentSnapshot,
+        snapshot: &rinadown_protocol::AgentSnapshot,
         cx: &mut Context<Self>,
     ) {
         self.controller.replace_snapshot(snapshot);
@@ -228,7 +228,7 @@ impl DownloadView {
         self.refresh_tasks(cx);
     }
 
-    pub fn apply_event(&mut self, event: &fluxdown_protocol::ServiceEvent, cx: &mut Context<Self>) {
+    pub fn apply_event(&mut self, event: &rinadown_protocol::ServiceEvent, cx: &mut Context<Self>) {
         self.controller.apply_event(event);
         self.refresh_tasks(cx);
     }
@@ -248,10 +248,10 @@ impl DownloadView {
             match selected {
                 SidebarSelection::Download(filter) => delegate.set_filter(filter),
                 SidebarSelection::MainQueue => {
-                    delegate.set_queue_filter(fluxdown_protocol::MAIN_QUEUE_ID)
+                    delegate.set_queue_filter(rinadown_protocol::MAIN_QUEUE_ID)
                 }
                 SidebarSelection::LaterQueue => {
-                    delegate.set_queue_filter(fluxdown_protocol::LATER_QUEUE_ID)
+                    delegate.set_queue_filter(rinadown_protocol::LATER_QUEUE_ID)
                 }
             }
             table.refresh(cx);

@@ -77,7 +77,7 @@ async function findOrCreateIssue(): Promise<number> {
         body: [
           "## Platform Availability Subscription Registry",
           "",
-          "This issue collects email subscriptions from users who want to be notified when FluxDown becomes available on their platform.",
+          "This issue collects email subscriptions from users who want to be notified when RinaDown becomes available on their platform.",
           "",
           "**Do not close this issue.** Each comment below represents one subscriber.",
           "",

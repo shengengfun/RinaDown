@@ -4,10 +4,10 @@ project(runner LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "flux_down")
+set(BINARY_NAME "rina_down")
 # The unique GTK application identifier for this application. See:
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
-set(APPLICATION_ID "com.fluxdown.app")
+set(APPLICATION_ID "com.rinadown.app")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -127,70 +127,70 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
     COMPONENT Runtime)
 endif()
 
-# === fluxdown_nmh: NMH relay binary ===
+# === rinadown_nmh: NMH relay binary ===
 # Build the Native Messaging Host relay binary alongside the app so that
-# nmh_registry::find_nmh_exe() always finds it next to flux_down
+# nmh_registry::find_nmh_exe() always finds it next to rina_down
 # (search path #1), covering Debug / Profile / Release and CI release builds.
 set(_NMH_WORKSPACE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
 
 # Match Rust profile to CMake build type so debug builds stay fast and
 # release builds are fully optimised.
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(_NMH_CARGO_ARGS "-p" "fluxdown_nmh")
+  set(_NMH_CARGO_ARGS "-p" "rinadown_nmh")
   set(_NMH_PROFILE "debug")
 else()
-  set(_NMH_CARGO_ARGS "-p" "fluxdown_nmh" "--release")
+  set(_NMH_CARGO_ARGS "-p" "rinadown_nmh" "--release")
   set(_NMH_PROFILE "release")
 endif()
 
-add_custom_target(fluxdown_nmh ALL
+add_custom_target(rinadown_nmh ALL
   COMMAND cargo build ${_NMH_CARGO_ARGS}
   WORKING_DIRECTORY "${_NMH_WORKSPACE_DIR}"
-  COMMENT "Building fluxdown_nmh NMH relay binary (${_NMH_PROFILE})"
+  COMMENT "Building rinadown_nmh NMH relay binary (${_NMH_PROFILE})"
   VERBATIM
 )
-add_dependencies(${BINARY_NAME} fluxdown_nmh)
-install(PROGRAMS "${_NMH_WORKSPACE_DIR}/target/${_NMH_PROFILE}/fluxdown_nmh"
+add_dependencies(${BINARY_NAME} rinadown_nmh)
+install(PROGRAMS "${_NMH_WORKSPACE_DIR}/target/${_NMH_PROFILE}/rinadown_nmh"
   DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime
 )
 
-# === fluxdown_updater: auto-update helper binary ===
+# === rinadown_updater: auto-update helper binary ===
 # Build the updater helper binary alongside the app so that
-# update_service can find it next to flux_down.
+# update_service can find it next to rina_down.
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  set(_UPDATER_CARGO_ARGS "-p" "fluxdown_updater")
+  set(_UPDATER_CARGO_ARGS "-p" "rinadown_updater")
   set(_UPDATER_PROFILE "debug")
 else()
-  set(_UPDATER_CARGO_ARGS "-p" "fluxdown_updater" "--release")
+  set(_UPDATER_CARGO_ARGS "-p" "rinadown_updater" "--release")
   set(_UPDATER_PROFILE "release")
 endif()
 
-add_custom_target(fluxdown_updater ALL
+add_custom_target(rinadown_updater ALL
   COMMAND cargo build ${_UPDATER_CARGO_ARGS}
   WORKING_DIRECTORY "${_NMH_WORKSPACE_DIR}"
-  COMMENT "Building fluxdown_updater helper binary (${_UPDATER_PROFILE})"
+  COMMENT "Building rinadown_updater helper binary (${_UPDATER_PROFILE})"
   VERBATIM
 )
-add_dependencies(${BINARY_NAME} fluxdown_updater)
-install(PROGRAMS "${_NMH_WORKSPACE_DIR}/target/${_UPDATER_PROFILE}/fluxdown_updater"
+add_dependencies(${BINARY_NAME} rinadown_updater)
+install(PROGRAMS "${_NMH_WORKSPACE_DIR}/target/${_UPDATER_PROFILE}/rinadown_updater"
   DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime
 )
 
 # Install application icon and .desktop file for XDG integration.
 # These allow Wayland compositors (e.g. KDE Plasma) to resolve the app icon
-# by its application ID (com.fluxdown.app) instead of showing the generic
+# by its application ID (com.rinadown.app) instead of showing the generic
 # Wayland logo in the taskbar.
 set(FLUTTER_PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
-install(FILES "${FLUTTER_PROJECT_ROOT}/assets/logo/fluxdown_logo.png"
+install(FILES "${FLUTTER_PROJECT_ROOT}/assets/logo/rinadown_logo.png"
   DESTINATION "${INSTALL_BUNDLE_DATA_DIR}/icons/hicolor/256x256/apps"
-  RENAME "com.fluxdown.app.png"
+  RENAME "com.rinadown.app.png"
   COMPONENT Runtime)
-install(FILES "${FLUTTER_PROJECT_ROOT}/assets/logo/fluxdown_logo.svg"
+install(FILES "${FLUTTER_PROJECT_ROOT}/assets/logo/rinadown_logo.svg"
   DESTINATION "${INSTALL_BUNDLE_DATA_DIR}/icons/hicolor/scalable/apps"
-  RENAME "com.fluxdown.app.svg"
+  RENAME "com.rinadown.app.svg"
   COMPONENT Runtime)
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/com.fluxdown.app.desktop"
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/com.rinadown.app.desktop"
   DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   COMPONENT Runtime)

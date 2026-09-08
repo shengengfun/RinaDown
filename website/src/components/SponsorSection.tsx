@@ -49,7 +49,7 @@ const POLL_INTERVAL = 2500;
 const POLL_TIMEOUT = 5 * 60 * 1000; // 5 minutes
 
 // Public sponsor-wall issue (comments = wall entries).
-const SPONSOR_WALL_URL = "https://github.com/zerx-lab/FluxDown/issues/3";
+const SPONSOR_WALL_URL = "https://github.com/zerx-lab/RinaDown/issues/3";
 
 const EVM_WALLET_ADDRESS = "0x02cc164ccb539733102cfe5a613d32895835a048";
 const SOLANA_WALLET_ADDRESS = "7j8tNtE8BbKZGAeafE73cSwFE71wLaDXYdejeyJ6EAsL";
@@ -284,7 +284,7 @@ export default function SponsorSection({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amountCents: Math.round(amountYuan * 100),
-          subject: "Support FluxDown",
+          subject: "Support RinaDown",
         }),
       });
       if (!res.ok) {

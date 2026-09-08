@@ -6,7 +6,7 @@
 /// 本引擎的硬约束（契约见 popup-contract）：
 /// - **零插件注册**：不得触碰 SharedPreferences / file_selector /
 ///   window_manager 等任何插件通道；
-/// - **不初始化 Rust**：提交结果经 `fluxdown/popup_child` 原生通道
+/// - **不初始化 Rust**：提交结果经 `rinadown/popup_child` 原生通道
 ///   中继回主引擎，由主引擎发送下载信号；
 /// - 主题令牌 / 语言 / 队列等环境数据全部由载荷 JSON 注入，
 ///   与主窗口共享同一套 FluxThemeTokens → ShadTheme 渲染管线，
@@ -37,7 +37,7 @@ class _PopupRelayBus {
 }
 
 /// 弹窗引擎与原生宿主的通道（原生侧注册在弹窗引擎 messenger 上）
-const _popupChannel = MethodChannel('fluxdown/popup_child');
+const _popupChannel = MethodChannel('rinadown/popup_child');
 
 /// 弹窗引擎入口 — 由 main() 在检测到 `--quick-popup` 参数时调用。
 /// rootBundle 资产读取不经插件通道，不违反零插件契约。

@@ -2,11 +2,11 @@
 //! 文件字节。Hello → FileRequest → FileStatusRequest → StartUpload →
 //! (AcceptUpload/QueueRank) → RequestParts → SendingPart。
 //!
-//! run: cargo run -p fluxdown_engine --example peer_probe -- <ip> <port>
+//! run: cargo run -p rinadown_engine --example peer_probe -- <ip> <port>
 
 use std::time::Duration;
 
-use fluxdown_engine::ed2k::proto::{self, PROTO_EDONKEY};
+use rinadown_engine::ed2k::proto::{self, PROTO_EDONKEY};
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
 
@@ -52,7 +52,7 @@ fn build_hello() -> Vec<u8> {
     uh[14] = 111;
     let ev: u32 = (3 << 24) | (1 << 7); // aMule software id 3, minimal
     let tags = [
-        enc_str_tag(0x01, "FluxDown"),
+        enc_str_tag(0x01, "RinaDown"),
         enc_u32_tag(0x11, 0x3C),
         enc_u32_tag(0xFB, ev),
     ];

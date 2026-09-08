@@ -34,7 +34,7 @@ impl<T> SelectionOutcome<T> {
     /// # Examples
     ///
     /// ```
-    /// use fluxdown_engine::selection::SelectionOutcome;
+    /// use rinadown_engine::selection::SelectionOutcome;
     ///
     /// let outcome = SelectionOutcome::UserChose(3);
     /// assert_eq!(outcome.into_inner(), 3);

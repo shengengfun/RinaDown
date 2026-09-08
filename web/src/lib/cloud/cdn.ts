@@ -26,7 +26,7 @@ import { cloudDeviceId, cloudSessionStore, getCloudAccessToken } from './session
 import type { CdnConfig } from './types'
 
 /** ETag 持久化键前缀，按登录用户 id 隔离（同桌面端 `cdn_config_etag.$uid` 惯例）。 */
-const ETAG_KEY_PREFIX = 'fluxdown.cloud.cdnEtag'
+const ETAG_KEY_PREFIX = 'rinadown.cloud.cdnEtag'
 /** 配置拉取周期（P1 契约 12h）。 */
 const CONFIG_PERIOD_MS = 12 * 3600_000
 /** 遥测上报周期（P2 契约 30min）。 */

@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 //  FluxMetricTokens — Layer1 非颜色设计变量
 // ═══════════════════════════════════════════════════════════
 
-/// FluxDown 主题的 Layer1 Token：命名圆角 / 命名透明度 / 间距 / 描边 /
+/// RinaDown 主题的 Layer1 Token：命名圆角 / 命名透明度 / 间距 / 描边 /
 /// 按钮尺寸 / 移动端几何。
 ///
 /// 与 [FluxThemeTokens]（Layer0 颜色）平行的第二层设计变量，使圆角/尺寸/

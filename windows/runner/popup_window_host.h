@@ -20,8 +20,8 @@
 // - 窗口 + 引擎懒创建、常驻复用：首次 show 创建，之后只 hide/show，
 //   进程存续期间禁止销毁（规避历史 isolate 频繁建销崩溃）；
 // - 弹窗引擎零插件注册、不初始化 Rust；
-// - 两条 MethodChannel：主引擎 `fluxdown/popup_host`（show/close/append/relay
-//   入、onResult/onClosed/onRelay 出），弹窗引擎 `fluxdown/popup_child`
+// - 两条 MethodChannel：主引擎 `rinadown/popup_host`（show/close/append/relay
+//   入、onResult/onClosed/onRelay 出），弹窗引擎 `rinadown/popup_child`
 //   （ready/submit/cancel/pickFolder/startDrag/resize/reveal/relay 入、
 //   setPayload/appendPayload/onRelay 出；resize/reveal 支持可选 width）。
 //

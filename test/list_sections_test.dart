@@ -7,11 +7,11 @@
 // needed (it requires rinf FFI, see scout-dart.md §13).
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/models/download_controller.dart';
-import 'package:flux_down/src/models/download_queue.dart';
-import 'package:flux_down/src/models/download_task.dart';
-import 'package:flux_down/src/models/list_entity.dart';
-import 'package:flux_down/src/models/view_prefs.dart';
+import 'package:rina_down/src/models/download_controller.dart';
+import 'package:rina_down/src/models/download_queue.dart';
+import 'package:rina_down/src/models/download_task.dart';
+import 'package:rina_down/src/models/list_entity.dart';
+import 'package:rina_down/src/models/view_prefs.dart';
 
 DownloadTask _task({
   required String id,

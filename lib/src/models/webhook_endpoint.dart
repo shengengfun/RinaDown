@@ -3,7 +3,7 @@ import 'dart:convert';
 /// Webhook 端点模型（免费自托管 BYOE）。
 ///
 /// **字段与 wire 契约一一对应**：整个列表以 JSON 数组存进引擎 config 表的
-/// `webhook.endpoints` 键，Rust 侧 `fluxdown_engine::webhook::EndpointSpec`
+/// `webhook.endpoints` 键，Rust 侧 `rinadown_engine::webhook::EndpointSpec`
 /// 是同一份 schema（camelCase）。加字段必须两侧同步，否则静默丢配置。
 class WebhookEndpoint {
   const WebhookEndpoint({

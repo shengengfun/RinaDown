@@ -125,7 +125,7 @@ jobs:
         shell: pwsh
         run: |
           $release = "build\windows\${{ matrix.arch }}\runner\Release"
-          $bytes = [System.IO.File]::ReadAllBytes("$release\flux_down.exe")
+          $bytes = [System.IO.File]::ReadAllBytes("$release\rina_down.exe")
           $peOff = [BitConverter]::ToInt32($bytes, 0x3C)
           $machine = [BitConverter]::ToUInt16($bytes, $peOff + 4)
           $archDir = switch ($machine) { 0x8664 { 'x64' } 0xAA64 { 'arm64' } default { throw "Unexpected PE machine" } }
@@ -149,15 +149,15 @@ jobs:
         run: |
           New-Item -Path "build\windows\${{ matrix.arch }}\runner\Release\portable" -ItemType File -Force | Out-Null
           New-Item -Path build\installer -ItemType Directory -Force | Out-Null
-          Compress-Archive -Path "build\windows\${{ matrix.arch }}\runner\Release\*" -DestinationPath "build\installer\FluxDown-${{ needs.version.outputs.version }}-windows-${{ matrix.arch }}-portable.zip"
+          Compress-Archive -Path "build\windows\${{ matrix.arch }}\runner\Release\*" -DestinationPath "build\installer\RinaDown-${{ needs.version.outputs.version }}-windows-${{ matrix.arch }}-portable.zip"
 
       - name: Upload Windows test artifacts
         uses: actions/upload-artifact@v4
         with:
           name: manual-windows-${{ matrix.arch }}-${{ github.run_number }}
           path: |
-            build/installer/FluxDown-*.exe
-            build/installer/FluxDown-*-portable.zip
+            build/installer/RinaDown-*.exe
+            build/installer/RinaDown-*-portable.zip
           if-no-files-found: error
 
   build-linux:
@@ -196,19 +196,19 @@ jobs:
           VERSION=${{ needs.version.outputs.version }}
           BUNDLE=build/linux/x64/release/bundle
           mkdir -p build/installer
-          mkdir -p "FluxDown-${VERSION}-linux-x64"
-          cp -a "$BUNDLE/." "FluxDown-${VERSION}-linux-x64/"
-          tar -czf "build/installer/FluxDown-${VERSION}-linux-x64.tar.gz" "FluxDown-${VERSION}-linux-x64"
-          rm -rf "FluxDown-${VERSION}-linux-x64"
+          mkdir -p "RinaDown-${VERSION}-linux-x64"
+          cp -a "$BUNDLE/." "RinaDown-${VERSION}-linux-x64/"
+          tar -czf "build/installer/RinaDown-${VERSION}-linux-x64.tar.gz" "RinaDown-${VERSION}-linux-x64"
+          rm -rf "RinaDown-${VERSION}-linux-x64"
           mkdir -p AppDir
           cp -a "$BUNDLE/." AppDir/
-          cp linux/com.fluxdown.app.desktop AppDir/
-          cp assets/logo/fluxdown_logo.png AppDir/com.fluxdown.app.png
-          printf '#!/bin/bash\nHERE="$(dirname "$(readlink -f "${0}")")"\nexport LD_LIBRARY_PATH="${HERE}/lib:${LD_LIBRARY_PATH:-}"\nexec "${HERE}/flux_down" "$@"\n' > AppDir/AppRun
+          cp linux/com.rinadown.app.desktop AppDir/
+          cp assets/logo/rinadown_logo.png AppDir/com.rinadown.app.png
+          printf '#!/bin/bash\nHERE="$(dirname "$(readlink -f "${0}")")"\nexport LD_LIBRARY_PATH="${HERE}/lib:${LD_LIBRARY_PATH:-}"\nexec "${HERE}/rina_down" "$@"\n' > AppDir/AppRun
           chmod +x AppDir/AppRun
           wget -qO appimagetool.AppImage https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
           chmod +x appimagetool.AppImage
-          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool.AppImage AppDir "build/installer/FluxDown-${VERSION}-linux-x64.AppImage"
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool.AppImage AppDir "build/installer/RinaDown-${VERSION}-linux-x64.AppImage"
       - name: Upload Linux test artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -253,14 +253,14 @@ jobs:
       - name: Package macOS artifacts
         run: |
           VERSION=${{ needs.version.outputs.version }}
-          APP_PATH=build/macos/Build/Products/Release/FluxDown.app
+          APP_PATH=build/macos/Build/Products/Release/RinaDown.app
           mkdir -p build/installer dmg_src
-          cp -R "$APP_PATH" "FluxDown-${VERSION}-macos-${{ matrix.arch }}"
-          tar -czf "build/installer/FluxDown-${VERSION}-macos-${{ matrix.arch }}.tar.gz" "FluxDown-${VERSION}-macos-${{ matrix.arch }}"
-          rm -rf "FluxDown-${VERSION}-macos-${{ matrix.arch }}"
+          cp -R "$APP_PATH" "RinaDown-${VERSION}-macos-${{ matrix.arch }}"
+          tar -czf "build/installer/RinaDown-${VERSION}-macos-${{ matrix.arch }}.tar.gz" "RinaDown-${VERSION}-macos-${{ matrix.arch }}"
+          rm -rf "RinaDown-${VERSION}-macos-${{ matrix.arch }}"
           cp -R "$APP_PATH" dmg_src/
           brew install create-dmg
-          create-dmg --volname "FluxDown ${VERSION}" --window-size 660 400 --icon "FluxDown.app" 160 185 --app-drop-link 500 185 --no-internet-enable "build/installer/FluxDown-${VERSION}-macos-${{ matrix.arch }}.dmg" dmg_src/ || hdiutil create -volname "FluxDown ${VERSION}" -srcfolder dmg_src -ov -format UDZO "build/installer/FluxDown-${VERSION}-macos-${{ matrix.arch }}.dmg"
+          create-dmg --volname "RinaDown ${VERSION}" --window-size 660 400 --icon "RinaDown.app" 160 185 --app-drop-link 500 185 --no-internet-enable "build/installer/RinaDown-${VERSION}-macos-${{ matrix.arch }}.dmg" dmg_src/ || hdiutil create -volname "RinaDown ${VERSION}" -srcfolder dmg_src -ov -format UDZO "build/installer/RinaDown-${VERSION}-macos-${{ matrix.arch }}.dmg"
       - name: Upload macOS test artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -311,10 +311,10 @@ jobs:
           mkdir -p build/android
           VERSION=${{ needs.version.outputs.version }}
           SRC=build/app/outputs/flutter-apk
-          cp "$SRC/app-arm64-v8a-release.apk" "build/android/FluxDown-${VERSION}-android-arm64-v8a.apk"
-          cp "$SRC/app-armeabi-v7a-release.apk" "build/android/FluxDown-${VERSION}-android-armeabi-v7a.apk"
-          cp "$SRC/app-x86_64-release.apk" "build/android/FluxDown-${VERSION}-android-x86_64.apk"
-          cp "$SRC/app-release.apk" "build/android/FluxDown-${VERSION}-android-universal.apk"
+          cp "$SRC/app-arm64-v8a-release.apk" "build/android/RinaDown-${VERSION}-android-arm64-v8a.apk"
+          cp "$SRC/app-armeabi-v7a-release.apk" "build/android/RinaDown-${VERSION}-android-armeabi-v7a.apk"
+          cp "$SRC/app-x86_64-release.apk" "build/android/RinaDown-${VERSION}-android-x86_64.apk"
+          cp "$SRC/app-release.apk" "build/android/RinaDown-${VERSION}-android-universal.apk"
       - name: Upload Android test artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -336,7 +336,7 @@ jobs:
         with:
           node-version: '22'
       - name: Build extension packages
-        working-directory: fluxDown
+        working-directory: rinaDown
         shell: bash
         run: |
           VERSION=${{ needs.version.outputs.clean_version }}
@@ -345,11 +345,11 @@ jobs:
           npm run build
           npm run build:firefox
           mkdir -p ../build/extension
-          (cd .output && zip -qr "../../build/extension/FluxDown-${VERSION}-chrome.zip" chrome-mv3)
+          (cd .output && zip -qr "../../build/extension/RinaDown-${VERSION}-chrome.zip" chrome-mv3)
           npx web-ext build \
             --source-dir .output/firefox-mv2 \
             --artifacts-dir ../build/extension \
-            --filename "FluxDown-${VERSION}-firefox.zip" \
+            --filename "RinaDown-${VERSION}-firefox.zip" \
             --overwrite-dest
       - name: Upload extension test artifacts
         uses: actions/upload-artifact@v4

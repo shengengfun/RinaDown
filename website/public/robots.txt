@@ -1,4 +1,4 @@
-# FluxDown — robots.txt
+# RinaDown — robots.txt
 # 策略:欢迎所有搜索引擎 + 主流 AI 爬虫抓取公开内容(推广目标是被搜索与 AI 引用),
 # 仅屏蔽 /api/ 动态端点。IndexNow key 见 public/<key>.txt。
 
@@ -37,4 +37,4 @@ Allow: /
 User-agent: Bytespider
 Allow: /
 
-Sitemap: https://fluxdown.zerx.dev/sitemap-index.xml
+Sitemap: https://rinadown.zerx.dev/sitemap-index.xml

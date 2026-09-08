@@ -511,7 +511,7 @@ export function FloatingNavbar({ className }: { className?: string }) {
 
             {/* Logo */}
             <a href="/" className="flex items-center gap-2 px-3 py-1">
-              <img src="/logo.svg" alt="FluxDown" className="h-6 w-6" />
+              <img src="/logo.svg" alt="RinaDown" className="h-6 w-6" />
               <span className="text-sm font-semibold tracking-tight hidden sm:inline">
                 <span className="text-brand-sky">Flux</span>
                 <span className="text-dark-text">Down</span>

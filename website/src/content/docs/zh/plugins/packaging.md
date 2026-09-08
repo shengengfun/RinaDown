@@ -35,11 +35,11 @@ my-plugin.fxplug          my-plugin.fxplug
 
 ## 插件市场
 
-FluxDown 的市场是**一份数据格式，不是一个服务**——一份应用直接读取的索引，无后端、无账号。组成部分：
+RinaDown 的市场是**一份数据格式，不是一个服务**——一份应用直接读取的索引，无后端、无账号。组成部分：
 
-- **索引**——一份 Git 版本化的 JSON 文件，列出插件、版本和下载镜像。默认索引在 GitHub 的 `zerx-lab/fluxdown-plugin-index` 仓库；任何人都可以 fork 一份自己维护。用户可以在应用里添加自定义索引源。
-- **内容寻址**——每个发布版本都记录 `contentHash = sha256(整个 .fxplug 文件)`。从任何镜像下载后，FluxDown 重新计算哈希，不一致就拒绝。被攻破的镜像换不掉内容。
-- **多镜像**——每个版本列出多个下载地址（raw.githubusercontent、jsDelivr、GitHub Releases……），FluxDown 依次尝试。镜像 URL 必须是 `https`，且不能指向私网/环回/元数据地址。
+- **索引**——一份 Git 版本化的 JSON 文件，列出插件、版本和下载镜像。默认索引在 GitHub 的 `zerx-lab/rinadown-plugin-index` 仓库；任何人都可以 fork 一份自己维护。用户可以在应用里添加自定义索引源。
+- **内容寻址**——每个发布版本都记录 `contentHash = sha256(整个 .fxplug 文件)`。从任何镜像下载后，RinaDown 重新计算哈希，不一致就拒绝。被攻破的镜像换不掉内容。
+- **多镜像**——每个版本列出多个下载地址（raw.githubusercontent、jsDelivr、GitHub Releases……），RinaDown 依次尝试。镜像 URL 必须是 `https`，且不能指向私网/环回/元数据地址。
 - **防回滚**——每份索引带一个单调递增的 `sequence`；应用记住每个索引见过的最大值，拒绝更旧的。
 
 v1 没有作者级密码学签名——完整性依靠内容寻址 + TLS + Git 历史。索引 schema 预留了签名字段，将来加上不会破坏现有客户端。

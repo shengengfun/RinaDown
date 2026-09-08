@@ -1,5 +1,5 @@
 //! 确定性真实下载测试床 —— 用一个**完全受控的本地 HTTP/1.1 服务器**驱动
-//! FluxDown 引擎的真实代码路径（`run_coordinated_download` / `download_single` /
+//! RinaDown 引擎的真实代码路径（`run_coordinated_download` / `download_single` /
 //! `resolve_file_info`），并能注入对抗行为：不支持 Range、Content-Length 撒谎、
 //! ETag 中途变化、gzip、断流重试、每连接返回不同字节（CDN 不一致）等。
 //!
@@ -19,12 +19,12 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use fluxdown_engine::db::Db;
-use fluxdown_engine::downloader::{ProgressUpdate, RequestSpec, build_client, resolve_file_info};
-use fluxdown_engine::events::{EngineEvent, EventSink};
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::segment_coordinator::run_coordinated_download;
-use fluxdown_engine::speed_limiter::SpeedLimiter;
+use rinadown_engine::db::Db;
+use rinadown_engine::downloader::{ProgressUpdate, RequestSpec, build_client, resolve_file_info};
+use rinadown_engine::events::{EngineEvent, EventSink};
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::segment_coordinator::run_coordinated_download;
+use rinadown_engine::speed_limiter::SpeedLimiter;
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -379,7 +379,7 @@ async fn handle_conn(mut stream: TcpStream, st: Arc<ServerState>) -> std::io::Re
     // GET
     // If-Range 语义（真实服务器行为）：若客户端带了 If-Range 且 validator 与当前
     // 版本不一致（ETag 变化 或 Last-Modified 变化），服务器**忽略 Range，返回 200
-    // 全量当前文件**。FluxDown 的续传/分段修复正是依赖这一点来检出"文件中途变化"。
+    // 全量当前文件**。RinaDown 的续传/分段修复正是依赖这一点来检出"文件中途变化"。
     let if_range_matches = match &req.if_range {
         None => true, // 无 If-Range → 正常按 Range 处理
         Some(v) => v == &format!("\"{}\"", etag) || v == &last_modified,
@@ -632,11 +632,11 @@ fn hex_str(bytes: &[u8]) -> String {
 
 fn test_client() -> reqwest::Client {
     let proxy = ProxyConfig::default();
-    build_client(&proxy, "FluxDownRealTest/1.0").expect("build_client")
+    build_client(&proxy, "RinaDownRealTest/1.0").expect("build_client")
 }
 
 fn unique_dir(tag: &str) -> std::path::PathBuf {
-    let d = std::env::temp_dir().join(format!("fluxdown_realtest_{}_{}", tag, std::process::id()));
+    let d = std::env::temp_dir().join(format!("rinadown_realtest_{}_{}", tag, std::process::id()));
     std::fs::create_dir_all(&d).expect("create work dir");
     d
 }
@@ -656,7 +656,7 @@ async fn run_coord(
     etag: &str,
     cancel: &CancellationToken,
 ) -> (
-    Result<(), fluxdown_engine::downloader::DownloadError>,
+    Result<(), rinadown_engine::downloader::DownloadError>,
     std::path::PathBuf,
 ) {
     let dest = work_dir.join(format!("{task_id}.bin"));
@@ -690,7 +690,7 @@ async fn run_coord(
         total,
         false,
         segments,
-        fluxdown_engine::cdn::NodePool::single(client.clone()),
+        rinadown_engine::cdn::NodePool::single(client.clone()),
         &db,
         &tx,
         cancel,
@@ -699,7 +699,7 @@ async fn run_coord(
         &sink,
         etag,
         "",
-        fluxdown_engine::segment_coordinator::ReportScope::whole_task(),
+        rinadown_engine::segment_coordinator::ReportScope::whole_task(),
         0,
         false,
         None,
@@ -798,7 +798,7 @@ async fn validated_plain_range_rejects_changed_version() {
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "binds a local port; run with --ignored"]
 async fn single_stream_resume_uses_plain_range_without_if_range() {
-    use fluxdown_engine::downloader::{DownloadParams, TEMP_EXT, run_download};
+    use rinadown_engine::downloader::{DownloadParams, TEMP_EXT, run_download};
 
     let work_dir = unique_dir("single_if_range_403");
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
@@ -871,7 +871,7 @@ async fn single_stream_resume_uses_plain_range_without_if_range() {
         hint_file_size: body.len() as i64,
         proxy_config: ProxyConfig::default(),
         sink: Arc::new(NoopTestSink),
-        selector: Arc::new(fluxdown_engine::NoopSelection),
+        selector: Arc::new(rinadown_engine::NoopSelection),
         checksum: String::new(),
         extra_headers: std::collections::HashMap::new(),
         spec: RequestSpec::empty_get(),
@@ -881,7 +881,7 @@ async fn single_stream_resume_uses_plain_range_without_if_range() {
         allow_overwrite: false,
         spawn_gen: 1,
         ffmpeg_path: None,
-        cdn: fluxdown_engine::cdn::CdnTaskInput::default(),
+        cdn: rinadown_engine::cdn::CdnTaskInput::default(),
         unattended: false,
         auto_proxy: None,
     })
@@ -1280,7 +1280,7 @@ async fn resume_after_cancel_is_byte_exact() {
         size as i64,
         false,
         8,
-        fluxdown_engine::cdn::NodePool::single(client.clone()),
+        rinadown_engine::cdn::NodePool::single(client.clone()),
         &db,
         &tx,
         &cancel,
@@ -1289,7 +1289,7 @@ async fn resume_after_cancel_is_byte_exact() {
         &sink,
         "",
         "",
-        fluxdown_engine::segment_coordinator::ReportScope::whole_task(),
+        rinadown_engine::segment_coordinator::ReportScope::whole_task(),
         0,
         false,
         None,
@@ -1322,7 +1322,7 @@ async fn resume_after_cancel_is_byte_exact() {
         size as i64,
         false,
         8,
-        fluxdown_engine::cdn::NodePool::single(client.clone()),
+        rinadown_engine::cdn::NodePool::single(client.clone()),
         &db,
         &tx2,
         &cancel_done,
@@ -1331,7 +1331,7 @@ async fn resume_after_cancel_is_byte_exact() {
         &sink,
         "",
         "",
-        fluxdown_engine::segment_coordinator::ReportScope::whole_task(),
+        rinadown_engine::segment_coordinator::ReportScope::whole_task(),
         1,
         false,
         None,
@@ -1525,7 +1525,7 @@ async fn run_full(
     checksum: &str,
     cancel: &CancellationToken,
 ) -> (i32, std::path::PathBuf) {
-    use fluxdown_engine::downloader::{DownloadParams, run_download};
+    use rinadown_engine::downloader::{DownloadParams, run_download};
 
     let client = test_client();
     let speed_limiter = SpeedLimiter::new(0);
@@ -1562,7 +1562,7 @@ async fn run_full(
         hint_file_size,
         proxy_config: ProxyConfig::default(),
         sink: std::sync::Arc::new(NoopTestSink),
-        selector: std::sync::Arc::new(fluxdown_engine::NoopSelection),
+        selector: std::sync::Arc::new(rinadown_engine::NoopSelection),
         checksum: checksum.to_string(),
         extra_headers: std::collections::HashMap::new(),
         spec: RequestSpec::empty_get(),
@@ -1570,7 +1570,7 @@ async fn run_full(
         use_server_time: false,
         allow_overwrite: false,
         ffmpeg_path: None,
-        cdn: fluxdown_engine::cdn::CdnTaskInput::default(),
+        cdn: rinadown_engine::cdn::CdnTaskInput::default(),
     };
 
     run_download(params).await;
@@ -1614,7 +1614,7 @@ async fn run_full_server_time(
     file_name: &str,
     use_server_time: bool,
 ) -> (i32, std::path::PathBuf) {
-    use fluxdown_engine::downloader::{DownloadParams, run_download};
+    use rinadown_engine::downloader::{DownloadParams, run_download};
 
     let client = test_client();
     let speed_limiter = SpeedLimiter::new(0);
@@ -1651,7 +1651,7 @@ async fn run_full_server_time(
         hint_file_size: 0,
         proxy_config: ProxyConfig::default(),
         sink: std::sync::Arc::new(NoopTestSink),
-        selector: std::sync::Arc::new(fluxdown_engine::NoopSelection),
+        selector: std::sync::Arc::new(rinadown_engine::NoopSelection),
         checksum: String::new(),
         extra_headers: std::collections::HashMap::new(),
         spec: RequestSpec::empty_get(),
@@ -1659,7 +1659,7 @@ async fn run_full_server_time(
         use_server_time,
         allow_overwrite: false,
         ffmpeg_path: None,
-        cdn: fluxdown_engine::cdn::CdnTaskInput::default(),
+        cdn: rinadown_engine::cdn::CdnTaskInput::default(),
     };
 
     run_download(params).await;
@@ -1730,7 +1730,7 @@ async fn use_server_time_applies_last_modified_to_file_mtime() {
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "binds a local port; run with --ignored"]
 async fn use_server_time_uses_new_last_modified_after_version_change() {
-    use fluxdown_engine::downloader::{DownloadParams, TEMP_EXT, run_download};
+    use rinadown_engine::downloader::{DownloadParams, TEMP_EXT, run_download};
 
     let work_dir = unique_dir("servertime_swap");
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
@@ -1796,7 +1796,7 @@ async fn use_server_time_uses_new_last_modified_after_version_change() {
         hint_file_size: 0,
         proxy_config: ProxyConfig::default(),
         sink: std::sync::Arc::new(NoopTestSink),
-        selector: std::sync::Arc::new(fluxdown_engine::NoopSelection),
+        selector: std::sync::Arc::new(rinadown_engine::NoopSelection),
         checksum: String::new(),
         extra_headers: std::collections::HashMap::new(),
         spec: RequestSpec::empty_get(),
@@ -1804,7 +1804,7 @@ async fn use_server_time_uses_new_last_modified_after_version_change() {
         use_server_time: true,
         allow_overwrite: false,
         ffmpeg_path: None,
-        cdn: fluxdown_engine::cdn::CdnTaskInput::default(),
+        cdn: rinadown_engine::cdn::CdnTaskInput::default(),
     };
     run_download(params).await;
     let _ = collector.await;
@@ -2314,7 +2314,7 @@ async fn hint_no_content_length_truncation_single_stream_must_not_be_accepted() 
         dlen,
         full.len()
     );
-    // 失败任务绝不能产出最终成品文件（.fluxdown 临时文件允许残留）。
+    // 失败任务绝不能产出最终成品文件（.rinadown 临时文件允许残留）。
     assert!(
         !dest.exists(),
         "❌ 截断的无 CL 单流被 finalize 成了成品文件"
@@ -2391,7 +2391,7 @@ async fn hint_no_content_length_truncation_via_range_fallback_must_not_be_accept
         dlen,
         full.len()
     );
-    // 失败任务绝不能产出最终成品文件（.fluxdown 临时文件允许残留）。
+    // 失败任务绝不能产出最终成品文件（.rinadown 临时文件允许残留）。
     assert!(
         !dest.exists(),
         "❌ 多段回退单流后截断文件被 finalize 成了成品文件"
@@ -2722,7 +2722,7 @@ async fn hint_on_non_advertising_range_server_degrades_to_single_stream() {
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "binds a local port; run with --ignored"]
 async fn resume_of_unverified_hint_task_stays_plain_get() {
-    use fluxdown_engine::downloader::{DownloadParams, run_download};
+    use rinadown_engine::downloader::{DownloadParams, run_download};
 
     let work_dir = unique_dir("resumeplain");
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
@@ -2783,7 +2783,7 @@ async fn resume_of_unverified_hint_task_stays_plain_get() {
         hint_file_size: size as i64,
         proxy_config: ProxyConfig::default(),
         sink: std::sync::Arc::new(NoopTestSink),
-        selector: std::sync::Arc::new(fluxdown_engine::NoopSelection),
+        selector: std::sync::Arc::new(rinadown_engine::NoopSelection),
         checksum: String::new(),
         extra_headers: std::collections::HashMap::new(),
         spec: RequestSpec::empty_get(),
@@ -2791,7 +2791,7 @@ async fn resume_of_unverified_hint_task_stays_plain_get() {
         use_server_time: false,
         allow_overwrite: false,
         ffmpeg_path: None,
-        cdn: fluxdown_engine::cdn::CdnTaskInput::default(),
+        cdn: rinadown_engine::cdn::CdnTaskInput::default(),
     };
     run_download(params).await;
     let _ = collector.await;
@@ -2942,25 +2942,25 @@ async fn hint_plain_first_upgrades_to_multi_segment_on_accept_ranges() {
 ///
 /// 用法（fnOS multiple-download 实测）：
 /// ```text
-/// FLUXDOWN_RT_URL="http://nas:1080/multiple-download?token=..." \
-/// FLUXDOWN_RT_SIZE=32583874 \
-/// FLUXDOWN_RT_COOKIES="fnos-token=..." \
-/// cargo test -p fluxdown_engine --test realtest manual_real_url -- --ignored --nocapture
+/// RINADOWN_RT_URL="http://nas:1080/multiple-download?token=..." \
+/// RINADOWN_RT_SIZE=32583874 \
+/// RINADOWN_RT_COOKIES="fnos-token=..." \
+/// cargo test -p rinadown_engine --test realtest manual_real_url -- --ignored --nocapture
 /// ```
 #[tokio::test(flavor = "current_thread")]
-#[ignore = "manual: requires FLUXDOWN_RT_URL pointing at a live endpoint"]
+#[ignore = "manual: requires RINADOWN_RT_URL pointing at a live endpoint"]
 async fn manual_real_url_hint_download() {
-    use fluxdown_engine::downloader::{DownloadParams, run_download};
+    use rinadown_engine::downloader::{DownloadParams, run_download};
 
-    let Ok(url) = std::env::var("FLUXDOWN_RT_URL") else {
-        eprintln!("FLUXDOWN_RT_URL 未设置 — 跳过");
+    let Ok(url) = std::env::var("RINADOWN_RT_URL") else {
+        eprintln!("RINADOWN_RT_URL 未设置 — 跳过");
         return;
     };
-    let size: i64 = std::env::var("FLUXDOWN_RT_SIZE")
+    let size: i64 = std::env::var("RINADOWN_RT_SIZE")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(-1); // -1 = 大小未知但确认可下载（同扩展 webRequest 嗅探语义）
-    let cookies = std::env::var("FLUXDOWN_RT_COOKIES").unwrap_or_default();
+    let cookies = std::env::var("RINADOWN_RT_COOKIES").unwrap_or_default();
 
     let work_dir = unique_dir("manual-real");
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
@@ -2977,10 +2977,10 @@ async fn manual_real_url_hint_download() {
     )
     .await;
 
-    // UA 与桌面 App 一致：FLUXDOWN_RT_UA 显式覆盖，空 = build_client 内置
+    // UA 与桌面 App 一致：RINADOWN_RT_UA 显式覆盖，空 = build_client 内置
     // Chrome UA（fnOS 等端点对非浏览器 UA 直接 400，test_client 的
-    // "FluxDownRealTest/1.0" 会被拒）。
-    let ua = std::env::var("FLUXDOWN_RT_UA").unwrap_or_default();
+    // "RinaDownRealTest/1.0" 会被拒）。
+    let ua = std::env::var("RINADOWN_RT_UA").unwrap_or_default();
     let client = build_client(&ProxyConfig::default(), &ua).expect("build_client");
     let speed_limiter = SpeedLimiter::new(0);
     let (tx, mut rx) = mpsc::channel::<ProgressUpdate>(256);
@@ -3019,7 +3019,7 @@ async fn manual_real_url_hint_download() {
         hint_file_size: size,
         proxy_config: ProxyConfig::default(),
         sink: std::sync::Arc::new(NoopTestSink),
-        selector: std::sync::Arc::new(fluxdown_engine::NoopSelection),
+        selector: std::sync::Arc::new(rinadown_engine::NoopSelection),
         checksum: String::new(),
         extra_headers: std::collections::HashMap::new(),
         spec: RequestSpec::empty_get(),
@@ -3027,7 +3027,7 @@ async fn manual_real_url_hint_download() {
         use_server_time: false,
         allow_overwrite: false,
         ffmpeg_path: None,
-        cdn: fluxdown_engine::cdn::CdnTaskInput::default(),
+        cdn: rinadown_engine::cdn::CdnTaskInput::default(),
     };
     run_download(params).await;
     let _ = collector.await;
@@ -3145,7 +3145,7 @@ async fn transient_200_on_resume_is_absorbed_byte_exact() {
         size,
         false,
         segs_count,
-        fluxdown_engine::cdn::NodePool::single(client.clone()),
+        rinadown_engine::cdn::NodePool::single(client.clone()),
         &db,
         &tx,
         &cancel,
@@ -3154,7 +3154,7 @@ async fn transient_200_on_resume_is_absorbed_byte_exact() {
         &sink,
         "",
         "",
-        fluxdown_engine::segment_coordinator::ReportScope::whole_task(),
+        rinadown_engine::segment_coordinator::ReportScope::whole_task(),
         0,
         false,
         None,

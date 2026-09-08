@@ -4,15 +4,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 
-import 'package:flux_down/src/bindings/bindings.dart';
-import 'package:flux_down/src/models/settings_provider.dart';
+import 'package:rina_down/src/bindings/bindings.dart';
+import 'package:rina_down/src/models/settings_provider.dart';
 
-/// Repro for zerx-lab/FluxDown#98: on Linux (.deb install) the
+/// Repro for zerx-lab/RinaDown#98: on Linux (.deb install) the
 /// "Associate .torrent files" toggle cannot be turned off.
 ///
-/// The .deb registers `com.fluxdown.app.desktop` system-wide (root-owned),
+/// The .deb registers `com.rinadown.app.desktop` system-wide (root-owned),
 /// so after `disassociate()` strips the per-user mimeapps.list override,
-/// `xdg-mime query default application/x-bittorrent` STILL resolves FluxDown.
+/// `xdg-mime query default application/x-bittorrent` STILL resolves RinaDown.
 /// The actor immediately re-queries and sends `FileAssociationStatus
 /// { is_associated: true }`, which clobbers the user's OFF choice and snaps
 /// the switch back on within ~50ms.
@@ -25,7 +25,7 @@ void main() {
   // SettingsProvider's constructor syncs auto-startup state over the
   // `launch_at_startup` method channel; mock it so the async sync completes.
   launchAtStartup.setup(
-    appName: 'FluxDownTest',
+    appName: 'RinaDownTest',
     appPath: Platform.resolvedExecutable,
   );
   binding.defaultBinaryMessenger.setMockMethodCallHandler(

@@ -1,4 +1,4 @@
-// FluxDown i18n — UI 字符串统一经 I18nStore 查表（assets/i18n/<locale>.json）。
+// RinaDown i18n — UI 字符串统一经 I18nStore 查表（assets/i18n/<locale>.json）。
 //
 // 使用方法:
 //   final s = S.of(context);

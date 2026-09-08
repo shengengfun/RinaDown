@@ -1,6 +1,6 @@
 //! 桌面进程启动参数、单实例锁与外部链接接入。
 //!
-//! 开机自启以 `--minimized` 拉起；系统把 `magnet:` / `ed2k:` / `fluxdown:` 链接或
+//! 开机自启以 `--minimized` 拉起；系统把 `magnet:` / `ed2k:` / `rinadown:` 链接或
 //! 直链交给本进程时，统一经 `agent.capture.submit` 交由 agent 建任务：
 //! 主实例自己提交，后续实例提交后立即退出，因此不依赖任何进程间通道。
 
@@ -57,7 +57,7 @@ pub fn is_capture_url(value: &str) -> bool {
     [
         "magnet:",
         "ed2k://",
-        "fluxdown:",
+        "rinadown:",
         "http://",
         "https://",
         "ftp://",
@@ -67,15 +67,15 @@ pub fn is_capture_url(value: &str) -> bool {
     .any(|scheme| lower.starts_with(scheme))
 }
 
-/// `fluxdown:` 协议 → 实际下载链接：`fluxdown://download?url=<encoded>` 或
-/// `fluxdown:<url>`；其他 scheme 原样返回。
+/// `rinadown:` 协议 → 实际下载链接：`rinadown://download?url=<encoded>` 或
+/// `rinadown:<url>`；其他 scheme 原样返回。
 #[must_use]
 pub fn normalize_capture_url(value: &str) -> String {
     let lower = value.to_ascii_lowercase();
-    if !lower.starts_with("fluxdown:") {
+    if !lower.starts_with("rinadown:") {
         return value.to_owned();
     }
-    let rest = &value["fluxdown:".len()..];
+    let rest = &value["rinadown:".len()..];
     let rest = rest.trim_start_matches('/');
     if let Some(query) = rest.strip_prefix("download?") {
         for pair in query.split('&') {
@@ -134,7 +134,7 @@ pub fn instance_dir(agent_token_path: &Path) -> PathBuf {
     agent_token_path
         .parent()
         .map(Path::to_path_buf)
-        .unwrap_or_else(|| std::env::temp_dir().join("fluxdown"))
+        .unwrap_or_else(|| std::env::temp_dir().join("rinadown"))
 }
 
 #[cfg(test)]
@@ -155,7 +155,7 @@ mod tests {
         assert!(options.minimized);
         assert_eq!(options.urls, vec!["magnet:?xt=urn:btih:abc"]);
         assert!(options.torrent_files.is_empty());
-        let file = std::env::temp_dir().join(format!("fluxdown-{}.torrent", std::process::id()));
+        let file = std::env::temp_dir().join(format!("rinadown-{}.torrent", std::process::id()));
         std::fs::write(&file, b"d8:announce0:e").expect("write");
         let options = LaunchOptions::from_args([file.display().to_string()]);
         assert_eq!(options.torrent_files, vec![file.clone()]);
@@ -167,13 +167,13 @@ mod tests {
     }
 
     #[test]
-    fn normalizes_fluxdown_scheme() {
+    fn normalizes_rinadown_scheme() {
         assert_eq!(
-            normalize_capture_url("fluxdown://download?url=https%3A%2F%2Fa.b%2Fc"),
+            normalize_capture_url("rinadown://download?url=https%3A%2F%2Fa.b%2Fc"),
             "https://a.b/c"
         );
         assert_eq!(
-            normalize_capture_url("fluxdown:https://a.b/c"),
+            normalize_capture_url("rinadown:https://a.b/c"),
             "https://a.b/c"
         );
         assert_eq!(normalize_capture_url("magnet:?x"), "magnet:?x");
@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn lock_is_exclusive() {
-        let dir = std::env::temp_dir().join(format!("fluxdown-lock-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("rinadown-lock-{}", std::process::id()));
         let first = InstanceLock::try_acquire(&dir).expect("lock");
         assert!(first.is_some());
         let second = InstanceLock::try_acquire(&dir).expect("lock");

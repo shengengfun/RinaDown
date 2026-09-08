@@ -28,9 +28,9 @@ class FeedbackResult {
   const FeedbackResult({required this.success, this.message, this.issueNumber});
 }
 
-/// 调用 FluxDown website API 提交用户反馈。
+/// 调用 RinaDown website API 提交用户反馈。
 ///
-/// API 端点: POST https://fluxdown.zerx.dev/api/feedback
+/// API 端点: POST https://rinadown.zerx.dev/api/feedback
 /// 服务端持有 GITHUB_TOKEN，客户端无需暴露凭据。
 class FeedbackService {
   FeedbackService._();
@@ -57,7 +57,7 @@ class FeedbackService {
     return '$osPart ($arch), locale $locale';
   }
 
-  static const _apiBase = 'https://fluxdown.zerx.dev';
+  static const _apiBase = 'https://rinadown.zerx.dev';
   static const _feedbackPath = '/api/feedback';
   static const _timeout = Duration(seconds: 15);
 

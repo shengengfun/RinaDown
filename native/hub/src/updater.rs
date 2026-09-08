@@ -2,7 +2,7 @@
 //! concurrent download of update packages, and launch installation.
 //!
 //! Platform strategies – all delegate waiting and file work to the compiled
-//! `fluxdown_updater` helper binary that ships alongside the application:
+//! `rinadown_updater` helper binary that ships alongside the application:
 //!
 //!   Windows setup  (.exe)   → updater: unblocks MOTW, runs NSIS silently
 //!   Windows portable (.zip) → updater: WaitForSingleObject, extracts ZIP, copies, restarts
@@ -13,7 +13,7 @@
 //!   macOS (.tar.gz/.app)    → updater: kill(pid,0) poll, extracts tar.gz, replaces .app, open
 //!
 //! Cold-start migration: users upgrading from a version that pre-dates
-//! `fluxdown_updater` do not have the helper binary in their install directory.
+//! `rinadown_updater` do not have the helper binary in their install directory.
 //! `find_updater_bin` falls back to `bootstrap_updater_from_zip`, which extracts
 //! the helper from the already-downloaded update ZIP and places a temporary copy
 //! in the OS temp directory for this one update cycle.  Subsequent updates will
@@ -70,7 +70,7 @@ const FLUSH_INTERVAL: i64 = 1024 * 1024; // 1 MB
 // Configuration
 // ---------------------------------------------------------------------------
 
-const UPDATE_API_BASE: &str = "https://fluxdown.zerx.dev";
+const UPDATE_API_BASE: &str = "https://rinadown.zerx.dev";
 
 #[cfg(target_os = "windows")]
 const PORTABLE_MARKER: &str = "portable";
@@ -196,15 +196,15 @@ fn is_arm64() -> bool {
 enum LinuxInstallType {
     /// Running as an AppImage ($APPIMAGE env is set by the AppImage runtime).
     AppImage,
-    /// Installed via .deb package to /opt/fluxdown/ (dpkg can locate the exe).
+    /// Installed via .deb package to /opt/rinadown/ (dpkg can locate the exe).
     Deb,
-    /// Installed via .pkg.tar.zst to /opt/fluxdown/ (pacman can locate the exe).
+    /// Installed via .pkg.tar.zst to /opt/rinadown/ (pacman can locate the exe).
     Arch,
     /// Extracted tar.gz in any user-writable directory.
     Portable,
 }
 
-/// Detect how FluxDown was installed on this Linux system.
+/// Detect how RinaDown was installed on this Linux system.
 #[cfg(target_os = "linux")]
 fn detect_linux_install_type() -> LinuxInstallType {
     // 1. AppImage: the AppImage runtime always sets $APPIMAGE to the path of
@@ -219,8 +219,8 @@ fn detect_linux_install_type() -> LinuxInstallType {
     };
     let exe_str = exe.to_str().unwrap_or("");
 
-    // 2. System package: both deb and arch install to /opt/fluxdown/.
-    if exe_str.starts_with("/opt/fluxdown") {
+    // 2. System package: both deb and arch install to /opt/rinadown/.
+    if exe_str.starts_with("/opt/rinadown") {
         // Try dpkg first (Debian/Ubuntu).
         let dpkg_found = std::process::Command::new("dpkg")
             .args(["-S", exe_str])
@@ -335,7 +335,7 @@ enum PreId {
 }
 
 /// Parsed semantic version: `major.minor.patch` core plus optional prerelease
-/// identifiers. Only the subset FluxDown emits (`X.Y.Z` / `X.Y.Z-pre`) is used.
+/// identifiers. Only the subset RinaDown emits (`X.Y.Z` / `X.Y.Z-pre`) is used.
 struct SemVer {
     core: (u64, u64, u64),
     pre: Vec<PreId>,
@@ -436,7 +436,7 @@ pub async fn check(current_version: &str, channel: &str) {
     match result {
         Ok(()) => {} // signal already sent inside check_inner
         Err(e) => {
-            fluxdown_engine::logger::report_error("updater", "check for update", &e);
+            rinadown_engine::logger::report_error("updater", "check for update", &e);
             UpdateCheckResult {
                 has_update: false,
                 latest_version: String::new(),
@@ -579,7 +579,7 @@ async fn check_inner(current_version: &str, channel: &str) -> Result<(), UpdateE
 pub async fn download(url: &str, version: &str, file_size: i64) {
     let result = download_inner(url, version, file_size).await;
     if let Err(e) = result {
-        fluxdown_engine::logger::report_error("updater", "download update", &e);
+        rinadown_engine::logger::report_error("updater", "download update", &e);
         UpdateDownloadProgress {
             version: version.to_string(),
             downloaded_bytes: 0,
@@ -619,7 +619,7 @@ fn sanitize_filename(raw: &str) -> String {
         .replace('\0', "");
     let name = name.trim();
     if name.is_empty() || name == "." {
-        "FluxDown-update".to_string()
+        "RinaDown-update".to_string()
     } else {
         name.to_string()
     }
@@ -639,8 +639,8 @@ fn sanitize_filename(raw: &str) -> String {
 fn pick_download_dir() -> PathBuf {
     #[cfg(target_os = "macos")]
     {
-        // 系统 API 解析（`fluxdown_engine::user_dirs`），不拼 `$HOME/Downloads`。
-        if let Some(downloads) = fluxdown_engine::user_dirs::download_dir()
+        // 系统 API 解析（`rinadown_engine::user_dirs`），不拼 `$HOME/Downloads`。
+        if let Some(downloads) = rinadown_engine::user_dirs::download_dir()
             && (downloads.is_dir()
                 // Best-effort create — fall through to temp_dir on failure.
                 || std::fs::create_dir_all(&downloads).is_ok())
@@ -650,7 +650,7 @@ fn pick_download_dir() -> PathBuf {
     }
     #[cfg(target_os = "android")]
     {
-        if let Some(pkg) = fluxdown_engine::data_dir::android_package_name() {
+        if let Some(pkg) = rinadown_engine::data_dir::android_package_name() {
             let cache = PathBuf::from(format!("/data/data/{pkg}/cache"));
             if cache.is_dir() || std::fs::create_dir_all(&cache).is_ok() {
                 return cache;
@@ -702,7 +702,7 @@ async fn download_inner(url: &str, version: &str, hint_file_size: i64) -> Result
         .rsplit('/')
         .next()
         .filter(|n| !n.is_empty())
-        .unwrap_or("FluxDown-update");
+        .unwrap_or("RinaDown-update");
     let file_name = sanitize_filename(raw_name);
     let download_dir = pick_download_dir();
     let file_path = download_dir.join(&file_name);
@@ -1287,7 +1287,7 @@ async fn download_segment_attempt(
 /// Name of the marker file the updater helper writes when an automatic
 /// portable update fails to overwrite the program files (e.g. the install
 /// directory is read-only or a file was locked). Kept in sync with the
-/// constant of the same purpose in `fluxdown_updater`.
+/// constant of the same purpose in `rinadown_updater`.
 const FAILURE_MARKER_NAME: &str = "update_failed.marker";
 
 /// Check for a leftover "update failed" marker written by the helper binary on
@@ -1343,7 +1343,7 @@ fn ensure_install_dir_writable() -> Result<(), UpdateError> {
         .parent()
         .ok_or_else(|| UpdateError::Other("cannot determine app directory".to_string()))?;
 
-    let probe = dir.join(format!(".fluxdown_write_test_{}", std::process::id()));
+    let probe = dir.join(format!(".rinadown_write_test_{}", std::process::id()));
     match std::fs::File::create(&probe) {
         Ok(_) => {
             let _ = std::fs::remove_file(&probe);
@@ -1352,10 +1352,10 @@ fn ensure_install_dir_writable() -> Result<(), UpdateError> {
         Err(e) => Err(UpdateError::Other(format!(
             "The install folder is not writable, so the update cannot replace \
              the program files automatically.\n\nFolder: {}\n\nThis usually \
-             happens when FluxDown is in a protected location such as \
-             \"Program Files\" or on a read-only drive. Move FluxDown to a \
+             happens when RinaDown is in a protected location such as \
+             \"Program Files\" or on a read-only drive. Move RinaDown to a \
              normal folder (e.g. your user directory) and try again, or download \
-             the latest version from https://fluxdown.zerx.dev\n\n({e})",
+             the latest version from https://rinadown.zerx.dev\n\n({e})",
             dir.display()
         ))),
     }
@@ -1450,7 +1450,7 @@ fn install_macos_dmg(dmg_path: &str) -> Result<(), UpdateError> {
         .status();
 
     // `open` returns immediately; Finder mounts the DMG and shows its window
-    // (which typically contains FluxDown.app + an Applications symlink).
+    // (which typically contains RinaDown.app + an Applications symlink).
     let status = std::process::Command::new("open")
         .arg(dmg_path)
         .stdin(std::process::Stdio::null())
@@ -1469,7 +1469,7 @@ fn install_macos_dmg(dmg_path: &str) -> Result<(), UpdateError> {
     Ok(())
 }
 
-/// macOS update: spawn `fluxdown_updater` and exit immediately.
+/// macOS update: spawn `rinadown_updater` and exit immediately.
 ///
 /// The updater polls `kill(pid, 0)` until this process exits, then:
 ///   1. Extracts the tar.gz to a temp directory.
@@ -1477,7 +1477,7 @@ fn install_macos_dmg(dmg_path: &str) -> Result<(), UpdateError> {
 ///   3. Replaces the existing .app (atomic `rename` when possible, `cp -a` fallback).
 ///   4. Relaunches the updated bundle via `open`.
 ///
-/// The updater binary lives at `FluxDown.app/Contents/MacOS/fluxdown_updater`,
+/// The updater binary lives at `RinaDown.app/Contents/MacOS/rinadown_updater`,
 /// which is the same directory as the main executable — `find_updater_bin()`
 /// finds it automatically via `current_exe().parent()`.
 ///
@@ -1488,15 +1488,15 @@ fn install_macos_dmg(dmg_path: &str) -> Result<(), UpdateError> {
 fn install_macos_app(tarball_path: &str) -> Result<(), UpdateError> {
     let exe = std::env::current_exe().map_err(UpdateError::Io)?;
 
-    // FluxDown.app/Contents/MacOS/flux_down
-    //              ↑ parent  ↑ parent  ↑ parent  →  FluxDown.app
+    // RinaDown.app/Contents/MacOS/rina_down
+    //              ↑ parent  ↑ parent  ↑ parent  →  RinaDown.app
     let app_bundle = exe
         .parent()
         .and_then(|p| p.parent())
         .and_then(|p| p.parent())
         .ok_or_else(|| UpdateError::Other("cannot locate .app bundle".to_string()))?;
 
-    // Parent of FluxDown.app  →  /Applications (or wherever the user placed it)
+    // Parent of RinaDown.app  →  /Applications (or wherever the user placed it)
     let install_dir = app_bundle
         .parent()
         .ok_or_else(|| UpdateError::Other("cannot locate install directory".to_string()))?;
@@ -1533,7 +1533,7 @@ fn install_macos_app(tarball_path: &str) -> Result<(), UpdateError> {
 // Updater helper binary location & cold-start bootstrap
 // ---------------------------------------------------------------------------
 
-/// Locate the `fluxdown_updater[.exe]` helper binary that is shipped alongside
+/// Locate the `rinadown_updater[.exe]` helper binary that is shipped alongside
 /// the main application in the same directory as the running executable.
 ///
 /// Returns `Err` when the binary is absent (e.g. the user is upgrading from a
@@ -1547,9 +1547,9 @@ fn find_updater_bin() -> Result<PathBuf, UpdateError> {
         .ok_or_else(|| UpdateError::Other("cannot determine app directory".to_string()))?;
 
     #[cfg(target_os = "windows")]
-    let name = "fluxdown_updater.exe";
+    let name = "rinadown_updater.exe";
     #[cfg(not(target_os = "windows"))]
-    let name = "fluxdown_updater";
+    let name = "rinadown_updater";
 
     let updater = dir.join(name);
     if updater.exists() {
@@ -1563,7 +1563,7 @@ fn find_updater_bin() -> Result<PathBuf, UpdateError> {
 }
 
 /// Bootstrap the updater helper for users upgrading from a version that did
-/// not ship `fluxdown_updater[.exe]`.
+/// not ship `rinadown_updater[.exe]`.
 ///
 /// Scans the already-downloaded update ZIP for the helper binary, extracts it
 /// to a private temp file (named with the current PID to avoid collisions),
@@ -1573,7 +1573,7 @@ fn find_updater_bin() -> Result<PathBuf, UpdateError> {
 fn bootstrap_updater_from_zip(zip_path: &str) -> Result<PathBuf, UpdateError> {
     use std::io;
 
-    const HELPER_NAME: &str = "fluxdown_updater.exe";
+    const HELPER_NAME: &str = "rinadown_updater.exe";
 
     let file = std::fs::File::open(zip_path).map_err(UpdateError::Io)?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| UpdateError::Other(e.to_string()))?;
@@ -1589,7 +1589,7 @@ fn bootstrap_updater_from_zip(zip_path: &str) -> Result<PathBuf, UpdateError> {
 
         if file_name.eq_ignore_ascii_case(HELPER_NAME) {
             let dest = std::env::temp_dir()
-                .join(format!("fluxdown_updater_boot_{}.exe", std::process::id()));
+                .join(format!("rinadown_updater_boot_{}.exe", std::process::id()));
             let mut out = std::fs::File::create(&dest).map_err(UpdateError::Io)?;
             io::copy(&mut entry, &mut out).map_err(UpdateError::Io)?;
             return Ok(dest);
@@ -1599,7 +1599,7 @@ fn bootstrap_updater_from_zip(zip_path: &str) -> Result<PathBuf, UpdateError> {
     Err(UpdateError::Other(format!(
         "{HELPER_NAME} was not found inside the downloaded archive. \
          The package may be from an older release. \
-         Please download and extract the new version manually from https://fluxdown.zerx.dev"
+         Please download and extract the new version manually from https://rinadown.zerx.dev"
     )))
 }
 
@@ -1663,7 +1663,7 @@ fn spawn_no_elevation(program: &Path, args: &[&str]) -> Result<(), UpdateError> 
     }
 }
 
-/// Windows setup update: spawn `fluxdown_updater` and exit immediately.
+/// Windows setup update: spawn `rinadown_updater` and exit immediately.
 ///
 /// The updater waits for this process to exit via `WaitForSingleObject`, then
 /// removes the Mark-of-the-Web `Zone.Identifier` alternate data stream from
@@ -1684,11 +1684,11 @@ fn install_setup(installer_path: &str) -> Result<(), UpdateError> {
     std::process::exit(0);
 }
 
-/// Windows portable update: spawn `fluxdown_updater` and exit immediately.
+/// Windows portable update: spawn `rinadown_updater` and exit immediately.
 ///
 /// The updater uses `WaitForSingleObject` for precise OS-level process-exit
 /// detection (no polling, no tasklist), then:
-///   1. Renames itself aside so the ZIP can overwrite `fluxdown_updater.exe`.
+///   1. Renames itself aside so the ZIP can overwrite `rinadown_updater.exe`.
 ///   2. Extracts the ZIP to a private temp directory.
 ///   3. Copies files into the app directory with exponential-backoff retry
 ///      for files transiently locked by antivirus scanners.
@@ -1697,7 +1697,7 @@ fn install_setup(installer_path: &str) -> Result<(), UpdateError> {
 ///
 /// No PowerShell, cmd.exe, or script interpreters are involved.
 ///
-/// Cold-start migration: if `fluxdown_updater.exe` is absent (upgrade from an
+/// Cold-start migration: if `rinadown_updater.exe` is absent (upgrade from an
 /// older version), the helper is bootstrapped directly from the downloaded ZIP
 /// and run from the OS temp directory for this one cycle.
 #[cfg(target_os = "windows")]
@@ -1712,7 +1712,7 @@ fn install_portable(zip_path: &str) -> Result<(), UpdateError> {
         .to_string_lossy();
 
     // Fall back to bootstrapping the helper from the ZIP when upgrading from
-    // an older version that did not ship fluxdown_updater.exe.
+    // an older version that did not ship rinadown_updater.exe.
     let updater = find_or_bootstrap_updater(zip_path)?;
     let pid = std::process::id();
 
@@ -1737,7 +1737,7 @@ fn install_portable(zip_path: &str) -> Result<(), UpdateError> {
 // Linux installers
 // ---------------------------------------------------------------------------
 
-/// Linux AppImage update: spawn `fluxdown_updater` and exit immediately.
+/// Linux AppImage update: spawn `rinadown_updater` and exit immediately.
 ///
 /// The updater polls `/proc/<pid>` until this process exits, then atomically
 /// replaces the running AppImage file with the new one (`mv -f`), sets the
@@ -1771,7 +1771,7 @@ fn install_appimage(new_appimage_path: &str) -> Result<(), UpdateError> {
     std::process::exit(0);
 }
 
-/// Linux deb update: spawn `fluxdown_updater` and exit immediately.
+/// Linux deb update: spawn `rinadown_updater` and exit immediately.
 ///
 /// The updater polls `/proc/<pid>`, then runs `pkexec dpkg -i` (which shows
 /// the distro's native password dialog), and restarts the application.
@@ -1791,7 +1791,7 @@ fn install_deb(deb_path: &str) -> Result<(), UpdateError> {
     std::process::exit(0);
 }
 
-/// Linux Arch update: spawn `fluxdown_updater` and exit immediately.
+/// Linux Arch update: spawn `rinadown_updater` and exit immediately.
 ///
 /// The updater polls `/proc/<pid>`, then runs `pkexec pacman -U` (which shows
 /// the distro's native password dialog), and restarts the application.
@@ -1811,7 +1811,7 @@ fn install_arch(pkg_path: &str) -> Result<(), UpdateError> {
     std::process::exit(0);
 }
 
-/// Linux portable tar.gz update: spawn `fluxdown_updater` and exit immediately.
+/// Linux portable tar.gz update: spawn `rinadown_updater` and exit immediately.
 ///
 /// The updater polls `/proc/<pid>`, extracts the tarball to a temp directory,
 /// unwraps single-folder archives, copies files into the app directory with
@@ -1902,8 +1902,8 @@ mod tests {
     #[test]
     fn sanitize_strips_query_and_fragment() {
         assert_eq!(
-            sanitize_filename("FluxDown-0.2.0-windows-x64-setup.exe?source=github"),
-            "FluxDown-0.2.0-windows-x64-setup.exe"
+            sanitize_filename("RinaDown-0.2.0-windows-x64-setup.exe?source=github"),
+            "RinaDown-0.2.0-windows-x64-setup.exe"
         );
         assert_eq!(sanitize_filename("pkg.zip#frag"), "pkg.zip");
         assert_eq!(sanitize_filename("pkg.zip?a=1#frag"), "pkg.zip");
@@ -1912,7 +1912,7 @@ mod tests {
         // Path components are stripped.
         assert_eq!(sanitize_filename("a/b/c.exe?x=1"), "c.exe");
         // Empty / degenerate input falls back to the safe default.
-        assert_eq!(sanitize_filename("?only=query"), "FluxDown-update");
+        assert_eq!(sanitize_filename("?only=query"), "RinaDown-update");
     }
 
     /// Roundtrip: saved progress is loaded back verbatim when the artifact

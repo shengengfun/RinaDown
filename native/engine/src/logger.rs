@@ -1,11 +1,11 @@
 //! 全局文件日志 — 与 Dart 端 LogService 写入同一目录/文件，按日期分文件。
 //!
 //! - 日志目录：由 `data_dir::resolve_data_dir()` 决定，加 `/logs` 后缀
-//!   - Linux: `~/.local/share/fluxdown/logs/`
-//!   - macOS: `~/Library/Application Support/fluxdown/logs/`
+//!   - Linux: `~/.local/share/rinadown/logs/`
+//!   - macOS: `~/Library/Application Support/rinadown/logs/`
 //!   - Windows 便携版: `<exe_dir>/portable_data/logs/`
-//!   - Windows 安装版: `%LOCALAPPDATA%/FluxDown/logs/`
-//! - 文件名：`fluxdown_YYYY-MM-DD.log`，分卷为 `fluxdown_YYYY-MM-DD.N.log`（与 Dart 端完全一致）
+//!   - Windows 安装版: `%LOCALAPPDATA%/RinaDown/logs/`
+//! - 文件名：`rinadown_YYYY-MM-DD.log`，分卷为 `rinadown_YYYY-MM-DD.N.log`（与 Dart 端完全一致）
 //! - 两端都以 append 模式写入，POSIX `O_APPEND` 保证单次 write 原子性
 //! - 启动时自动清理 7 天前的日志文件
 //! - `tracing` 事件统一补充级别、target、源码位置；错误带稳定 `error_id` 并立即刷盘
@@ -13,7 +13,7 @@
 //! - `health()` 暴露初始化与持久化写入降级状态，供诊断页与 Web UI 展示
 //!
 //! ## 自动分割与清理（与 Dart 端 log_service.dart 协议一致）
-//! - 单文件超过 2MB 自动分割到 `fluxdown_YYYY-MM-DD.N.log` 分卷；
+//! - 单文件超过 2MB 自动分割到 `rinadown_YYYY-MM-DD.N.log` 分卷；
 //! - 日志总大小超过上限（默认 10MB，可通过 `set_max_total_bytes` 由设置覆盖）时
 //!   按（日期, 分卷序号）从最旧开始删除；
 //! - 清理只做目录遍历 + metadata，不读文件内容，内存占用极小。
@@ -204,9 +204,9 @@ impl AppLogger {
 
     fn file_path(&self, date_tag: &str, part: u32) -> PathBuf {
         let name = if part == 0 {
-            format!("fluxdown_{date_tag}.log")
+            format!("rinadown_{date_tag}.log")
         } else {
-            format!("fluxdown_{date_tag}.{part}.log")
+            format!("rinadown_{date_tag}.{part}.log")
         };
         self.log_dir.join(name)
     }
@@ -292,7 +292,7 @@ impl AppLogger {
         self.maybe_roll_by_size(&mut state)
     }
 
-    /// 清理超过 `max_days` 天的 `fluxdown_*.log` 文件。
+    /// 清理超过 `max_days` 天的 `rinadown_*.log` 文件。
     fn cleanup_old_logs(&self, max_days: u64) -> io::Result<()> {
         let cutoff = SystemTime::now() - Duration::from_secs(max_days * 86400);
         for entry in fs::read_dir(&self.log_dir)? {
@@ -302,7 +302,7 @@ impl AppLogger {
                 .file_name()
                 .and_then(|name| name.to_str())
                 .unwrap_or("");
-            if !name.starts_with("fluxdown_") || !name.ends_with(".log") {
+            if !name.starts_with("rinadown_") || !name.ends_with(".log") {
                 continue;
             }
             let metadata = fs::metadata(&path)?;
@@ -404,10 +404,10 @@ impl<'writer> MakeWriter<'writer> for AppLogWriterFactory {
     }
 }
 
-/// 解析日志文件名 `fluxdown_YYYY-MM-DD.log` / `fluxdown_YYYY-MM-DD.N.log`，
+/// 解析日志文件名 `rinadown_YYYY-MM-DD.log` / `rinadown_YYYY-MM-DD.N.log`，
 /// 返回 (日期, 分卷序号)。非日志文件返回 None。
 fn parse_log_name(name: &str) -> Option<(&str, u32)> {
-    let rest = name.strip_prefix("fluxdown_")?.strip_suffix(".log")?;
+    let rest = name.strip_prefix("rinadown_")?.strip_suffix(".log")?;
     let (date, part) = match rest.split_once('.') {
         Some((date, part)) => (date, part.parse::<u32>().ok()?),
         None => (rest, 0),
@@ -481,9 +481,9 @@ pub fn init() -> Result<(), LoggerInitError> {
 
 /// 用显式数据目录初始化全局日志：日志写入 `<data_dir>/logs`。
 ///
-/// 供 headless server 使用——它按 `FLUXDOWN_DATA_DIR` 解析数据目录，日志须
+/// 供 headless server 使用——它按 `RINADOWN_DATA_DIR` 解析数据目录，日志须
 /// 随之落到同一（可能是挂载卷的）目录，而非平台默认的 HOME 路径。Docker
-/// 部署（`FLUXDOWN_DATA_DIR=/data`）下日志因此持久化到 `/data/logs`。
+/// 部署（`RINADOWN_DATA_DIR=/data`）下日志因此持久化到 `/data/logs`。
 pub fn init_with_dir(data_dir: &Path) -> Result<(), LoggerInitError> {
     init_at(data_dir.join("logs"))
 }
@@ -705,7 +705,7 @@ where
 
 /// 单个日志文件的元信息（列举与导出用）。
 pub struct LogFileMeta {
-    /// 文件名（`fluxdown_YYYY-MM-DD.log` / `fluxdown_YYYY-MM-DD.N.log`）。
+    /// 文件名（`rinadown_YYYY-MM-DD.log` / `rinadown_YYYY-MM-DD.N.log`）。
     pub name: String,
     /// 文件字节大小。
     pub size: u64,
@@ -721,7 +721,7 @@ pub fn log_dir() -> PathBuf {
 
 /// 列举日志目录下全部日志文件，按文件名升序（即日期 + 分卷序）。
 ///
-/// 只识别 `fluxdown_YYYY-MM-DD[.N].log` 命名的文件，忽略目录内其它内容。
+/// 只识别 `rinadown_YYYY-MM-DD[.N].log` 命名的文件，忽略目录内其它内容。
 pub fn list_log_files() -> Vec<LogFileMeta> {
     list_log_files_in(&log_dir())
 }
@@ -835,13 +835,13 @@ fn resolve_log_dir() -> PathBuf {
 // ══════════════════════════════════════════════════
 //  宏 — 直接替换 rinf::debug_print!
 //
-//  `#[macro_export]` 把宏放到 crate 根路径(`fluxdown_engine::log_info!`),
+//  `#[macro_export]` 把宏放到 crate 根路径(`rinadown_engine::log_info!`),
 //  下方 `pub use` 把它们重新导出回 `logger` 模块路径,使得
-//  `fluxdown_engine::logger::log_info!` 与 hub 侧历史用法
+//  `rinadown_engine::logger::log_info!` 与 hub 侧历史用法
 //  `crate::logger::log_info!`(经 hub 的 `pub use` shim 转发)保持一致。
 //  宏体内必须用 `$crate` 而非 `crate`——`crate::` 在 `macro_rules!` 里按
 //  *调用点* 所在 crate 解析,只有 `$crate` 才会不论调用点在哪个 crate,
-//  始终指回定义宏的 `fluxdown_engine`。
+//  始终指回定义宏的 `rinadown_engine`。
 // ══════════════════════════════════════════════════
 
 /// 记录普通日志，格式同 `format!()`。
@@ -899,7 +899,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_nanos())
             .unwrap_or(0);
-        let dir = std::env::temp_dir().join(format!("fluxdown_logtest_{tag}_{nanos}"));
+        let dir = std::env::temp_dir().join(format!("rinadown_logtest_{tag}_{nanos}"));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -907,7 +907,7 @@ mod tests {
     #[test]
     fn parse_plain_daily_file() {
         assert_eq!(
-            parse_log_name("fluxdown_2026-06-10.log"),
+            parse_log_name("rinadown_2026-06-10.log"),
             Some(("2026-06-10", 0))
         );
     }
@@ -915,25 +915,25 @@ mod tests {
     #[test]
     fn parse_part_file() {
         assert_eq!(
-            parse_log_name("fluxdown_2026-06-10.3.log"),
+            parse_log_name("rinadown_2026-06-10.3.log"),
             Some(("2026-06-10", 3))
         );
     }
 
     #[test]
     fn reject_non_log_names() {
-        assert_eq!(parse_log_name("fluxdown_logs.zip"), None);
-        assert_eq!(parse_log_name("fluxdown_backup.log"), None);
-        assert_eq!(parse_log_name("fluxdown_2026-06-10.abc.log"), None);
+        assert_eq!(parse_log_name("rinadown_logs.zip"), None);
+        assert_eq!(parse_log_name("rinadown_backup.log"), None);
+        assert_eq!(parse_log_name("rinadown_2026-06-10.abc.log"), None);
         assert_eq!(parse_log_name("other_2026-06-10.log"), None);
     }
 
     #[test]
     fn list_log_files_filters_non_logs_and_sorts_ascending() {
         let dir = temp_dir("list");
-        std::fs::write(dir.join("fluxdown_2026-01-02.log"), b"b").unwrap();
-        std::fs::write(dir.join("fluxdown_2026-01-01.log"), b"aa").unwrap();
-        std::fs::write(dir.join("fluxdown_2026-01-01.1.log"), b"ccc").unwrap();
+        std::fs::write(dir.join("rinadown_2026-01-02.log"), b"b").unwrap();
+        std::fs::write(dir.join("rinadown_2026-01-01.log"), b"aa").unwrap();
+        std::fs::write(dir.join("rinadown_2026-01-01.1.log"), b"ccc").unwrap();
         std::fs::write(dir.join("readme.txt"), b"ignore me").unwrap();
 
         let files = list_log_files_in(&dir);
@@ -942,9 +942,9 @@ mod tests {
         assert_eq!(
             names,
             [
-                "fluxdown_2026-01-01.1.log",
-                "fluxdown_2026-01-01.log",
-                "fluxdown_2026-01-02.log",
+                "rinadown_2026-01-01.1.log",
+                "rinadown_2026-01-01.log",
+                "rinadown_2026-01-02.log",
             ]
         );
         // 大小如实反映内容字节数。
@@ -962,7 +962,7 @@ mod tests {
 
         let dir = temp_dir("zip");
         std::fs::write(
-            dir.join("fluxdown_2026-01-01.log"),
+            dir.join("rinadown_2026-01-01.log"),
             concat!(
                 "Authorization: Bearer top-secret\n",
                 "https://cdn.example/file?abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ\n",
@@ -970,7 +970,7 @@ mod tests {
             ),
         )
         .unwrap();
-        std::fs::write(dir.join("fluxdown_2026-01-02.log"), b"world!!").unwrap();
+        std::fs::write(dir.join("rinadown_2026-01-02.log"), b"world!!").unwrap();
         std::fs::write(dir.join("notes.md"), b"skip").unwrap();
 
         let bytes = super::export_logs_zip_from(&dir).unwrap();
@@ -986,7 +986,7 @@ mod tests {
             got.insert(entry.name().to_string(), content);
         }
         let sanitized = got
-            .get("fluxdown_2026-01-01.log")
+            .get("rinadown_2026-01-01.log")
             .map(String::as_str)
             .unwrap();
         assert!(sanitized.contains("Authorization: [REDACTED]"));
@@ -995,7 +995,7 @@ mod tests {
         assert!(sanitized.contains("/home/***/downloads"));
         assert!(!sanitized.contains("top-secret"));
         assert_eq!(
-            got.get("fluxdown_2026-01-02.log").map(String::as_str),
+            got.get("rinadown_2026-01-02.log").map(String::as_str),
             Some("world!!")
         );
         assert!(!got.contains_key("notes.md"));

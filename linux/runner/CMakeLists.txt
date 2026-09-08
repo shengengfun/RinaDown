@@ -5,7 +5,7 @@ project(runner LANGUAGES CXX C)
 find_program(GLIB_COMPILE_RESOURCES glib-compile-resources REQUIRED)
 get_filename_component(FLUTTER_PROJECT_ROOT "${CMAKE_SOURCE_DIR}/.." ABSOLUTE)
 set(GRESOURCE_XML
-  "${CMAKE_CURRENT_SOURCE_DIR}/resources/com.fluxdown.app.gresource.xml")
+  "${CMAKE_CURRENT_SOURCE_DIR}/resources/com.rinadown.app.gresource.xml")
 set(GRESOURCE_C "${CMAKE_CURRENT_BINARY_DIR}/resources.c")
 add_custom_command(
   OUTPUT ${GRESOURCE_C}
@@ -16,8 +16,8 @@ add_custom_command(
     ${GRESOURCE_XML}
   DEPENDS
     ${GRESOURCE_XML}
-    ${FLUTTER_PROJECT_ROOT}/assets/logo/fluxdown_logo.png
-    ${FLUTTER_PROJECT_ROOT}/assets/logo/fluxdown_logo.svg
+    ${FLUTTER_PROJECT_ROOT}/assets/logo/rinadown_logo.png
+    ${FLUTTER_PROJECT_ROOT}/assets/logo/rinadown_logo.svg
 )
 
 # Define the application target. To change its name, change BINARY_NAME in the

@@ -1,4 +1,4 @@
-// FluxDown 插件通知钩子入口（classic script；入口挂 globalThis）。
+// RinaDown 插件通知钩子入口（classic script；入口挂 globalThis）。
 //
 // 全部钩子均为 fire-and-forget：抛错/超时只记日志，绝不影响任务状态。
 // 仅 onError 内可调 flux.task.requestRetry({delayMs}) 命令式请求重试

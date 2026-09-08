@@ -152,11 +152,11 @@ async function findOrCreateIssue(): Promise<number> {
         body: [
           "## Pricing Poll & Discussion",
           "",
-          "This issue records community votes and discussion about FluxDown premium pricing",
+          "This issue records community votes and discussion about RinaDown premium pricing",
           "(lifetime one-time purchase vs subscription). Final prices are TBD.",
           "",
           "**Do not close this issue.** Each comment below is one vote or one discussion post,",
-          "submitted by a GitHub-authenticated user from https://fluxdown.zerx.dev/pricing.",
+          "submitted by a GitHub-authenticated user from https://rinadown.zerx.dev/pricing.",
           "",
           "### Data format",
           "```json",

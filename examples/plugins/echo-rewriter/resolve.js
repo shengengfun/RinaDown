@@ -1,4 +1,4 @@
-// FluxDown 插件 resolver 入口（classic script，非 ESM；入口挂 globalThis）。
+// RinaDown 插件 resolver 入口（classic script，非 ESM；入口挂 globalThis）。
 //
 // 引擎在每次实际发起下载前、协议判定之前调用 globalThis.resolve(ctx)：
 //   - 返回对象 → 用其 url/fileName/... 覆盖后按协议重新分派（HTTP/HLS/BT/…）。

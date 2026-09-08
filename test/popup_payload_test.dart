@@ -4,10 +4,10 @@
 // 该 JSON 是两个引擎间的 wire 契约。本测试只断言往返语义（roundtrip +
 // 缺省字段容错），不断言实现细节（如 JSON 键顺序 / 内部字段名）。
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/bindings/bindings.dart';
-import 'package:flux_down/src/popup/popup_payload.dart';
-import 'package:flux_down/src/widgets/manifest_select_view.dart';
-import 'package:flux_down/src/widgets/quick_download_form.dart';
+import 'package:rina_down/src/bindings/bindings.dart';
+import 'package:rina_down/src/popup/popup_payload.dart';
+import 'package:rina_down/src/widgets/manifest_select_view.dart';
+import 'package:rina_down/src/widgets/quick_download_form.dart';
 
 /// 递归深度比较，用于校验 tokensJson 这类任意嵌套 Map/List 结构在
 /// jsonEncode → jsonDecode 之后语义不变（值相等，不要求同一实例）。

@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::time::Duration;
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     AgentEvent, AgentPreferencesDto, AgentSnapshot, ApplicationErrorCode, ComponentStatusDto,
     ConnPolicySummaryDto, DaemonConfigPatch, DaemonConfigSnapshot, DaemonEvent,
     DiagnosticsReportDto, GatewayPatchParams, GatewayStatusDto, PlatformIntegrationDto, PluginDto,
@@ -74,7 +74,7 @@ pub struct SettingsStore {
     plugins: Vec<PluginDto>,
     components: Vec<ComponentStatusDto>,
     webhook_deliveries: Vec<WebhookDeliveryDto>,
-    session: Option<fluxdown_protocol::AgentSessionDto>,
+    session: Option<rinadown_protocol::AgentSessionDto>,
     daemon_connected: bool,
     stale: bool,
 
@@ -248,7 +248,7 @@ impl SettingsStore {
         &self.sync
     }
     #[must_use]
-    pub fn session(&self) -> Option<&fluxdown_protocol::AgentSessionDto> {
+    pub fn session(&self) -> Option<&rinadown_protocol::AgentSessionDto> {
         self.session.as_ref()
     }
     #[must_use]
@@ -322,7 +322,7 @@ impl SettingsStore {
             .values
             .get(key)
             .cloned()
-            .unwrap_or_else(|| fluxdown_protocol::daemon_config_default(key).to_owned())
+            .unwrap_or_else(|| rinadown_protocol::daemon_config_default(key).to_owned())
     }
     #[must_use]
     pub fn daemon_bool(&self, key: &str) -> bool {
@@ -331,7 +331,7 @@ impl SettingsStore {
     #[must_use]
     pub fn daemon_i64(&self, key: &str) -> i64 {
         self.daemon_str(key).trim().parse().unwrap_or_else(|_| {
-            fluxdown_protocol::daemon_config_default(key)
+            rinadown_protocol::daemon_config_default(key)
                 .parse()
                 .unwrap_or(0)
         })
@@ -339,7 +339,7 @@ impl SettingsStore {
     #[must_use]
     pub fn daemon_f64(&self, key: &str) -> f64 {
         self.daemon_str(key).trim().parse().unwrap_or_else(|_| {
-            fluxdown_protocol::daemon_config_default(key)
+            rinadown_protocol::daemon_config_default(key)
                 .parse()
                 .unwrap_or(0.0)
         })
@@ -355,7 +355,7 @@ impl SettingsStore {
             return;
         }
         let value = value.into();
-        let normalized = match fluxdown_protocol::normalize_daemon_config_value(key, &value) {
+        let normalized = match rinadown_protocol::normalize_daemon_config_value(key, &value) {
             Ok(normalized) => normalized,
             Err(error) => {
                 self.set_error(SettingsErrorKind::InvalidArgument, error.to_string(), cx);
@@ -368,7 +368,7 @@ impl SettingsStore {
         self.daemon
             .values
             .insert(key.to_owned(), normalized.clone());
-        if let Some(spec) = fluxdown_protocol::SYNC_SETTING_SPECS
+        if let Some(spec) = rinadown_protocol::SYNC_SETTING_SPECS
             .iter()
             .find(|spec| spec.owner == SettingOwner::Daemon && spec.storage_key == key)
         {
@@ -423,7 +423,7 @@ impl SettingsStore {
         }
         let synced = match setting_spec(key) {
             Some(spec) => {
-                if let Err(error) = fluxdown_protocol::validate_value(spec.key, &value) {
+                if let Err(error) = rinadown_protocol::validate_value(spec.key, &value) {
                     self.set_error(SettingsErrorKind::InvalidArgument, error, cx);
                     return;
                 }
@@ -635,7 +635,7 @@ impl SettingsStore {
     }
     pub fn repair_diagnostics(
         &mut self,
-        params: fluxdown_protocol::DiagnosticRepairParams,
+        params: rinadown_protocol::DiagnosticRepairParams,
         cx: &mut Context<Self>,
     ) {
         let params = serde_json::to_value(params).unwrap_or_else(|_| json!({}));
@@ -886,15 +886,15 @@ impl SettingsStore {
 /// daemon wire 字符串 → 云同步目录键的 JSON 值。
 fn daemon_string_to_json(spec_key: &str, wire: &str) -> Value {
     match setting_value_kind(spec_key) {
-        fluxdown_protocol::SettingValueKind::Boolean => Value::Bool(matches!(wire, "true" | "1")),
-        fluxdown_protocol::SettingValueKind::Integer => {
+        rinadown_protocol::SettingValueKind::Boolean => Value::Bool(matches!(wire, "true" | "1")),
+        rinadown_protocol::SettingValueKind::Integer => {
             wire.parse::<i64>().map_or(Value::Null, Value::from)
         }
-        fluxdown_protocol::SettingValueKind::Float => wire
+        rinadown_protocol::SettingValueKind::Float => wire
             .parse::<f64>()
             .ok()
             .and_then(serde_json::Number::from_f64)
             .map_or(Value::Null, Value::Number),
-        fluxdown_protocol::SettingValueKind::String => Value::String(wire.to_owned()),
+        rinadown_protocol::SettingValueKind::String => Value::String(wire.to_owned()),
     }
 }

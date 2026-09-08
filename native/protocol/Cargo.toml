@@ -1,5 +1,5 @@
 [package]
-name = "fluxdown_protocol"
+name = "rinadown_protocol"
 version = "0.1.0"
 edition.workspace = true
 publish = false

@@ -318,7 +318,7 @@ mod tests {
     /// 「文件已不存在」而不是弹一条系统错误。
     #[test]
     fn missing_path_reports_not_found() {
-        let missing = std::env::temp_dir().join("fluxdown-clipboard-missing-xyz");
+        let missing = std::env::temp_dir().join("rinadown-clipboard-missing-xyz");
         let path = missing.to_string_lossy().to_string();
         assert_eq!(copy_path(&path), Err("not_found".to_string()));
     }
@@ -373,7 +373,7 @@ mod tests {
     fn clipboard_roundtrip_reads_back_the_path() {
         use super::copy_path;
 
-        let dir = std::env::temp_dir().join("fluxdown-clipboard-roundtrip");
+        let dir = std::env::temp_dir().join("rinadown-clipboard-roundtrip");
         assert!(std::fs::create_dir_all(&dir).is_ok(), "建临时目录失败");
         let dir_path = dir.to_string_lossy().to_string();
         assert_eq!(copy_path(&dir_path), Ok(true), "目录应被识别为文件夹");

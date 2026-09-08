@@ -3,7 +3,7 @@
 use std::pin::Pin;
 
 pub type PortFuture<T> =
-    Pin<Box<dyn Future<Output = Result<T, fluxdown_protocol::RpcErrorData>> + Send + 'static>>;
+    Pin<Box<dyn Future<Output = Result<T, rinadown_protocol::RpcErrorData>> + Send + 'static>>;
 
 pub trait SettingsPort: Send + Sync {
     fn call(

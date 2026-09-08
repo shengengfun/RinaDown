@@ -13,7 +13,7 @@ import { CloudApiError } from './types'
 /** 默认服务地址：Actions 打包时经 VITE_FLUXCLOUD_BASE_URL 构建期注入官方地址，
  *  未注入（本地开发）回退本地联调端口，与桌面端 FLUXCLOUD_BASE_URL dart-define 对称。 */
 const DEFAULT_BASE_URL: string = import.meta.env.VITE_FLUXCLOUD_BASE_URL?.trim() || 'http://127.0.0.1:8720'
-const BASE_KEY = 'fluxdown.cloud.base'
+const BASE_KEY = 'rinadown.cloud.base'
 const API_PREFIX = '/api/v1'
 
 /** 当前生效的云服务地址：仅开发构建允许 localStorage 自定义覆盖（对应设置项也只在

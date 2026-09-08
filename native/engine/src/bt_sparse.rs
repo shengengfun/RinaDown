@@ -178,7 +178,7 @@ mod tests {
 
     fn unique_test_dir(tag: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
-            "fluxdown_bt_sparse_test_{tag}_{}_{}",
+            "rinadown_bt_sparse_test_{tag}_{}_{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

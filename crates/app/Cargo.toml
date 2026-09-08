@@ -1,10 +1,10 @@
 [package]
-name = "fluxdown_ui_app"
+name = "rinadown_ui_app"
 version = "0.1.0"
 edition.workspace = true
 
 [[bin]]
-name = "fluxdown-desktop"
+name = "rinadown-desktop"
 path = "src/main.rs"
 
 [lints]
@@ -12,15 +12,15 @@ workspace = true
 
 [dependencies]
 directories = "6"
-fluxdown_protocol = { version = "0.1.0", path = "../../native/protocol" }
-fluxdown_ui_account = { version = "0.1.0", path = "../account" }
-fluxdown_ui_downloads = { path = "../downloads" }
-fluxdown_ui_extensions = { version = "0.1.0", path = "../extensions" }
-fluxdown_ui_i18n = { path = "../i18n" }
-fluxdown_ui_rss = { version = "0.1.0", path = "../rss" }
-fluxdown_ui_settings = { path = "../settings" }
-fluxdown_ui_shell = { path = "../shell" }
-fluxdown_ui_theme = { path = "../theme" }
+rinadown_protocol = { version = "0.1.0", path = "../../native/protocol" }
+rinadown_ui_account = { version = "0.1.0", path = "../account" }
+rinadown_ui_downloads = { path = "../downloads" }
+rinadown_ui_extensions = { version = "0.1.0", path = "../extensions" }
+rinadown_ui_i18n = { path = "../i18n" }
+rinadown_ui_rss = { version = "0.1.0", path = "../rss" }
+rinadown_ui_settings = { path = "../settings" }
+rinadown_ui_shell = { path = "../shell" }
+rinadown_ui_theme = { path = "../theme" }
 futures-util = "0.3.32"
 gpui.workspace = true
 gpui-component.workspace = true

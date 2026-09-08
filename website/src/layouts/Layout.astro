@@ -16,7 +16,7 @@ interface Props {
 }
 
 const {
-  title = "FluxDown — Multi-Protocol Download Manager, Rebuilt in Rust",
+  title = "RinaDown — Multi-Protocol Download Manager, Rebuilt in Rust",
   description = "A multi-protocol download manager rebuilt in Rust — dynamic segmentation, deep browser integration, HTTP/FTP/BitTorrent/ED2K/HLS support. Free and open source.",
   canonicalUrl,
   lang = "en",
@@ -47,7 +47,7 @@ const ogImageUrl = OG_IMAGE_URL;
 ---
 
 <!doctype html>
-<html lang={lang} class="fluxdown-loading" data-fixed-lang={isLangExplicit ? true : undefined}>
+<html lang={lang} class="rinadown-loading" data-fixed-lang={isLangExplicit ? true : undefined}>
   <head>
     <meta charset="utf-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
@@ -76,11 +76,11 @@ const ogImageUrl = OG_IMAGE_URL;
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
     <meta property="og:url" content={resolvedCanonical} />
-    <meta property="og:site_name" content="FluxDown" />
+    <meta property="og:site_name" content="RinaDown" />
     <meta property="og:image" content={ogImageUrl} />
     <meta property="og:image:width" content={String(OG_IMAGE_WIDTH)} />
     <meta property="og:image:height" content={String(OG_IMAGE_HEIGHT)} />
-    <meta property="og:image:alt" content="FluxDown — the download manager, rebuilt in Rust" />
+    <meta property="og:image:alt" content="RinaDown — the download manager, rebuilt in Rust" />
     <meta property="og:locale" content={ogLocale} />
     <meta property="og:locale:alternate" content={ogLocaleAlternate} />
 
@@ -89,7 +89,7 @@ const ogImageUrl = OG_IMAGE_URL;
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImageUrl} />
-    <meta name="twitter:image:alt" content="FluxDown — the download manager, rebuilt in Rust" />
+    <meta name="twitter:image:alt" content="RinaDown — the download manager, rebuilt in Rust" />
 
     <!-- JSON-LD: 全站实体图(Organization + WebSite + SoftwareApplication),页面级节点并入 -->
     <script type="application/ld+json" set:html={JSON.stringify(buildGraph(jsonLdNodes))} />
@@ -120,7 +120,7 @@ const ogImageUrl = OG_IMAGE_URL;
 
         // 1. Theme: apply saved preference or respect system preference
         var savedTheme = null;
-        try { savedTheme = localStorage.getItem('fluxdown-theme'); } catch(e) {}
+        try { savedTheme = localStorage.getItem('rinadown-theme'); } catch(e) {}
         if (savedTheme === 'light') {
           html.classList.add('light');
         } else if (!savedTheme) {
@@ -134,7 +134,7 @@ const ogImageUrl = OG_IMAGE_URL;
         // (显式固定语言的页面,如 docs,不参与该逻辑,避免覆盖服务端渲染的 lang)
         if (!html.hasAttribute('data-fixed-lang')) {
           var savedLocale = null;
-          try { savedLocale = localStorage.getItem('fluxdown-locale'); } catch(e) {}
+          try { savedLocale = localStorage.getItem('rinadown-locale'); } catch(e) {}
           if (savedLocale === 'zh') {
             html.lang = 'zh-CN';
           } else if (savedLocale === 'ja') {
@@ -152,7 +152,7 @@ const ogImageUrl = OG_IMAGE_URL;
         }
 
         // 3. Remove loading class to reveal content (prevents FOUC)
-        html.classList.remove('fluxdown-loading');
+        html.classList.remove('rinadown-loading');
       })();
     </script>
   </head>
@@ -166,7 +166,7 @@ const ogImageUrl = OG_IMAGE_URL;
           html.classList.add('theme-transitioning');
           html.classList.toggle('light');
           var isLight = html.classList.contains('light');
-          localStorage.setItem('fluxdown-theme', isLight ? 'light' : 'dark');
+          localStorage.setItem('rinadown-theme', isLight ? 'light' : 'dark');
           window.dispatchEvent(new CustomEvent('theme-change', { detail: { light: isLight } }));
           // Remove transition class after animation completes
           setTimeout(function() { html.classList.remove('theme-transitioning'); }, 350);

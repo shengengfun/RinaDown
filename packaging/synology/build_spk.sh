@@ -8,7 +8,7 @@
 #   arch 为群晖架构家族值（官方 Appendix A）：x86_64 覆盖全部 Intel/AMD 机型，
 #   armv8 覆盖 rtd1296/rtd1619b/armada37xx 等 ARM64 机型。
 #
-# 前置：imagemagick（convert）用于从 assets/logo/fluxdown_logo.png 生成套件图标。
+# 前置：imagemagick（convert）用于从 assets/logo/rinadown_logo.png 生成套件图标。
 set -eu
 
 [ $# -eq 5 ] || { echo "usage: $0 <version> <dsm6|dsm7> <x86_64|armv8> <binary> <out_spk>" >&2; exit 2; }
@@ -16,7 +16,7 @@ VERSION=$1 DSM=$2 ARCH=$3 BIN=$4 OUT=$5
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
-LOGO="$REPO_ROOT/assets/logo/fluxdown_logo.png"
+LOGO="$REPO_ROOT/assets/logo/rinadown_logo.png"
 
 [ -f "$BIN" ] || { echo "binary not found: $BIN" >&2; exit 1; }
 command -v convert >/dev/null || { echo "imagemagick 'convert' not in PATH" >&2; exit 1; }
@@ -49,14 +49,14 @@ trap 'rm -rf "$work"' EXIT
 stage="$work/stage"
 payload="$work/payload"
 
-# ── package.tgz 载荷：bin/fluxdown-server（Web UI 已编译期内嵌，无 web/ 目录）──
+# ── package.tgz 载荷：bin/rinadown-server（Web UI 已编译期内嵌，无 web/ 目录）──
 mkdir -p "$payload/bin"
-cp "$BIN" "$payload/bin/fluxdown-server"
-chmod 755 "$payload/bin/fluxdown-server"
+cp "$BIN" "$payload/bin/rinadown-server"
+chmod 755 "$payload/bin/rinadown-server"
 
 # ── ui/：DSM 桌面应用入口。官方要求该目录在 package.tgz 内（安装后位于
-#    /var/packages/FluxDown/target/ui），DSM 依 INFO 的 dsmuidir 将其软链到
-#    /usr/syno/synoman/webman/3rdparty/FluxDown，主菜单/导航窗格才会出图标。
+#    /var/packages/RinaDown/target/ui），DSM 依 INFO 的 dsmuidir 将其软链到
+#    /usr/syno/synoman/webman/3rdparty/RinaDown，主菜单/导航窗格才会出图标。
 #    .url 用 protocol+port+url 组合（DSM 以访问 NAS 的主机名自动拼 URL，spksrc 同款）；
 #    图标 {0} 会被 DSM 按 16/24/32/48/64/72/256 逐尺寸请求，须全量生成。──
 mkdir -p "$payload/ui/images"
@@ -66,9 +66,9 @@ done
 cat > "$payload/ui/config" <<'UICONF'
 {
   ".url": {
-    "com.fluxdown.server": {
+    "com.rinadown.server": {
       "type": "url",
-      "title": "FluxDown",
+      "title": "RinaDown",
       "desc": "Blazing fast, multi-protocol download manager",
       "icon": "images/icon_{0}.png",
       "protocol": "http",
@@ -89,19 +89,19 @@ tar -czf "$stage/package.tgz" --owner=0 --group=0 --numeric-owner -C "$payload" 
 EXTRACT_KB=$(du -sk "$payload" | cut -f1)
 CHECKSUM=$(md5sum "$stage/package.tgz" | cut -d' ' -f1)
 {
-	echo 'package="FluxDown"'
+	echo 'package="RinaDown"'
 	echo "version=\"$SPK_VERSION\""
-	echo 'displayname="FluxDown Server"'
+	echo 'displayname="RinaDown Server"'
 	echo 'description="Blazing fast, multi-protocol download manager. Rust engine with HTTP/HTTPS/FTP/BitTorrent/HLS support, intelligent segmentation, and a full Web UI on port 17800."'
 	echo 'maintainer="zerx-lab"'
-	echo 'maintainer_url="https://fluxdown.zerx.dev"'
-	echo 'support_url="https://github.com/zerx-lab/FluxDown/issues"'
+	echo 'maintainer_url="https://rinadown.zerx.dev"'
+	echo 'support_url="https://github.com/zerx-lab/RinaDown/issues"'
 	echo "arch=\"$ARCH\""
 	echo 'thirdparty="yes"'
 	echo 'startable="yes"'
 	echo 'adminport="17800"'
 	echo 'dsmuidir="ui"'
-	echo 'dsmappname="com.fluxdown.server"'
+	echo 'dsmappname="com.rinadown.server"'
 	echo "extractsize=\"$EXTRACT_KB\""
 	echo "checksum=\"$CHECKSUM\""
 	if [ "$DSM" = "dsm7" ]; then

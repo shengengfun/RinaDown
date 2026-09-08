@@ -18,7 +18,7 @@
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/services/shutdown_service.dart';
+import 'package:rina_down/src/services/shutdown_service.dart';
 
 /// Minimal stand-in for the real activeCount source (DownloadController),
 /// which cannot be instantiated in unit tests (it wires up native signal

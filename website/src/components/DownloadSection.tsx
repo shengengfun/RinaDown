@@ -33,33 +33,33 @@ const techStack = [
   { name: "SQLite", color: "text-success" },
 ];
 
-const DOCKER_IMAGE = "ghcr.io/zerx-lab/fluxdown-server:latest";
+const DOCKER_IMAGE = "ghcr.io/zerx-lab/rinadown-server:latest";
 
-const DOCKER_RUN_CMD = `docker run -d --name fluxdown-server \\
+const DOCKER_RUN_CMD = `docker run -d --name rinadown-server \\
   -p 17800:17800 \\
-  -v fluxdown-data:/data \\
+  -v rinadown-data:/data \\
   -v ./downloads:/root/Downloads \\
   --restart unless-stopped \\
   ${DOCKER_IMAGE}`;
 
 const DOCKER_COMPOSE_YML = `services:
-  fluxdown-server:
+  rinadown-server:
     image: ${DOCKER_IMAGE}
-    container_name: fluxdown-server
+    container_name: rinadown-server
     restart: unless-stopped
     ports:
       - "17800:17800"
     volumes:
-      - fluxdown-data:/data
+      - rinadown-data:/data
       - ./downloads:/root/Downloads
 
 volumes:
-  fluxdown-data:`;
+  rinadown-data:`;
 
 // Scoop 自托管源安装命令（本仓库 bucket）。官方 extras 源待项目达标后再加。
 
-const SCOOP_SELFHOSTED_CMD = `scoop bucket add fluxdown https://github.com/zerx-lab/FluxDown
-scoop install fluxdown/fluxdown`;
+const SCOOP_SELFHOSTED_CMD = `scoop bucket add rinadown https://github.com/zerx-lab/RinaDown
+scoop install rinadown/rinadown`;
 
 /* Windows logo — not available in Simple Icons (trademark), use inline SVG.
    color="currentColor"（侧栏）渲染单色；不传 color（详情头部）渲染官方四色磁贴。 */
@@ -109,7 +109,7 @@ interface ReleaseInfo {
     linux_arch: ReleaseAsset | null;
     linux_tarball: ReleaseAsset | null;
   };
-  /** FluxDown Server（headless Web 版）独立 release，无发布时为 null */
+  /** RinaDown Server（headless Web 版）独立 release，无发布时为 null */
   server: {
     version: string;
     tag: string;
@@ -131,7 +131,7 @@ interface ReleaseInfo {
       synology_dsm6_arm64: ReleaseAsset | null;
     };
   } | null;
-  /** FluxDown CLI（命令行客户端）独立 release，无发布时为 null */
+  /** RinaDown CLI（命令行客户端）独立 release，无发布时为 null */
   cli: {
     version: string;
     tag: string;
@@ -144,7 +144,7 @@ interface ReleaseInfo {
       macos_arm64: ReleaseAsset | null;
     };
   } | null;
-  /** FluxDown 移动端（Android）独立 release，无发布时为 null */
+  /** RinaDown 移动端（Android）独立 release，无发布时为 null */
   mobile: {
     version: string;
     tag: string;
@@ -250,17 +250,17 @@ export default function DownloadSection() {
       if (typeof key === "string" && KEYS.includes(key))
         setActivePlatform(key);
     };
-    const w = window as { __fluxdownPendingPlatform?: string };
-    apply(w.__fluxdownPendingPlatform);
-    delete w.__fluxdownPendingPlatform;
+    const w = window as { __rinadownPendingPlatform?: string };
+    apply(w.__rinadownPendingPlatform);
+    delete w.__rinadownPendingPlatform;
     const handler = (e: Event) => {
       apply((e as CustomEvent<string>).detail);
-      (window as { __fluxdownPendingPlatform?: string }).__fluxdownPendingPlatform =
+      (window as { __rinadownPendingPlatform?: string }).__rinadownPendingPlatform =
         undefined;
     };
-    window.addEventListener("fluxdown:select-platform", handler);
+    window.addEventListener("rinadown:select-platform", handler);
     return () =>
-      window.removeEventListener("fluxdown:select-platform", handler);
+      window.removeEventListener("rinadown:select-platform", handler);
   }, []);
 
   const [subscribeTarget, setSubscribeTarget] = useState<string | null>(null);
@@ -356,7 +356,7 @@ export default function DownloadSection() {
     /** 全彩品牌 logo 图片（覆盖 icon 渲染）；imgFull 时铺满整个磁贴（自带圆角底） */
     iconImg?: string;
     iconImgFull?: boolean;
-    /** 平台独立版本号（如 FluxDown Server），缺省时用桌面客户端版本 */
+    /** 平台独立版本号（如 RinaDown Server），缺省时用桌面客户端版本 */
     version?: string;
     setup: ReleaseAsset | null;
     portable: ReleaseAsset | null;
@@ -1308,7 +1308,7 @@ export default function DownloadSection() {
               <div className="flex flex-wrap gap-2">
                 {/* Chrome 官方商店按钮 */}
                 <a
-                  href="https://chromewebstore.google.com/detail/fluxdown/meleenglfggcmcajknpeeeiobnpfmahc"
+                  href="https://chromewebstore.google.com/detail/rinadown/meleenglfggcmcajknpeeeiobnpfmahc"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-blue/30 bg-brand-blue/10 px-4 py-2 text-xs font-semibold text-brand-blue hover:bg-brand-blue/20 transition-colors"
@@ -1325,7 +1325,7 @@ export default function DownloadSection() {
                 </a>
                 {/* Firefox 官方商店按钮 */}
                 <a
-                  href="https://addons.mozilla.org/zh-CN/firefox/addon/fluxdown"
+                  href="https://addons.mozilla.org/zh-CN/firefox/addon/rinadown"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#ff7139]/30 bg-[#ff7139]/10 px-4 py-2 text-xs font-semibold text-[#ff7139] hover:bg-[#ff7139]/20 transition-colors"
@@ -1342,7 +1342,7 @@ export default function DownloadSection() {
                 </a>
                 {/* Edge 官方商店按钮 */}
                 <a
-                  href="https://microsoftedge.microsoft.com/addons/detail/fluxdown/nglkkjbogjghekbhhcnccnpfedjbdhhd"
+                  href="https://microsoftedge.microsoft.com/addons/detail/rinadown/nglkkjbogjghekbhhcnccnpfedjbdhhd"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#0078d4]/30 bg-[#0078d4]/10 px-4 py-2 text-xs font-semibold text-[#3b9eff] hover:bg-[#0078d4]/20 transition-colors"

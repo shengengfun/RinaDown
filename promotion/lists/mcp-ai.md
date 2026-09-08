@@ -1,12 +1,12 @@
-# MCP / AI 工具收录渠道调研（FluxDown）
+# MCP / AI 工具收录渠道调研（RinaDown）
 
 > 核实时间：**2026-07-27**。所有结论均来自当日直读目标仓库的 `README.md` / `CONTRIBUTING.md`、
 > GitHub API（`gh api`，非缓存）、或目标站点 HTML。未能取证的项一律标注「未核实」。
 > 本文件只产出物料与规则，**不代为向任何外部仓库/表单提交**。
 
-## FluxDown 的关键约束（决定所有渠道的资格）
+## RinaDown 的关键约束（决定所有渠道的资格）
 
-FluxDown 的 MCP 是**内嵌在应用里、由用户各自本地自托管的端点**：
+RinaDown 的 MCP 是**内嵌在应用里、由用户各自本地自托管的端点**：
 
 - 传输：Streamable HTTP，`POST http://127.0.0.1:17800/mcp`（默认仅监听回环）
 - 鉴权：`Authorization: Bearer <admin token>`，与管理 API 共用
@@ -23,10 +23,10 @@ FluxDown 的 MCP 是**内嵌在应用里、由用户各自本地自托管的端�
 
 ## 汇总表
 
-| 渠道 | star / 规模 | 最近活跃（当日实测） | 接受本地端点 MCP | FluxDown 够格 | 禁 AI-PR | 优先级 |
+| 渠道 | star / 规模 | 最近活跃（当日实测） | 接受本地端点 MCP | RinaDown 够格 | 禁 AI-PR | 优先级 |
 |---|---:|---|---|---|---|---|
 | [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers) | 91,430 ★ | push 2026-07-25 | ✅ 有 🏠 Local Service 图例 | ✅ **已收录** | ❌ 明确欢迎（`🤖🤖🤖` 快速通道） | ✅ 完成 |
-| [Glama](https://glama.ai/mcp/servers/zerx-lab/FluxDown) | 目录站 | 持续 | ✅ 页面打 `Local` 标签 | ✅ **已收录**（75% 完成度） | — | **P0（补完资料）** |
+| [Glama](https://glama.ai/mcp/servers/zerx-lab/RinaDown) | 目录站 | 持续 | ✅ 页面打 `Local` 标签 | ✅ **已收录**（75% 完成度） | — | **P0（补完资料）** |
 | [TensorBlock/awesome-mcp-servers](https://github.com/TensorBlock/awesome-mcp-servers) | 790 ★ / 7,747 条目 | PR #1393 merged 2026-07-25 | ✅ 元数据字段含 `stdio/sse/streamable-http`，公网端点为可选 | ✅ | ❌ 无禁令（自家 bot 也发 PR） | **P0** |
 | [mcpservers.org](https://mcpservers.org/submit)（= wong2 仓库唯一入口） | 4,227 ★ | push 2026-07-13 | ✅ 未设公网端点门槛 | ✅ | 纯网页表单，无 PR | **P1** |
 | [mcp.so](https://mcp.so/submit) | ~2,031 ★（站点源码 chatmcp/mcpso） | 站点源码 2026-07-26 | ✅ 提交类型区分 "MCP Server" / "Remote Server" | ✅（选 MCP Server） | 纯网页表单，无 PR | **P1** |
@@ -59,7 +59,7 @@ FluxDown 的 MCP 是**内嵌在应用里、由用户各自本地自托管的端�
 线上条目现文（供其他清单复用措辞）：
 
 ```markdown
-- [zerx-lab/FluxDown](https://github.com/zerx-lab/FluxDown) [![zerx-lab/FluxDown MCP server](https://glama.ai/mcp/servers/zerx-lab/FluxDown/badges/score.svg)](https://glama.ai/mcp/servers/zerx-lab/FluxDown) 🦀 🏠 🪟 - Control the FluxDown multi-protocol download manager (HTTP/FTP/BitTorrent/HLS): add, list, pause, resume, remove downloads and manage queues.
+- [zerx-lab/RinaDown](https://github.com/zerx-lab/RinaDown) [![zerx-lab/RinaDown MCP server](https://glama.ai/mcp/servers/zerx-lab/RinaDown/badges/score.svg)](https://glama.ai/mcp/servers/zerx-lab/RinaDown) 🦀 🏠 🪟 - Control the RinaDown multi-protocol download manager (HTTP/FTP/BitTorrent/HLS): add, list, pause, resume, remove downloads and manage queues.
 ```
 
 **此渠道无需再做任何事。**
@@ -68,11 +68,11 @@ FluxDown 的 MCP 是**内嵌在应用里、由用户各自本地自托管的端�
 
 ## 1. Glama —— 已收录，但资料只完成 75%（P0，收益最高）
 
-**接受本地端点：✅ 明确**。FluxDown 页面被打上 `Rust` + **`Local`** 标签，分类 `App Automation`。
+**接受本地端点：✅ 明确**。RinaDown 页面被打上 `Rust` + **`Local`** 标签，分类 `App Automation`。
 这是全网对「本地自托管 MCP」最友好的目录，且是 punkpeye 清单的上游依赖。
 
-- 页面：https://glama.ai/mcp/servers/zerx-lab/FluxDown
-- 评分页：https://glama.ai/mcp/servers/zerx-lab/FluxDown/score
+- 页面：https://glama.ai/mcp/servers/zerx-lab/RinaDown
+- 评分页：https://glama.ai/mcp/servers/zerx-lab/RinaDown/score
 - 当前实测状态：**Profile completion 75%**；Server Coherence **A**；Tool Definition Quality **B**
   （9/9 工具平均 3.5/5，最低 2.8/5）；Maintenance **B**；License **A**（AGPL 3.0 被判定为 permissive）；
   Author verified ✅；Has a Glama release ✅（v0.2.2）
@@ -81,13 +81,13 @@ FluxDown 的 MCP 是**内嵌在应用里、由用户各自本地自托管的端�
 
 | 扣分项 | 原文 | 动作 |
 |---|---|---|
-| No `glama.json` | "Add a glama.json file to provide metadata about your server." | 在 FluxDown 仓库根目录加下方文件 |
+| No `glama.json` | "Add a glama.json file to provide metadata about your server." | 在 RinaDown 仓库根目录加下方文件 |
 | No recent usage | "No tool usage detected in the last 30 days." | 用服务器页的 **Try in Browser** 跑几次工具，播种使用量 |
 | No related servers | "Add related servers to improve discoverability." | 在页面上关联同类服务器（下载/媒体类） |
 | Tool Definition Quality B | 平均 3.5/5，最低 2.8/5 | 改 `native/api/src/mcp.rs` 里各工具的 `description` 与参数说明 |
 | Naming Consistency 4/5 | "queue_list 没有遵循 `download_` 前缀模式" | 仅记录；改名是破坏性变更，**不建议**为分数改 |
 
-**可直接落地的 `glama.json`**（放 FluxDown 仓库根目录，schema 为当日实测拉取）：
+**可直接落地的 `glama.json`**（放 RinaDown 仓库根目录，schema 为当日实测拉取）：
 
 ```json
 {
@@ -96,11 +96,11 @@ FluxDown 的 MCP 是**内嵌在应用里、由用户各自本地自托管的端�
 }
 ```
 
-附带建议（非阻塞）：`FluxDown/README.md` 第 17 行现在挂的是自制 shields 徽章
+附带建议（非阻塞）：`RinaDown/README.md` 第 17 行现在挂的是自制 shields 徽章
 （`img.shields.io/badge/MCP-Glama-...`），可换成 Glama 官方 score 徽章，与 punkpeye 条目一致：
 
 ```markdown
-[![MCP Server](https://glama.ai/mcp/servers/zerx-lab/FluxDown/badges/score.svg)](https://glama.ai/mcp/servers/zerx-lab/FluxDown)
+[![MCP Server](https://glama.ai/mcp/servers/zerx-lab/RinaDown/badges/score.svg)](https://glama.ai/mcp/servers/zerx-lab/RinaDown)
 ```
 
 ---
@@ -143,7 +143,7 @@ FluxDown 的 MCP 是**内嵌在应用里、由用户各自本地自托管的端�
 追加到 `docs/utilities--helpers.md` 最后一行之后：
 
 ```markdown
-- [zerx-lab/FluxDown](https://github.com/zerx-lab/FluxDown): Control the FluxDown multi-protocol download manager from an agent — add tasks from HTTP/HTTPS, FTP, magnet or BitTorrent sources, then list, inspect, pause, resume and remove them and browse named queues. Transport: `streamable-http` at `http://127.0.0.1:17800/mcp`. Auth: bearer token. Install: run the FluxDown desktop app, or the headless server image `ghcr.io/zerx-lab/fluxdown-server`, then enable the MCP endpoint in settings.
+- [zerx-lab/RinaDown](https://github.com/zerx-lab/RinaDown): Control the RinaDown multi-protocol download manager from an agent — add tasks from HTTP/HTTPS, FTP, magnet or BitTorrent sources, then list, inspect, pause, resume and remove them and browse named queues. Transport: `streamable-http` at `http://127.0.0.1:17800/mcp`. Auth: bearer token. Install: run the RinaDown desktop app, or the headless server image `ghcr.io/zerx-lab/rinadown-server`, then enable the MCP endpoint in settings.
 ```
 
 **分类选择理由**：`Utilities & Helpers`（"simple, general-purpose tools"）是唯一贴合的桶。
@@ -153,7 +153,7 @@ FluxDown 的 MCP 是**内嵌在应用里、由用户各自本地自托管的端�
 备选桶为 `docs/filesystems.md`，仅在维护者要求改分类时使用。
 
 **提交入口**：https://github.com/TensorBlock/awesome-mcp-servers/compare （fork 后开 PR）
-**PR 标题建议**：`Add zerx-lab/FluxDown to Utilities & Helpers`（匹配已合并 PR 的标题习惯，
+**PR 标题建议**：`Add zerx-lab/RinaDown to Utilities & Helpers`（匹配已合并 PR 的标题习惯，
 如 #1391 `Add ThomasCrouzet/icloud-mcp to Project and Task Management`）
 
 ---
@@ -176,9 +176,9 @@ FluxDown 的 MCP 是**内嵌在应用里、由用户各自本地自托管的端�
 
 | 字段 | 填写内容 |
 |---|---|
-| Server Name | `FluxDown` |
-| Short Description | `Control the FluxDown multi-protocol download manager (HTTP/FTP/BitTorrent/HLS) from AI agents — add, list, pause, resume and remove downloads and manage queues over a local Streamable HTTP MCP endpoint.` |
-| Link (GitHub or docs) | `https://github.com/zerx-lab/FluxDown` |
+| Server Name | `RinaDown` |
+| Short Description | `Control the RinaDown multi-protocol download manager (HTTP/FTP/BitTorrent/HLS) from AI agents — add, list, pause, resume and remove downloads and manage queues over a local Streamable HTTP MCP endpoint.` |
+| Link (GitHub or docs) | `https://github.com/zerx-lab/RinaDown` |
 | Category | 下拉里没有"下载/媒体"，可选项为 Development / Productivity / Database / Search / Web Scraping / File System / Version Control / Communication / Cloud Service / Cloud Storage / Marketing / Finance / Design / Memory / Other → **选 `File System`**（次选 `Productivity`） |
 | Contact Email | 你本人的邮箱 |
 
@@ -190,11 +190,11 @@ FluxDown 的 MCP 是**内嵌在应用里、由用户各自本地自托管的端�
 README 全文只讲怎么本地跑站点，不含条目提交流程；条目数据在 Supabase 里，不在仓库里。
 
 **接受本地端点：✅**。表单顶部就把提交类型分成 **MCP Server / Remote Server / MCP Client** 三类
-——"Remote Server" 才是公网端点那一类，FluxDown 选 **MCP Server**。
+——"Remote Server" 才是公网端点那一类，RinaDown 选 **MCP Server**。
 
 **提交入口**：https://mcp.so/submit?type=server
 **费用**：免费（排队审核、无徽章、随机排序、nofollow）；或 **$39 一次性**（免审核立即发布、Verified 徽章、featured 排序、dofollow）。
-**必填**：Repository URL → `https://github.com/zerx-lab/FluxDown`（Name 可留空自动抓取）。
+**必填**：Repository URL → `https://github.com/zerx-lab/RinaDown`（Name 可留空自动抓取）。
 
 ---
 
@@ -205,11 +205,11 @@ README 全文只讲怎么本地跑站点，不含条目提交流程；条目数�
 
 **提交入口**：https://www.pulsemcp.com/submit → 选 **MCP Server**
 **唯一必填**：URL，提示语原文 "Can be a GitHub repository, a subfolder of a repository, or a standalone website."
-→ 填 `https://github.com/zerx-lab/FluxDown`
+→ 填 `https://github.com/zerx-lab/RinaDown`
 **免费**，无 star/年龄门槛。
 
 注意：PulseMCP 首选数据源是官方 MCP Registry（"We ingest entries from the Official MCP Registry
-daily and process them weekly"）。FluxDown 进不了官方 registry，**必须走这个手工表单**。
+daily and process them weekly"）。RinaDown 进不了官方 registry，**必须走这个手工表单**。
 
 ---
 
@@ -222,14 +222,14 @@ daily and process them weekly"）。FluxDown 进不了官方 registry，**必须
 `closed / state_reason=completed` 的收录（#2099 于 2026-07-24 完成）。
 
 **问题所在（前置项）**：Cline 的一键安装模型是「把你的 README 丢给 Cline，让它自动 clone + 配置」。
-FluxDown 的 MCP 不能单独 clone 运行，必须先装整个 FluxDown 应用或起 headless 容器。
+RinaDown 的 MCP 不能单独 clone 运行，必须先装整个 RinaDown 应用或起 headless 容器。
 README 原文要求：
 
 > Confirm that you have tested giving Cline just your `README.md` and/or the `llms-install.md`
 > and watched him successfully setup the server.
 
-**因此提交前必须在 FluxDown 仓库根目录加一个 `llms-install.md`**，内容至少覆盖：
-用 `docker run ghcr.io/zerx-lab/fluxdown-server` 起服务（镜像为 amd64 + arm64 多架构）→
+**因此提交前必须在 RinaDown 仓库根目录加一个 `llms-install.md`**，内容至少覆盖：
+用 `docker run ghcr.io/zerx-lab/rinadown-server` 起服务（镜像为 amd64 + arm64 多架构）→
 从首次启动日志里取 admin token → 把 `http://127.0.0.1:17800/mcp` + `Authorization: Bearer <token>`
 写进客户端 `mcpServers` 配置。并亲自用 Cline 跑通一遍。
 
@@ -247,10 +247,10 @@ README 原文要求：
 
 **接受本地端点：⚠️ 有条件**。实测 https://smithery.ai/docs/build/publish.md 只有两个发布 Tab：
 
-| 路径 | 要求 | FluxDown 是否满足 |
+| 路径 | 要求 | RinaDown 是否满足 |
 |---|---|---|
 | **URL**（Bring your own hosting） | "Streamable HTTP transport" + **public HTTPS URL**；Smithery 会用 `SmitheryBot/1.0` 从 Cloudflare Workers 主动扫描你的端点 | ❌ `127.0.0.1` 不可达 |
-| **Local (MCPB Bundle)** | 明文限定 "**For local stdio servers**"，需上传预构建 `.mcpb` 包 | ⚠️ FluxDown 是 HTTP 不是 stdio |
+| **Local (MCPB Bundle)** | 明文限定 "**For local stdio servers**"，需上传预构建 `.mcpb` 包 | ⚠️ RinaDown 是 HTTP 不是 stdio |
 
 **结论**：想上 Smithery，唯一现实路径是**做一个 stdio→HTTP 的桥接进程并打成 `.mcpb` 包**：
 一个极薄的 stdio MCP 代理，把 JSON-RPC 转发到用户本机 `http://127.0.0.1:17800/mcp`，
@@ -302,7 +302,7 @@ connection without deploying it" —— 但那是**终端用户自己打隧道**
 - **排版**：每行 `- <img src="..." height="14"/> [Name](url) - Description`，图标 14px，描述不带句号。
 
 ```markdown
-- <img src="https://cdn.simpleicons.org/rust/CE422B" height="14"/> [FluxDown](https://github.com/zerx-lab/FluxDown) - Multi-protocol download manager (HTTP/FTP/BitTorrent/HLS) exposing a local Streamable HTTP MCP endpoint to add, list, pause, resume and remove downloads and manage queues
+- <img src="https://cdn.simpleicons.org/rust/CE422B" height="14"/> [RinaDown](https://github.com/zerx-lab/RinaDown) - Multi-protocol download manager (HTTP/FTP/BitTorrent/HLS) exposing a local Streamable HTTP MCP endpoint to add, list, pause, resume and remove downloads and manage queues
 ```
 
 其他要求：一个 PR 只提一条、PR 标题要有意义、检查拼写、去尾随空格、先搜重复。无 star/年龄/截图门槛。
@@ -324,14 +324,14 @@ connection without deploying it" —— 但那是**终端用户自己打隧道**
 >
 > We don't accept: **New server implementations** — We encourage you to publish them to the MCP Server Registry instead.
 
-→ 这个渠道已 100% 重定向到官方 registry，而 registry 恰恰拒收 FluxDown。**死路，不要提 PR。**
+→ 这个渠道已 100% 重定向到官方 registry，而 registry 恰恰拒收 RinaDown。**死路，不要提 PR。**
 
 ### ✖ modelcontextprotocol/registry（官方 registry）—— 已实测拒收
 
 `remotes` 类型要求公网可达 URL，`mcp-publisher validate` 实测拒绝 `http://127.0.0.1:17800/mcp`；
-`packages` 类型要求发布 npm/PyPI/NuGet 等可安装包，FluxDown 没有。
-（此结论沿用 `FluxDown/promotion/README.md` 已记录的实测，本次未重跑。）
-`FluxDown/promotion/mcp/server.json` 保留作官方 MCP 描述文档，**不是** registry 提交物。
+`packages` 类型要求发布 npm/PyPI/NuGet 等可安装包，RinaDown 没有。
+（此结论沿用 `RinaDown/promotion/README.md` 已记录的实测，本次未重跑。）
+`RinaDown/promotion/mcp/server.json` 保留作官方 MCP 描述文档，**不是** registry 提交物。
 
 ### ✖ docker/mcp-registry（Docker MCP Catalog / Docker Desktop MCP Toolkit）—— 协议不合格
 
@@ -340,8 +340,8 @@ connection without deploying it" —— 但那是**终端用户自己打隧道**
 > Make sure that the license of your MCP Server allows people to consume it.
 > (MIT or Apache 2 are great, **GPL is not**).
 
-FluxDown 是 **AGPL-3.0**，被这一条直接排除。技术上本来是匹配的（它明确支持
-"🏠 Local Servers (Containerized)"，FluxDown 也有 `ghcr.io/zerx-lab/fluxdown-server` 多架构镜像），
+RinaDown 是 **AGPL-3.0**，被这一条直接排除。技术上本来是匹配的（它明确支持
+"🏠 Local Servers (Containerized)"，RinaDown 也有 `ghcr.io/zerx-lab/rinadown-server` 多架构镜像），
 **唯一的阻断项就是协议**。除非改协议——不建议——否则不要投。
 
 ### ✖ wong2/awesome-mcp-servers 直接提 PR —— 明文不接受
@@ -354,9 +354,9 @@ FluxDown 是 **AGPL-3.0**，被这一条直接排除。技术上本来是匹配�
 
 | # | 动作 | 谁做 | 阻断项 |
 |---|---|---|---|
-| 1 | ✅ **已完成** 2026-07-27：`FluxDown/glama.json` 已创建（$schema + maintainers:["zerx-lab"]） | 已代做 | — |
+| 1 | ✅ **已完成** 2026-07-27：`RinaDown/glama.json` 已创建（$schema + maintainers:["zerx-lab"]） | 已代做 | — |
 | 2 | Glama 页面用 Try in Browser 播种使用量 + 关联相似服务器 | **你本人**（需登录 Glama） | 需账号 |
-| 3 | ✅ **已完成** 2026-07-27：`native/api/src/mcp.rs` 12 个工具的 description 与参数说明全部改写为英文，覆盖「做什么 + 参数语义 + 返回什么」；`cargo check -p fluxdown_api` 通过，`mcp::tests::tools_list_returns_every_tool` 通过 | 已代做 | — |
+| 3 | ✅ **已完成** 2026-07-27：`native/api/src/mcp.rs` 12 个工具的 description 与参数说明全部改写为英文，覆盖「做什么 + 参数语义 + 返回什么」；`cargo check -p rinadown_api` 通过，`mcp::tests::tools_list_returns_every_tool` 通过 | 已代做 | — |
 | 4 | ✅ **已提交** 2026-07-27：PR https://github.com/TensorBlock/awesome-mcp-servers/pull/1420 | 已代做 | 等审核 |
 | 5 | mcpservers.org / mcp.so / PulseMCP 三个表单各填一次（均免费） | **你本人**（需邮箱/人机验证） | 无 |
 | 6 | 出 400×400 PNG logo + 写 `llms-install.md` + 用 Cline 跑通 → 提 Cline issue | 可代做前两项 | 需你本人验证 |

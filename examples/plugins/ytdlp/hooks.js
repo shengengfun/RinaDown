@@ -1,4 +1,4 @@
-// FluxDown 插件：yt-dlp 通用解析 onDone 钩子（classic script，入口挂 globalThis）。
+// RinaDown 插件：yt-dlp 通用解析 onDone 钩子（classic script，入口挂 globalThis）。
 //
 // 作用：关闭「优先 MP4 容器」时，下载完成后把非 mp4 产物（通常为 VP9/WebM）
 // 用 ffmpeg 转码为 H.264/AAC 的兼容 mp4。站点无关——对任意来源的非 mp4 产物生效。
@@ -7,7 +7,7 @@
 //   1. 设置「优先 MP4 容器」= 关（preferMp4 === false）；
 //   2. 产物不是 .mp4/.m4a（即 webm 等非 mp4 容器）；
 //   3. flux.ffmpeg 门面存在（manifest 已声明 permissions:["ffmpeg"] 授权）
-//      且 FluxDown 装有 ffmpeg（可在 App「组件」页安装）。
+//      且 RinaDown 装有 ffmpeg（可在 App「组件」页安装）。
 //
 // 约束（见 flux.ffmpeg 契约）：ffmpeg 在任务 save_dir 牢笼内执行，参数中的文件
 // 一律用相对名（basename，前缀 './' 防以 '-' 开头的文件名被当作选项）；绝对路径
@@ -100,7 +100,7 @@ globalThis.onDone = async (ctx) => {
   flux.logger.info('[ytdlp] onDone: 已转为 mp4:', outName, '(' + secs + 's，源文件保留)');
 
   // 登记衍生产物：使 App「删除任务并删除文件」时把 mp4 与源 webm 一并删除，
-  // 保证单一任务的所有文件成组管理。旧版 FluxDown 无此 API 时静默跳过。
+  // 保证单一任务的所有文件成组管理。旧版 RinaDown 无此 API 时静默跳过。
   if (flux.task && flux.task.recordArtifact) {
     try {
       await flux.task.recordArtifact(outName);

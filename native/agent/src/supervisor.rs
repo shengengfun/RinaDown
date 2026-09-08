@@ -1,4 +1,4 @@
-//! agent 对同级 `fluxdownd` 的单飞启动与异步回收。
+//! agent 对同级 `rinadownd` 的单飞启动与异步回收。
 
 use std::path::PathBuf;
 use std::process::Stdio;
@@ -9,9 +9,9 @@ use tokio::sync::Mutex;
 /// daemon 启动错误。
 #[derive(Debug, thiserror::Error)]
 pub enum SupervisorError {
-    #[error("could not locate sibling fluxdownd: {0}")]
+    #[error("could not locate sibling rinadownd: {0}")]
     Locate(#[from] std::io::Error),
-    #[error("failed to spawn fluxdownd: {0}")]
+    #[error("failed to spawn rinadownd: {0}")]
     Spawn(String),
 }
 
@@ -64,8 +64,8 @@ impl DaemonSupervisor {
         let supervisor_state = self.state.clone();
         state.reapers.push(tokio::spawn(async move {
             match child.wait().await {
-                Ok(status) => tracing::info!(%status, "supervised fluxdownd exited"),
-                Err(error) => tracing::warn!(error = %error, "failed to reap fluxdownd"),
+                Ok(status) => tracing::info!(%status, "supervised rinadownd exited"),
+                Err(error) => tracing::warn!(error = %error, "failed to reap rinadownd"),
             }
             let mut state = supervisor_state.lock().await;
             if state.generation == generation {
@@ -77,14 +77,14 @@ impl DaemonSupervisor {
 }
 
 fn daemon_executable() -> Result<PathBuf, std::io::Error> {
-    if let Some(path) = std::env::var_os("FLUXDOWN_DAEMON_BIN") {
+    if let Some(path) = std::env::var_os("RINADOWN_DAEMON_BIN") {
         return Ok(PathBuf::from(path));
     }
     let current = std::env::current_exe()?;
     let name = if cfg!(windows) {
-        "fluxdownd.exe"
+        "rinadownd.exe"
     } else {
-        "fluxdownd"
+        "rinadownd"
     };
     Ok(current.with_file_name(name))
 }

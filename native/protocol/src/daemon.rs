@@ -907,7 +907,7 @@ pub struct LinkPairConfirmRequest {
 
 /// 响应方处理一次入站配对 `confirm` 的终局（HTTP 层用于渲染 `paired` + `reason`）。
 ///
-/// 与引擎 `link::manager::PairConfirmOutcome` 一一对应，但独立定义：`fluxdown_api`
+/// 与引擎 `link::manager::PairConfirmOutcome` 一一对应，但独立定义：`rinadown_api`
 /// 不依赖引擎的 link 模块（后者是可选 feature，移动端整块不编译）。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinkPairConfirmOutcome {
@@ -1427,7 +1427,7 @@ pub enum WsServerMsg {
         total_segments: i32,
     },
     /// 多 CDN 并发下载的节点级活动事件（任务详情日志）。语义与字段约定见
-    /// `fluxdown_engine::events::EngineEvent::TaskCdnEvent`。
+    /// `rinadown_engine::events::EngineEvent::TaskCdnEvent`。
     TaskCdnEvent {
         task_id: String,
         /// "pool" | "kick" | "breaker" | "fallback" | "summary"
@@ -1789,7 +1789,7 @@ pub struct StatsResponse {
     pub server_version: String,
     /// 当前 WS 连接数。
     pub ws_clients: usize,
-    /// 演示模式开关（服务器以 `FLUXDOWN_DEMO_URL` 启动时为 true）。
+    /// 演示模式开关（服务器以 `RINADOWN_DEMO_URL` 启动时为 true）。
     pub demo_mode: bool,
     /// 演示模式下唯一允许下载的 URL；非演示模式为空串。
     pub demo_url: String,

@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use fluxdown_protocol::daemon::{
+use rinadown_protocol::daemon::{
     BtFileDto, HlsQualityOptionDto, QueueDto, QueuePositionDto, ResolveVariantOptionDto,
     SegmentDetailDto, TaskDto, WsClientMsg, WsServerMsg,
 };
@@ -191,7 +191,7 @@ fn sample_queue_dto(id: &str) -> QueueDto {
         default_save_dir: "/downloads/work".into(),
         position: 1,
         default_segments: 4,
-        default_user_agent: "FluxDown/1.0".into(),
+        default_user_agent: "RinaDown/1.0".into(),
         is_running: true,
         schedule_enabled: false,
         schedule_start: String::new(),

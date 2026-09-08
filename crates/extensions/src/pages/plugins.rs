@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use fluxdown_protocol::{InstalledPlugin, MarketEntryDto, PluginDto};
+use rinadown_protocol::{InstalledPlugin, MarketEntryDto, PluginDto};
 use gpui::{
     AppContext as _, Context, Entity, IntoElement, ParentElement, SharedString, Styled, Window,
     div, prelude::FluentBuilder as _, px,
@@ -678,8 +678,8 @@ impl ExtensionsView {
                 market.loading = false;
                 match result.and_then(|value| {
                     serde_json::from_value::<Vec<MarketEntryDto>>(value).map_err(|_| {
-                        fluxdown_protocol::RpcErrorData::new(
-                            fluxdown_protocol::ApplicationErrorCode::ProtocolIncompatible,
+                        rinadown_protocol::RpcErrorData::new(
+                            rinadown_protocol::ApplicationErrorCode::ProtocolIncompatible,
                             false,
                         )
                     })
@@ -832,7 +832,7 @@ impl ExtensionsView {
     fn finish_plugin_op(
         &mut self,
         op: PluginOp,
-        result: Result<serde_json::Value, fluxdown_protocol::RpcErrorData>,
+        result: Result<serde_json::Value, rinadown_protocol::RpcErrorData>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -1011,7 +1011,7 @@ impl ExtensionsView {
 
 #[cfg(test)]
 mod tests {
-    use fluxdown_protocol::MarketEntryDto;
+    use rinadown_protocol::MarketEntryDto;
 
     use super::filter_market;
 

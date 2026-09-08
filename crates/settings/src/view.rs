@@ -1,7 +1,7 @@
 //! 设置窗口内容：左侧分类 + 搜索 + 右侧分区（gpui-component `Settings` DSL）。
 
-use fluxdown_ui_i18n::Translator;
-use fluxdown_ui_theme::active_theme;
+use rinadown_ui_i18n::Translator;
+use rinadown_ui_theme::active_theme;
 use gpui::{
     AnyView, Context, Entity, IntoElement, ParentElement, Render, SharedString, Styled, Window,
     div, prelude::FluentBuilder as _, px,
@@ -129,7 +129,7 @@ impl Render for SettingsView {
             })
             .child(
                 div().flex_1().min_h_0().child(
-                    Settings::new("fluxdown-settings")
+                    Settings::new("rinadown-settings")
                         .sidebar_width(px(200.))
                         .with_group_variant(GroupBoxVariant::Outline)
                         .small()

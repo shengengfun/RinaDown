@@ -1,4 +1,4 @@
-// FluxDown 本地互联（link）管理面 REST 客户端 —— 局域网直连配对/发现/下发任务，与云中转
+// RinaDown 本地互联（link）管理面 REST 客户端 —— 局域网直连配对/发现/下发任务，与云中转
 // （lib/cloud/*）完全独立、互不影响。契约见 native/api/src/routes.rs 新增 API_LINK_* 常量 +
 // web/link_mgmt_contract.md；复用 lib/api.ts 的 apiFetch，走同一鉴权/错误处理管线（401 清
 // 凭证跳登录、非 2xx 抛 ApiError，message 经 translateBackendMessage 本地化）。

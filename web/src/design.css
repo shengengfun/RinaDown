@@ -1,5 +1,5 @@
 /* ============================================================
-   FluxDown Web — 应用样式
+   RinaDown Web — 应用样式
    移植自 design/web/styles.css 的 .webapp 作用域部分（像素级依据）；
    仅做两处机械转换：.webapp → :root、[data-theme="dark"] → .dark。
    布局微调用 Tailwind v4 工具类（见 index.css 的 @theme 令牌）。

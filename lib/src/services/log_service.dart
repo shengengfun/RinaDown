@@ -12,14 +12,14 @@ import 'platform_utils.dart';
 ///
 /// 日志目录由 [resolveDataDir] 决定：
 /// - Windows 便携版: exe 同级 logs/
-/// - Windows 安装版: %LOCALAPPDATA%/FluxDown/logs/
-/// - Linux: ~/.local/share/fluxdown/logs/
-/// - macOS: ~/Library/Application Support/fluxdown/logs/
+/// - Windows 安装版: %LOCALAPPDATA%/RinaDown/logs/
+/// - Linux: ~/.local/share/rinadown/logs/
+/// - macOS: ~/Library/Application Support/rinadown/logs/
 ///
 /// 使用缓冲写入 + 定时刷盘，兼顾性能和崩溃前日志完整度。
 ///
 /// 自动分割与清理（与 Rust 端 logger.rs 协议一致）：
-/// - 单文件超过 2MB 自动分割为 `fluxdown_YYYY-MM-DD.N.log` 分卷；
+/// - 单文件超过 2MB 自动分割为 `rinadown_YYYY-MM-DD.N.log` 分卷；
 /// - 日志总大小超过上限（默认 10MB，可在设置中调整）时按
 ///   （日期, 分卷序号）从最旧开始删除；
 /// - 清理只做目录遍历 + stat，不读文件内容，内存占用极小。
@@ -62,9 +62,9 @@ class LogService {
   /// 日志目录总大小默认上限（可由设置覆盖，见 [maxTotalBytes]）
   static const int _defaultMaxTotalBytes = 10 * 1024 * 1024;
 
-  /// 日志文件名格式：fluxdown_YYYY-MM-DD.log 或 fluxdown_YYYY-MM-DD.N.log
+  /// 日志文件名格式：rinadown_YYYY-MM-DD.log 或 rinadown_YYYY-MM-DD.N.log
   static final RegExp _logNamePattern = RegExp(
-    r'^fluxdown_(\d{4}-\d{2}-\d{2})(?:\.(\d+))?\.log$',
+    r'^rinadown_(\d{4}-\d{2}-\d{2})(?:\.(\d+))?\.log$',
   );
 
   int _maxTotalBytes = _defaultMaxTotalBytes;
@@ -265,7 +265,7 @@ class LogService {
     for (final entity in _logDir.listSync()) {
       if (entity is! File) continue;
       final name = p.basename(entity.path);
-      if (!name.startsWith('fluxdown_') || !name.endsWith('.log')) continue;
+      if (!name.startsWith('rinadown_') || !name.endsWith('.log')) continue;
       logFiles.add(entity);
     }
     if (logFiles.isEmpty) return 0;
@@ -330,7 +330,7 @@ class LogService {
     for (final entity in _logDir.listSync()) {
       if (entity is! File) continue;
       final name = p.basename(entity.path);
-      if (!name.startsWith('fluxdown_') || !name.endsWith('.log')) continue;
+      if (!name.startsWith('rinadown_') || !name.endsWith('.log')) continue;
       try {
         total += entity.lengthSync();
       } catch (_) {}
@@ -345,7 +345,7 @@ class LogService {
     for (final entity in _logDir.listSync()) {
       if (entity is! File) continue;
       final name = p.basename(entity.path);
-      if (!name.startsWith('fluxdown_') || !name.endsWith('.log')) continue;
+      if (!name.startsWith('rinadown_') || !name.endsWith('.log')) continue;
       count++;
     }
     return count;
@@ -378,7 +378,7 @@ class LogService {
 
     _writeRaw(
       '\n'
-      '====== FluxDown log session started at $now ======\n'
+      '====== RinaDown log session started at $now ======\n'
       '  pid: $pid\n'
       '  exe: ${Platform.resolvedExecutable}\n'
       '  isolate: ${Isolate.current.debugName}\n'
@@ -406,7 +406,7 @@ class LogService {
 
   String _filePath(String dateTag, int part) {
     final suffix = part == 0 ? '' : '.$part';
-    return '${_logDir.path}${Platform.pathSeparator}fluxdown_$dateTag$suffix.log';
+    return '${_logDir.path}${Platform.pathSeparator}rinadown_$dateTag$suffix.log';
   }
 
   /// 找到 [dateTag] 当天已有的最大分卷序号；若该分卷已写满则返回下一个序号。
@@ -506,16 +506,16 @@ class LogService {
 
   /// 解析日志目录：委托 platform_utils.resolveDataDir()，加 /logs 后缀。
   ///
-  /// - Linux: ~/.local/share/fluxdown/logs
-  /// - macOS: ~/Library/Application Support/fluxdown/logs
+  /// - Linux: ~/.local/share/rinadown/logs
+  /// - macOS: ~/Library/Application Support/rinadown/logs
   /// - Windows 便携版: exe 同级 logs/
-  /// - Windows 安装版: %LOCALAPPDATA%/FluxDown/logs
+  /// - Windows 安装版: %LOCALAPPDATA%/RinaDown/logs
   static Directory _resolveLogDir() {
     final dataDir = resolveDataDir();
     return Directory('$dataDir${Platform.pathSeparator}logs');
   }
 
-  /// 清理超过 [_retentionDays] 天的 fluxdown_*.log 文件。
+  /// 清理超过 [_retentionDays] 天的 rinadown_*.log 文件。
   void _cleanupOldLogs() {
     try {
       if (!_logDir.existsSync()) return;
@@ -523,7 +523,7 @@ class LogService {
       for (final entity in _logDir.listSync()) {
         if (entity is! File) continue;
         final name = entity.uri.pathSegments.last;
-        if (!name.startsWith('fluxdown_') || !name.endsWith('.log')) continue;
+        if (!name.startsWith('rinadown_') || !name.endsWith('.log')) continue;
         try {
           final modified = entity.lastModifiedSync();
           if (modified.isBefore(cutoff)) {

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Maintainer>
-  <Icon>https://cdn.jsdelivr.net/gh/zerx-lab/FluxDown@main/assets/logo/fluxdown_logo.svg</Icon>
+  <Icon>https://cdn.jsdelivr.net/gh/zerx-lab/RinaDown@main/assets/logo/rinadown_logo.svg</Icon>
   <Profile>
-    zerx-lab builds FluxDown, a Rust-powered multi-protocol download manager (HTTP/HTTPS/FTP/BitTorrent/HLS) with a Web UI, browser extension, aria2-compatible JSON-RPC and an MCP endpoint. Free, no ads, no tracking.
+    zerx-lab builds RinaDown, a Rust-powered multi-protocol download manager (HTTP/HTTPS/FTP/BitTorrent/HLS) with a Web UI, browser extension, aria2-compatible JSON-RPC and an MCP endpoint. Free, no ads, no tracking.
   </Profile>
-  <WebPage>https://fluxdown.zerx.dev</WebPage>
+  <WebPage>https://rinadown.zerx.dev</WebPage>
 </Maintainer>

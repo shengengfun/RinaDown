@@ -1,10 +1,10 @@
-; FluxDown Windows Installer Script (Inno Setup)
+; RinaDown Windows Installer Script (Inno Setup)
 ; This script is used by GitHub Actions to build the installer.
 
-#define MyAppName "FluxDown"
-#define MyAppPublisher "FluxDown"
+#define MyAppName "RinaDown"
+#define MyAppPublisher "RinaDown"
 #define MyAppURL "https://github.com/user/x_down"
-#define MyAppExeName "flux_down.exe"
+#define MyAppExeName "rina_down.exe"
 
 ; Version is passed from CI via /DMyAppVersion=x.y.z
 #ifndef MyAppVersion
@@ -29,7 +29,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir=..\..\build\installer
-OutputBaseFilename=FluxDown-{#MyAppVersion}-windows-{#MyAppArch}-setup
+OutputBaseFilename=RinaDown-{#MyAppVersion}-windows-{#MyAppArch}-setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -60,8 +60,8 @@ english.FileAssociations=File associations:
 chinesesimplified.FileAssociations=文件关联：
 english.LaunchOnStartup=Launch at system startup
 chinesesimplified.LaunchOnStartup=开机时自动启动
-english.TorrentAssoc=Associate .torrent files with FluxDown
-chinesesimplified.TorrentAssoc=将 .torrent 文件关联到 FluxDown
+english.TorrentAssoc=Associate .torrent files with RinaDown
+chinesesimplified.TorrentAssoc=将 .torrent 文件关联到 RinaDown
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -88,24 +88,24 @@ Filename: "{app}\{#MyAppExeName}"; Flags: nowait skipifdoesntexist skipifnotsile
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: """{app}\{#MyAppExeName}"" --silentStart"; Flags: uninsdeletevalue; Tasks: launchonstartup
 
 ; .torrent file association
-Root: HKCU; Subkey: "Software\Classes\.torrent"; ValueType: string; ValueData: "FluxDown.TorrentFile"; Flags: uninsdeletekey; Tasks: torrentassoc
-Root: HKCU; Subkey: "Software\Classes\FluxDown.TorrentFile"; ValueType: string; ValueData: "BitTorrent File"; Flags: uninsdeletekey; Tasks: torrentassoc
-Root: HKCU; Subkey: "Software\Classes\FluxDown.TorrentFile\DefaultIcon"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"",0"; Flags: uninsdeletekey; Tasks: torrentassoc
-Root: HKCU; Subkey: "Software\Classes\FluxDown.TorrentFile\shell\open\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey; Tasks: torrentassoc
+Root: HKCU; Subkey: "Software\Classes\.torrent"; ValueType: string; ValueData: "RinaDown.TorrentFile"; Flags: uninsdeletekey; Tasks: torrentassoc
+Root: HKCU; Subkey: "Software\Classes\RinaDown.TorrentFile"; ValueType: string; ValueData: "BitTorrent File"; Flags: uninsdeletekey; Tasks: torrentassoc
+Root: HKCU; Subkey: "Software\Classes\RinaDown.TorrentFile\DefaultIcon"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"",0"; Flags: uninsdeletekey; Tasks: torrentassoc
+Root: HKCU; Subkey: "Software\Classes\RinaDown.TorrentFile\shell\open\command"; ValueType: string; ValueData: """{app}\{#MyAppExeName}"" ""%1"""; Flags: uninsdeletekey; Tasks: torrentassoc
 
 [UninstallDelete]
 ; 删除 KvStore 落盘文件（含匿名统计设备 ID / 首装标记 / 窗口状态等本地偏好）。
 ; 语义：卸载后重装 = 生成新设备 ID = 统计为新安装；升级/覆盖安装不触发本节，ID 保留。
-; 路径 = shared_preferences_windows：%APPDATA%\<CompanyName>\<ProductName>（Runner.rc 均为 FluxDown）。
-Type: files; Name: "{userappdata}\FluxDown\FluxDown\shared_preferences.json"
-Type: dirifempty; Name: "{userappdata}\FluxDown\FluxDown"
-Type: dirifempty; Name: "{userappdata}\FluxDown"
+; 路径 = shared_preferences_windows：%APPDATA%\<CompanyName>\<ProductName>（Runner.rc 均为 RinaDown）。
+Type: files; Name: "{userappdata}\RinaDown\RinaDown\shared_preferences.json"
+Type: dirifempty; Name: "{userappdata}\RinaDown\RinaDown"
+Type: dirifempty; Name: "{userappdata}\RinaDown"
 
 ; NMH manifest JSON files written at runtime by native/hub/src/nmh_registry.rs
 ; into the exe's own directory (never installed via [Files], so the standard
 ; uninstall never learns about them and leaves them on disk).
-Type: files; Name: "{app}\com.fluxdown.nmh.json"
-Type: files; Name: "{app}\com.fluxdown.nmh.firefox.json"
+Type: files; Name: "{app}\com.rinadown.nmh.json"
+Type: files; Name: "{app}\com.rinadown.nmh.firefox.json"
 
 [Code]
 function DesktopIconAlreadyExists: Boolean;
@@ -118,7 +118,7 @@ var
   ResultCode: Integer;
 begin
   Result := '';
-  { Force-kill flux_down.exe as a fallback in case Restart Manager fails }
+  { Force-kill rina_down.exe as a fallback in case Restart Manager fails }
   Exec('taskkill', '/f /im {#MyAppExeName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   { Upgrade installs must overwrite the previous uninstaller; a stray
     read-only attribute on it makes CreateFile fail with access denied.
@@ -144,7 +144,7 @@ begin
   Result := Copy(Command, FirstQuote + 1, SecondQuote - 1);
 end;
 
-{ Remove a URL scheme handler (fluxdown:// / ed2k:// / magnet:) registered at runtime by
+{ Remove a URL scheme handler (rinadown:// / ed2k:// / magnet:) registered at runtime by
   native/hub/src/protocol_registry.rs. These keys live under
   HKCU\Software\Classes\<scheme> and are never declared in [Registry] — the
   standard uninstall never removes them, and Windows tries to relaunch the
@@ -175,20 +175,20 @@ procedure RemoveTorrentAssociation;
 var
   Command, RegisteredExe, AppExe, ProgId: String;
 begin
-  if not RegQueryStringValue(HKCU, 'Software\Classes\FluxDown.TorrentFile\shell\open\command', '', Command) then
+  if not RegQueryStringValue(HKCU, 'Software\Classes\RinaDown.TorrentFile\shell\open\command', '', Command) then
     Exit;
   RegisteredExe := ExtractQuotedExe(Command);
   AppExe := ExpandConstant('{app}\{#MyAppExeName}');
   if (RegisteredExe = '') or (CompareText(RegisteredExe, AppExe) <> 0) then
     Exit;
   if RegQueryStringValue(HKCU, 'Software\Classes\.torrent', '', ProgId)
-    and (CompareText(ProgId, 'FluxDown.TorrentFile') = 0) then
+    and (CompareText(ProgId, 'RinaDown.TorrentFile') = 0) then
     RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\.torrent');
-  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\FluxDown.TorrentFile');
+  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\RinaDown.TorrentFile');
 end;
 
 { Remove the autostart Run value written at runtime by the launch_at_startup
-  plugin (lib/main.dart — value name "FluxDown", data `"<exe>" --silentStart`).
+  plugin (lib/main.dart — value name "RinaDown", data `"<exe>" --silentStart`).
   The app migrates even the installer-written task entry to this runtime form
   on first launch (lib/main.dart, "legacy/installer autostart entry"
   migration), so after any app run the uninstall log no longer matches the
@@ -221,14 +221,14 @@ begin
     { Chrome/Edge/Firefox Native Messaging Host registrations written at
       runtime by native/hub/src/nmh_registry.rs. Never declared in the
       Registry section (the app writes them directly via winreg on every startup),
-      so the standard uninstall never removes them. `com.fluxdown.nmh` is
-      FluxDown-specific, safe to remove unconditionally. }
-    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Google\Chrome\NativeMessagingHosts\com.fluxdown.nmh');
-    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Microsoft\Edge\NativeMessagingHosts\com.fluxdown.nmh');
-    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Mozilla\NativeMessagingHosts\com.fluxdown.nmh');
+      so the standard uninstall never removes them. `com.rinadown.nmh` is
+      RinaDown-specific, safe to remove unconditionally. }
+    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Google\Chrome\NativeMessagingHosts\com.rinadown.nmh');
+    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Microsoft\Edge\NativeMessagingHosts\com.rinadown.nmh');
+    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Mozilla\NativeMessagingHosts\com.rinadown.nmh');
 
-    { fluxdown:// / ed2k:// / magnet: URL protocol handlers — same gap as above. }
-    RemoveProtocolHandler('fluxdown');
+    { rinadown:// / ed2k:// / magnet: URL protocol handlers — same gap as above. }
+    RemoveProtocolHandler('rinadown');
     RemoveProtocolHandler('ed2k');
     RemoveProtocolHandler('magnet');
 

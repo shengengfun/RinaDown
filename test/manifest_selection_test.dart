@@ -10,9 +10,9 @@
 // 根级散件（大小未知/超长名）。
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/bindings/bindings.dart';
-import 'package:flux_down/src/models/manifest_breadcrumb.dart';
-import 'package:flux_down/src/models/manifest_selection.dart';
+import 'package:rina_down/src/bindings/bindings.dart';
+import 'package:rina_down/src/models/manifest_breadcrumb.dart';
+import 'package:rina_down/src/models/manifest_selection.dart';
 
 /// 取路径的父目录段（模拟 items 里 path 是"相对子目录"字段，不含文件名）。
 ManifestItemDto _fileAt(String id, String dirPath, String fileName, {int size = 100}) {

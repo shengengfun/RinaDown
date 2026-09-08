@@ -1,7 +1,7 @@
 //! API 宿主契约 —— [`ApiHost`] trait。
 //!
 //! HTTP 层只依赖本 trait，不关心宿主形态：legacy hub/server 与
-//! `fluxdown-agent` 都在各自边界实现能力，API crate 不依赖下载引擎。
+//! `rinadown-agent` 都在各自边界实现能力，API crate 不依赖下载引擎。
 
 use std::collections::HashMap;
 
@@ -9,7 +9,7 @@ use tokio::sync::broadcast;
 
 use async_trait::async_trait;
 
-use fluxdown_protocol::daemon::{
+use rinadown_protocol::daemon::{
     CreateGroupRequest, CreateTaskRequest, DownloadRequest, GroupDto, LinkAuth, LinkCodeResponse,
     LinkDeviceInfo, LinkDiscoveredPeer, LinkPairBeginResponse, LinkPairConfirmOutcome,
     LinkPairConfirmRequest, LinkPairHelloRequest, LinkPairHelloResponse, LinkPingInfo,
@@ -29,7 +29,7 @@ pub const UNKNOWN_ENDPOINT_MESSAGE: &str = "unknown endpoint";
 /// # Examples
 ///
 /// ```
-/// use fluxdown_api::service::ApiError;
+/// use rinadown_api::service::ApiError;
 ///
 /// let e = ApiError::BadRequest("url is required".to_string());
 /// assert_eq!(e.to_string(), "url is required");
@@ -109,7 +109,7 @@ pub trait ApiHost: Send + Sync {
     /// （桌面端会弹出快速下载确认框），**不**直接创建任务。
     async fn submit_external(&self, req: DownloadRequest) -> Result<(), ApiError>;
 
-    /// 读取全局配置表快照（config key → value，FluxDown 原生键名）。
+    /// 读取全局配置表快照（config key → value，RinaDown 原生键名）。
     ///
     /// aria2 兼容层（`getGlobalOption`）经此读取后翻译为 aria2 选项名。
     /// 默认实现返回空表（宿主未接线时兼容层按「无配置」降级）。
@@ -119,13 +119,13 @@ pub trait ApiHost: Send + Sync {
 
     /// Web UI 默认语言（`en`/`zh`）。`/ping` 无鉴权透出，供未登录的前端
     /// 决定界面默认语言；每次请求实时求值，配置变更无需重启即可生效。
-    /// 宿主自行决定配置表与部署环境（如 `FLUXDOWN_LANG`）的优先级。
+    /// 宿主自行决定配置表与部署环境（如 `RINADOWN_LANG`）的优先级。
     /// 默认实现返回 `None`（无 Web UI 的宿主，`/ping` 响应省略该字段）。
     async fn web_language(&self) -> Option<String> {
         None
     }
 
-    /// 写入并 live-apply 一组配置键（FluxDown 原生键名 → 值）。
+    /// 写入并 live-apply 一组配置键（RinaDown 原生键名 → 值）。
     ///
     /// 语义：先持久化到 config 表，再按键名热应用到引擎
     /// （镜像桌面 `SaveConfig` / server `ActorCmd::ApplyConfig` 路径）。
@@ -213,7 +213,7 @@ pub trait ApiHost: Send + Sync {
     }
 
     /// 按插件声明权限探测缺失的基础组件（如 `"ffmpeg"`/`"ytdlp"`），供安装
-    /// 成功后回填 [`fluxdown_protocol::daemon::InstalledPlugin::missing_components`] 提醒
+    /// 成功后回填 [`rinadown_protocol::daemon::InstalledPlugin::missing_components`] 提醒
     /// 用户安装依赖。依赖表见引擎 `plugin::dependencies`。默认空（无提醒）。
     async fn plugin_missing_components(&self, identity: &str) -> Vec<String> {
         let _ = identity;
@@ -518,7 +518,7 @@ pub enum TaskEventKind {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_api::service::{TaskEventKind, task_event_for_transition};
+/// use rinadown_api::service::{TaskEventKind, task_event_for_transition};
 ///
 /// // 首次观测即下载中 → Start。
 /// assert_eq!(task_event_for_transition(None, 1), Some(TaskEventKind::Start));
@@ -547,7 +547,7 @@ pub fn task_event_for_transition(prev: Option<i32>, next: i32) -> Option<TaskEve
 /// 单条任务生命周期事件。见 [`ApiHost::subscribe_task_events`]。
 #[derive(Debug, Clone)]
 pub struct TaskEvent {
-    /// FluxDown 任务 ID（UUID；jsonrpc 层负责转 GID）。
+    /// RinaDown 任务 ID（UUID；jsonrpc 层负责转 GID）。
     pub task_id: String,
     /// 事件类别。
     pub kind: TaskEventKind,

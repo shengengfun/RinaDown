@@ -24,7 +24,7 @@ const kUaPresets = <String, String>{
 
 /// 根据 UA 字符串反推预设 key。
 ///
-/// 空字符串 → 'default'（全局设置里 = 引擎内置 FluxDown 标识；
+/// 空字符串 → 'default'（全局设置里 = 引擎内置 RinaDown 标识；
 /// 任务/队列级 = 继承上层设置），命中预设 → 对应 key，否则 → 'custom'。
 String detectUaPreset(String ua) {
   if (ua.isEmpty) return 'default';

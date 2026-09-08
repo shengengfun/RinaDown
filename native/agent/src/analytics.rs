@@ -8,7 +8,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::state::{AgentState, StateStore};
 
-const BAKED_APP_KEY: &str = match option_env!("FLUXDOWN_ANALYTICS_APP_KEY") {
+const BAKED_APP_KEY: &str = match option_env!("RINADOWN_ANALYTICS_APP_KEY") {
     Some(value) => value,
     None => "",
 };
@@ -28,11 +28,11 @@ impl AnalyticsWorker {
         state: Arc<Mutex<AgentState>>,
         store: Arc<StateStore>,
     ) -> Result<Self, reqwest::Error> {
-        let endpoint = std::env::var("FLUXDOWN_ANALYTICS_ENDPOINT")
+        let endpoint = std::env::var("RINADOWN_ANALYTICS_ENDPOINT")
             .ok()
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| DEFAULT_ENDPOINT.to_owned());
-        let app_key = std::env::var("FLUXDOWN_ANALYTICS_APP_KEY")
+        let app_key = std::env::var("RINADOWN_ANALYTICS_APP_KEY")
             .ok()
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| BAKED_APP_KEY.to_owned());
@@ -140,7 +140,7 @@ impl AnalyticsWorker {
 
 fn analytics_disabled_by_env() -> bool {
     matches!(
-        std::env::var("FLUXDOWN_ANALYTICS").as_deref(),
+        std::env::var("RINADOWN_ANALYTICS").as_deref(),
         Ok("off") | Ok("0") | Ok("false")
     )
 }

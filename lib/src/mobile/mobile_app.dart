@@ -16,25 +16,25 @@ import 'mobile_shell.dart';
 
 /// 移动端应用根组件
 ///
-/// 与桌面 [FluxDownApp] 的差异：
+/// 与桌面 [RinaDownApp] 的差异：
 /// - 无窗口管理 / 托盘 / 开机启动 / NMH 等桌面服务
 /// - 保留 HLS 画质选择与 BT 文件选择服务（Rust 信号驱动的全局弹窗）
 /// - 首页为 [MobileShell]（任务列表 + 设置 双屏 + 悬浮 Dock）
-class FluxDownMobileApp extends StatefulWidget {
+class RinaDownMobileApp extends StatefulWidget {
   final ThemeProvider themeProvider;
   final LocaleNotifier localeNotifier;
 
-  const FluxDownMobileApp({
+  const RinaDownMobileApp({
     super.key,
     required this.themeProvider,
     required this.localeNotifier,
   });
 
   @override
-  State<FluxDownMobileApp> createState() => _FluxDownMobileAppState();
+  State<RinaDownMobileApp> createState() => _RinaDownMobileAppState();
 }
 
-class _FluxDownMobileAppState extends State<FluxDownMobileApp> {
+class _RinaDownMobileAppState extends State<RinaDownMobileApp> {
   final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override

@@ -12,7 +12,7 @@ const _tag = 'ForegroundSvc';
 
 /// TaskHandler 入口回调（必须是顶层 / 静态函数，并标注 vm:entry-point）。
 ///
-/// FluxDown 的下载引擎（Rust via Rinf）运行在主 isolate 内，前台服务的唯一
+/// RinaDown 的下载引擎（Rust via Rinf）运行在主 isolate 内，前台服务的唯一
 /// 职责是**保活进程**——切换到其他应用时系统不杀进程，下载得以继续。因此
 /// 后台 isolate 不承载任何下载逻辑，[_KeepAliveTaskHandler] 为空实现。
 @pragma('vm:entry-point')
@@ -178,7 +178,7 @@ class ForegroundServiceManager {
   void _init(S s) {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
-        channelId: 'fluxdown_download_service',
+        channelId: 'rinadown_download_service',
         channelName: s.fgServiceChannelName,
         channelDescription: s.fgServiceChannelDesc,
         channelImportance: NotificationChannelImportance.LOW,

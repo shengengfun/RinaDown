@@ -12,13 +12,13 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/services/log_service.dart';
+import 'package:rina_down/src/services/log_service.dart';
 
 void main() {
   late Directory dir;
 
   setUp(() {
-    dir = Directory.systemTemp.createTempSync('fluxdown_log_concurrent');
+    dir = Directory.systemTemp.createTempSync('rinadown_log_concurrent');
   });
 
   tearDown(() {
@@ -27,7 +27,7 @@ void main() {
     } catch (_) {}
   });
 
-  /// 目录里唯一那个 fluxdown_*.log。
+  /// 目录里唯一那个 rinadown_*.log。
   File logFile() => dir.listSync().whereType<File>().firstWhere(
     (f) => f.path.endsWith('.log'),
   );

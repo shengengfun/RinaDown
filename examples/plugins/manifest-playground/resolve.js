@@ -1,4 +1,4 @@
-// FluxDown 测试插件：多嵌套文件夹/多文件清单（两段式 resolver，classic script）。
+// RinaDown 测试插件：多嵌套文件夹/多文件清单（两段式 resolver，classic script）。
 //
 // 初段（ctx.resolverItem 为空）：返回 { manifest: { name, items } } 清单，
 //   数据集镜像 design/desktop-task-views/manifest.js 的 mock（选择弹窗设计原型），

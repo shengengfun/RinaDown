@@ -2,7 +2,7 @@
 // panel's Log tab even though the coordinator signal itself carries no
 // wall-clock time — verifies the constructor default and explicit override.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/models/download_task.dart';
+import 'package:rina_down/src/models/download_task.dart';
 
 void main() {
   test('receivedAt defaults to now() when not supplied', () {

@@ -1,4 +1,4 @@
-# FluxDown Advisor 严重级分诊
+# RinaDown Advisor 严重级分诊
 
 规范细节以项目根 AGENTS.md 为准；本文件只定义违规 → 严重级映射。
 

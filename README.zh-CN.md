@@ -1,31 +1,31 @@
 <div align="center">
 
-<img src="assets/logo/fluxdown_logo.png" alt="FluxDown Logo" width="128" />
+<img src="assets/logo/rinadown_logo.png" alt="RinaDown Logo" width="128" />
 
-# FluxDown
+# RinaDown
 
 ### 下载，全面加速。
 
 *极速多协议下载管理器 —— 免费开源的 IDM 替代品。*
 
-[![Latest Release](https://img.shields.io/github/v/release/zerx-lab/FluxDown?style=flat-square&color=06b6d4&label=release)](https://github.com/zerx-lab/FluxDown/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/zerx-lab/FluxDown/total?style=flat-square&color=22c55e)](https://github.com/zerx-lab/FluxDown/releases)
+[![Latest Release](https://img.shields.io/github/v/release/zerx-lab/RinaDown?style=flat-square&color=06b6d4&label=release)](https://github.com/zerx-lab/RinaDown/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/zerx-lab/RinaDown/total?style=flat-square&color=22c55e)](https://github.com/zerx-lab/RinaDown/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20NAS%20%7C%20Android-8b5cf6?style=flat-square)](#安装)
 [![Rust](https://img.shields.io/badge/engine-Rust-f74c00?style=flat-square&logo=rust)](native/engine)
 [![Flutter](https://img.shields.io/badge/UI-Flutter-02569B?style=flat-square&logo=flutter)](lib)
-[![MCP Server](https://glama.ai/mcp/servers/zerx-lab/FluxDown/badges/score.svg)](https://glama.ai/mcp/servers/zerx-lab/FluxDown)
+[![MCP Server](https://glama.ai/mcp/servers/zerx-lab/RinaDown/badges/score.svg)](https://glama.ai/mcp/servers/zerx-lab/RinaDown)
 
 [![Awesome Rust](https://img.shields.io/badge/Awesome-Rust-orange?logo=rust&style=flat-square)](https://github.com/rust-unofficial/awesome-rust#utilities)
 [![Awesome Windows](https://img.shields.io/badge/Awesome-Windows-0078D4?style=flat-square)](https://github.com/thechampagne/awesome-windows#utilities)
 [![Awesome Free Apps](https://img.shields.io/badge/Awesome-Free%20Apps-22c55e?style=flat-square)](https://github.com/Axorax/awesome-free-apps#download-managers)
 [![Android FOSS](https://img.shields.io/badge/Android-FOSS-3DDC84?style=flat-square&logo=android&logoColor=white)](https://github.com/offa/android-foss#-downloader--manager)
 [![Open Source Android](https://img.shields.io/badge/Open%20Source-Android%20Apps-3DDC84?style=flat-square&logo=android&logoColor=white)](https://github.com/pcqpcq/open-source-android-apps/blob/master/categories/tools.md)
-[![Portainer](https://img.shields.io/badge/Portainer-Template-13BEF9?style=flat-square&logo=portainer&logoColor=white)](https://portainer-templates.as93.net/fluxdown)
-[![Unraid CA](https://img.shields.io/badge/Unraid-CA-F15A2C?style=flat-square)](https://github.com/selfhosters/unRAID-CA-templates/blob/master/templates/fluxdown.xml)
+[![Portainer](https://img.shields.io/badge/Portainer-Template-13BEF9?style=flat-square&logo=portainer&logoColor=white)](https://portainer-templates.as93.net/rinadown)
+[![Unraid CA](https://img.shields.io/badge/Unraid-CA-F15A2C?style=flat-square)](https://github.com/selfhosters/unRAID-CA-templates/blob/master/templates/rinadown.xml)
 [![Chinese Indie Dev](https://img.shields.io/badge/Chinese%20Indie-Dev-ef4444?style=flat-square)](https://github.com/1c7/chinese-independent-developer)
 
-[**官网**](https://fluxdown.zerx.dev) · [**下载**](https://fluxdown.zerx.dev/#download) · [**更新日志**](https://fluxdown.zerx.dev/changelog) · [**常见问题**](https://fluxdown.zerx.dev/faq) · [**反馈**](https://fluxdown.zerx.dev/feedback)
+[**官网**](https://rinadown.zerx.dev) · [**下载**](https://rinadown.zerx.dev/#download) · [**更新日志**](https://rinadown.zerx.dev/changelog) · [**常见问题**](https://rinadown.zerx.dev/faq) · [**反馈**](https://rinadown.zerx.dev/feedback)
 
 [English](README.md) | **简体中文**
 
@@ -57,9 +57,9 @@
 | **精美界面** | shadcn 风格组件、IDM 式分段可视化、命名队列、系统托盘 |
 | **干净纯粹** | 零广告、零追踪、无账号 —— 数据完全留在本地 |
 
-## FluxDown vs. IDM
+## RinaDown vs. IDM
 
-| | FluxDown | IDM |
+| | RinaDown | IDM |
 |---|:---:|:---:|
 | 价格 | **免费开源** | $24.95 + 续费 |
 | 开源 | 是（AGPL-3.0） | 否 |
@@ -73,7 +73,7 @@
 
 ## 安装
 
-从 [**GitHub Releases**](https://github.com/zerx-lab/FluxDown/releases/latest) 或 [**fluxdown.zerx.dev**](https://fluxdown.zerx.dev/#download) 获取最新版本：
+从 [**GitHub Releases**](https://github.com/zerx-lab/RinaDown/releases/latest) 或 [**rinadown.zerx.dev**](https://rinadown.zerx.dev/#download) 获取最新版本：
 
 | 平台 | 安装包 |
 |---|---|
@@ -81,22 +81,22 @@
 | **macOS**（Intel / Apple Silicon） | `.dmg` · 便携版 `.tar.gz` |
 | **Linux**（x64） | `.AppImage` · `.deb` · Arch `.pkg.tar.zst` · 便携版 `.tar.gz` |
 | **Android**（arm64-v8a / armeabi-v7a / x86_64） | 分架构 `.apk` · 通用 `.apk` |
-| **NAS / 服务器**（headless，x64 / ARM64） | [Docker](https://ghcr.io/zerx-lab/fluxdown-server) · 群晖 DSM 6/7 `.spk` · QNAP `.qpkg` · OpenWrt `.ipk` · Unraid CA 模板 · CasaOS / ZimaOS 应用商店 |
+| **NAS / 服务器**（headless，x64 / ARM64） | [Docker](https://ghcr.io/zerx-lab/rinadown-server) · 群晖 DSM 6/7 `.spk` · QNAP `.qpkg` · OpenWrt `.ipk` · Unraid CA 模板 · CasaOS / ZimaOS 应用商店 |
 
 ### 浏览器扩展
 
-安装扩展后，FluxDown 会自动接管浏览器下载：
+安装扩展后，RinaDown 会自动接管浏览器下载：
 
-[<img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Chrome Web Store" />](https://chromewebstore.google.com/detail/fluxdown/meleenglfggcmcajknpeeeiobnpfmahc)
-[<img src="https://img.shields.io/badge/Edge-Add--ons-0078D4?style=for-the-badge&logo=microsoftedge&logoColor=white" alt="Edge Add-ons" />](https://microsoftedge.microsoft.com/addons/detail/fluxdown/nglkkjbogjghekbhhcnccnpfedjbdhhd)
-[<img src="https://img.shields.io/badge/Firefox-Add--ons-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white" alt="Firefox Add-ons" />](https://addons.mozilla.org/zh-CN/firefox/addon/fluxdown)
+[<img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Chrome Web Store" />](https://chromewebstore.google.com/detail/rinadown/meleenglfggcmcajknpeeeiobnpfmahc)
+[<img src="https://img.shields.io/badge/Edge-Add--ons-0078D4?style=for-the-badge&logo=microsoftedge&logoColor=white" alt="Edge Add-ons" />](https://microsoftedge.microsoft.com/addons/detail/rinadown/nglkkjbogjghekbhhcnccnpfedjbdhhd)
+[<img src="https://img.shields.io/badge/Firefox-Add--ons-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white" alt="Firefox Add-ons" />](https://addons.mozilla.org/zh-CN/firefox/addon/rinadown)
 
 ## MCP 服务器（Model Context Protocol）
 
-FluxDown 内置 **MCP 服务器**，AI 智能体（Claude Desktop、Cursor、Cline 等）可通过 [Model Context Protocol](https://modelcontextprotocol.io) 管理下载。采用 **Streamable HTTP**（单一 `POST /mcp` 上的 JSON-RPC 2.0），复用本机 API 端口，无需额外进程。
+RinaDown 内置 **MCP 服务器**，AI 智能体（Claude Desktop、Cursor、Cline 等）可通过 [Model Context Protocol](https://modelcontextprotocol.io) 管理下载。采用 **Streamable HTTP**（单一 `POST /mcp` 上的 JSON-RPC 2.0），复用本机 API 端口，无需额外进程。
 
 - **端点**：`http://127.0.0.1:17800/mcp`（默认仅本机可访问）
-- **鉴权**：Bearer token（`Authorization: Bearer <token>` 或 `X-FluxDown-Token`），与管理 API 共用
+- **鉴权**：Bearer token（`Authorization: Bearer <token>` 或 `X-RinaDown-Token`），与管理 API 共用
 - **开启方式**：设置 → API 服务 → 打开 *MCP 端点*（自动生成 token）；headless 服务器默认开启
 
 ### 工具（12 个）
@@ -119,7 +119,7 @@ FluxDown 内置 **MCP 服务器**，AI 智能体（Claude Desktop、Cursor、Cli
 ```json
 {
   "mcpServers": {
-    "fluxdown": {
+    "rinadown": {
       "url": "http://127.0.0.1:17800/mcp",
       "headers": { "Authorization": "Bearer <your-token>" }
     }
@@ -135,10 +135,10 @@ Flutter 负责渲染界面，零 FFI 依赖的 Rust 引擎负责下载。两端�
 
 ```mermaid
 flowchart TD
-    EXT["浏览器扩展 (WXT)"] -->|Native Messaging| NMH["fluxdown_nmh"]
+    EXT["浏览器扩展 (WXT)"] -->|Native Messaging| NMH["rinadown_nmh"]
     NMH -->|Named Pipe / Unix socket| HUB
     UI["Flutter UI (shadcn_ui)"] <-->|Rinf 信号| HUB["hub — FFI 适配层"]
-    HUB --> ENGINE["fluxdown_engine"]
+    HUB --> ENGINE["rinadown_engine"]
     ENGINE --> HTTP["HTTP/HTTPS"]
     ENGINE --> FTP["FTP"]
     ENGINE --> BT["BitTorrent"]
@@ -152,7 +152,7 @@ flowchart TD
 | UI | Flutter + shadcn_ui | [`lib/`](lib) |
 | FFI 桥接 | Rinf（Dart ↔ Rust 信号） | [`native/hub/`](native/hub) |
 | 下载引擎 | Rust + Tokio（零 FFI 依赖） | [`native/engine/`](native/engine) |
-| 浏览器扩展 | WXT + TypeScript | [`fluxDown/`](fluxDown) |
+| 浏览器扩展 | WXT + TypeScript | [`rinaDown/`](rinaDown) |
 | 官网 | Astro + React | [`website/`](website) |
 
 ## 从源码构建
@@ -161,8 +161,8 @@ flowchart TD
 
 ```shell
 # 克隆开发分支（main = 日常开发，stable = 稳定版本）
-git clone -b main https://github.com/zerx-lab/FluxDown.git
-cd FluxDown
+git clone -b main https://github.com/zerx-lab/RinaDown.git
+cd RinaDown
 
 # 检查环境
 rustc --version
@@ -194,7 +194,7 @@ sudo apt-get install cmake ninja-build clang pkg-config \
 sudo pacman -S cmake ninja clang pkgconf gtk3 libayatana-appindicator libnotify libsecret patchelf zstd
 ```
 
-NMH 中继二进制（`fluxdown_nmh`）由 CMake 在 `flutter build` 时自动构建。发行包（AppImage / deb / Arch / 便携版）由 [CI](.github/workflows/release.yml) 在每次打 tag 时自动产出。
+NMH 中继二进制（`rinadown_nmh`）由 CMake 在 `flutter build` 时自动构建。发行包（AppImage / deb / Arch / 便携版）由 [CI](.github/workflows/release.yml) 在每次打 tag 时自动产出。
 
 </details>
 
@@ -203,7 +203,7 @@ NMH 中继二进制（`fluxdown_nmh`）由 CMake 在 `flutter build` 时自动�
 
 ```shell
 flutter test                          # Dart 测试
-cargo test -p fluxdown_engine        # Rust 引擎测试
+cargo test -p rinadown_engine        # Rust 引擎测试
 cargo test -p hub                    # FFI 适配层测试
 ```
 
@@ -211,8 +211,8 @@ cargo test -p hub                    # FFI 适配层测试
 
 ## 参与贡献与社区
 
-- **Bug 反馈 / 功能建议** —— [GitHub Issues](https://github.com/zerx-lab/FluxDown/issues) 或应用内反馈对话框
-- **QQ 群** —— [832143651](https://fluxdown.zerx.dev/qq-group)
+- **Bug 反馈 / 功能建议** —— [GitHub Issues](https://github.com/zerx-lab/RinaDown/issues) 或应用内反馈对话框
+- **QQ 群** —— [832143651](https://rinadown.zerx.dev/qq-group)
 
 欢迎提交 Pull Request！请从 `main` 拉分支并把 PR 提到 `main` —— `main` 是开发分支，`stable` 只承载稳定版本（由维护者从 `main` 合并前进）。提交前请确保通过：
 
@@ -229,7 +229,7 @@ flutter analyze                                     # Dart
 
 <div align="center">
 
-**如果 FluxDown 帮你省下了时间，欢迎点个 Star —— 让更多人发现这个项目。**
+**如果 RinaDown 帮你省下了时间，欢迎点个 Star —— 让更多人发现这个项目。**
 
 Made by [zerx-lab](https://github.com/zerx-lab)
 

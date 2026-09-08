@@ -4,13 +4,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use fluxdown_engine::db::{Db, EngineWriteGuard};
-use fluxdown_engine::download_manager;
-use fluxdown_engine::events::EventSink;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::selection::HostSelection;
-use fluxdown_engine::{Engine, EngineConfig};
-use fluxdown_protocol::{DaemonConfigSnapshot, DaemonSnapshot};
+use rinadown_engine::db::{Db, EngineWriteGuard};
+use rinadown_engine::download_manager;
+use rinadown_engine::events::EventSink;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::selection::HostSelection;
+use rinadown_engine::{Engine, EngineConfig};
+use rinadown_protocol::{DaemonConfigSnapshot, DaemonSnapshot};
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 
@@ -30,14 +30,14 @@ pub async fn run(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let process_config = DaemonConfig::from_env()?;
     let data_dir =
-        fluxdown_engine::data_dir::resolve_data_dir(process_config.data_dir_override.as_deref())?;
-    fluxdown_engine::logger::init_with_dir(&data_dir)?;
+        rinadown_engine::data_dir::resolve_data_dir(process_config.data_dir_override.as_deref())?;
+    rinadown_engine::logger::init_with_dir(&data_dir)?;
     let _ = tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .try_init();
 
     let (boot_db, write_guard) = open_database(&process_config, &data_dir).await?;
-    let default_save_dir = fluxdown_engine::user_dirs::download_dir_or_cwd();
+    let default_save_dir = rinadown_engine::user_dirs::download_dir_or_cwd();
     boot_db.init_default_config(&default_save_dir).await?;
     let all_config = boot_db.get_all_config().await?;
 
@@ -133,7 +133,7 @@ pub async fn run(
         .await
         .map_err(|error| std::io::Error::other(error.message))?;
     let listener = TcpListener::bind(process_config.bind_addr).await?;
-    tracing::info!(address = %process_config.bind_addr, "fluxdownd control plane listening");
+    tracing::info!(address = %process_config.bind_addr, "rinadownd control plane listening");
 
     let sweep_task = spawn_blob_sweeper(blobs.clone(), cancel.clone());
     let result = serve(listener, service, bearer, cancel.clone()).await;
@@ -160,7 +160,7 @@ pub async fn run(
 async fn open_database(
     config: &DaemonConfig,
     data_dir: &std::path::Path,
-) -> Result<(Db, EngineWriteGuard), fluxdown_engine::db::DbError> {
+) -> Result<(Db, EngineWriteGuard), rinadown_engine::db::DbError> {
     match &config.database_url {
         Some(url) => Db::connect_exclusive(url, data_dir).await,
         None => Db::open_exclusive(data_dir).await,
@@ -170,25 +170,25 @@ async fn open_database(
 async fn initial_snapshot(
     db: &Db,
     config: &HashMap<String, String>,
-) -> Result<DaemonSnapshot, fluxdown_engine::db::DbError> {
+) -> Result<DaemonSnapshot, rinadown_engine::db::DbError> {
     Ok(DaemonSnapshot {
         tasks: db
             .load_all_tasks()
             .await?
             .into_iter()
-            .map(fluxdown_engine_protocol::task_info_to_dto)
+            .map(rinadown_engine_protocol::task_info_to_dto)
             .collect(),
         queues: db
             .load_all_queues()
             .await?
             .into_iter()
-            .map(fluxdown_engine_protocol::queue_info_to_dto)
+            .map(rinadown_engine_protocol::queue_info_to_dto)
             .collect(),
         groups: db
             .load_all_groups()
             .await?
             .into_iter()
-            .map(fluxdown_engine_protocol::group_info_to_dto)
+            .map(rinadown_engine_protocol::group_info_to_dto)
             .collect(),
         config: DaemonConfigSnapshot {
             revision: config
@@ -201,7 +201,7 @@ async fn initial_snapshot(
             .load_all_rss_sources()
             .await?
             .into_iter()
-            .map(fluxdown_engine_protocol::rss_source_info_to_dto)
+            .map(rinadown_engine_protocol::rss_source_info_to_dto)
             .collect(),
         ..DaemonSnapshot::default()
     })
@@ -358,25 +358,25 @@ pub fn runtime_capabilities(engine_initialized: bool) -> Vec<String> {
         return Vec::new();
     }
     let capabilities = vec![
-        fluxdown_protocol::method::CAPABILITY_DAEMON_TASKS.to_owned(),
-        fluxdown_protocol::method::CAPABILITY_DAEMON_QUEUES.to_owned(),
-        fluxdown_protocol::method::CAPABILITY_DAEMON_GROUPS.to_owned(),
-        fluxdown_protocol::method::CAPABILITY_DAEMON_CONFIG.to_owned(),
-        fluxdown_protocol::method::CAPABILITY_DAEMON_RSS.to_owned(),
-        fluxdown_protocol::method::CAPABILITY_DAEMON_WEBHOOKS.to_owned(),
-        fluxdown_protocol::method::CAPABILITY_DAEMON_SELECTIONS.to_owned(),
-        fluxdown_protocol::method::CAPABILITY_DAEMON_FILES.to_owned(),
+        rinadown_protocol::method::CAPABILITY_DAEMON_TASKS.to_owned(),
+        rinadown_protocol::method::CAPABILITY_DAEMON_QUEUES.to_owned(),
+        rinadown_protocol::method::CAPABILITY_DAEMON_GROUPS.to_owned(),
+        rinadown_protocol::method::CAPABILITY_DAEMON_CONFIG.to_owned(),
+        rinadown_protocol::method::CAPABILITY_DAEMON_RSS.to_owned(),
+        rinadown_protocol::method::CAPABILITY_DAEMON_WEBHOOKS.to_owned(),
+        rinadown_protocol::method::CAPABILITY_DAEMON_SELECTIONS.to_owned(),
+        rinadown_protocol::method::CAPABILITY_DAEMON_FILES.to_owned(),
     ];
     #[cfg(feature = "plugins")]
     let capabilities = {
         let mut enabled = capabilities;
-        enabled.push(fluxdown_protocol::method::CAPABILITY_DAEMON_PLUGINS.to_owned());
+        enabled.push(rinadown_protocol::method::CAPABILITY_DAEMON_PLUGINS.to_owned());
         enabled
     };
     #[cfg(feature = "components")]
     let capabilities = {
         let mut enabled = capabilities;
-        enabled.push(fluxdown_protocol::method::CAPABILITY_DAEMON_COMPONENTS.to_owned());
+        enabled.push(rinadown_protocol::method::CAPABILITY_DAEMON_COMPONENTS.to_owned());
         enabled
     };
     capabilities

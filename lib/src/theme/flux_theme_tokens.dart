@@ -31,7 +31,7 @@ class FluxThemeScope extends InheritedWidget {
 //  FluxThemeTokens — 主题 Token 数据类
 // ═══════════════════════════════════════════════════════════
 
-/// FluxDown 主题 Token 系统
+/// RinaDown 主题 Token 系统
 ///
 /// 将所有 UI 颜色抽象为语义化 Token，支持 JSON 序列化/反序列化，
 /// 允许用户完全自定义每个 UI 元素的颜色。

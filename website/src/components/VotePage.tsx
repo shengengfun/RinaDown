@@ -10,7 +10,7 @@ interface VoteResults {
   total: number;
 }
 
-const STORAGE_KEY = "fluxdown-voted-community";
+const STORAGE_KEY = "rinadown-voted-community";
 
 const OPTIONS: {
   key: VoteOption;

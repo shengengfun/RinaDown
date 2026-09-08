@@ -4,7 +4,7 @@ import { useLocale } from "@/lib/i18n";
 import { ANNOUNCEMENTS } from "@/lib/announcements";
 import type { Announcement } from "@/lib/announcements";
 
-const STORAGE_KEY = "fluxdown-dismissed-announcements";
+const STORAGE_KEY = "rinadown-dismissed-announcements";
 
 /** 浮层延迟入场，避免与首屏内容争夺注意力 */
 const APPEAR_DELAY_MS = 1800;

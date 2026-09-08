@@ -20,7 +20,7 @@
 //!
 //! 安全：不校验 `Content-Type`（与真实 aria2 一致，兼容不带 `application/json`
 //! 头的 aria2 风格脚本），以「请求体能否解析为合法 JSON-RPC」为准入门槛；
-//! 支持 aria2 约定的 `token:xxx`（params[0]）或 `X-FluxDown-Token` 头鉴权。
+//! 支持 aria2 约定的 `token:xxx`（params[0]）或 `X-RinaDown-Token` 头鉴权。
 //! `system.listMethods`/`system.listNotifications` 不鉴权（对齐 aria2：
 //! 这两个方法重写了 `execute()`，从不调用 `authorize()`）。
 //!
@@ -35,11 +35,11 @@ use serde_json::{Value, json};
 use crate::aria2;
 use crate::auth::constant_time_eq;
 use crate::service::{ApiError, ApiHost};
-use fluxdown_protocol::daemon::{CreateTaskRequest, TaskDto};
+use rinadown_protocol::daemon::{CreateTaskRequest, TaskDto};
 
 /// 处理一个 `/jsonrpc` 请求体，返回 JSON-RPC 响应（始终 HTTP 200 包裹）。
 ///
-/// `header_token_ok`：`X-FluxDown-Token` 头是否已通过校验（由 HTTP 层判定）；
+/// `header_token_ok`：`X-RinaDown-Token` 头是否已通过校验（由 HTTP 层判定）；
 /// `config_token`：服务端配置的 token（空 = 不鉴权）。
 pub(crate) async fn handle_jsonrpc(
     host: &dyn ApiHost,
@@ -70,7 +70,7 @@ pub(crate) async fn handle_jsonrpc(
 }
 
 /// 校验单个 JSON-RPC 调用的 token（服务端配置了 token 时）。
-/// 接受 `X-FluxDown-Token` 头（已由 HTTP 层判定）或 aria2 约定的
+/// 接受 `X-RinaDown-Token` 头（已由 HTTP 层判定）或 aria2 约定的
 /// `params[0] = "token:xxx"`。
 fn jsonrpc_token_ok(params: &Value, config_token: &str, header_token_ok: bool) -> bool {
     if config_token.is_empty() || header_token_ok {
@@ -293,7 +293,7 @@ async fn create_task_and_respond(id: &Value, host: &dyn ApiHost, req: CreateTask
     }
 }
 
-/// `aria2.remove`/`aria2.forceRemove`：FluxDown 不区分「优雅/强制」停止，
+/// `aria2.remove`/`aria2.forceRemove`：RinaDown 不区分「优雅/强制」停止，
 /// 两者等价为 `delete_task(task_id, delete_files=false)`。
 async fn remove_download(arr: &[Value], id: &Value, host: &dyn ApiHost) -> Value {
     let gid = match require_gid(arr, id) {
@@ -309,7 +309,7 @@ async fn remove_download(arr: &[Value], id: &Value, host: &dyn ApiHost) -> Value
     gid_result(id, &canonical, result)
 }
 
-/// `aria2.pause`/`aria2.forcePause`：FluxDown 不区分「优雅/强制」暂停。
+/// `aria2.pause`/`aria2.forcePause`：RinaDown 不区分「优雅/强制」暂停。
 async fn pause_download(arr: &[Value], id: &Value, host: &dyn ApiHost) -> Value {
     let gid = match require_gid(arr, id) {
         Ok(g) => g,
@@ -620,7 +620,7 @@ mod tests {
 
     use super::*;
     use crate::service::{ApiError, LiveSpeed};
-    use fluxdown_protocol::daemon::{CreateTaskRequest, QueueDto};
+    use rinadown_protocol::daemon::{CreateTaskRequest, QueueDto};
 
     /// 本模块专用的轻量 `ApiHost`：记录调用、按需注入任务/配置/速率快照。
     /// 与 `tests.rs` 的黑盒 HTTP `MockHost`相互独立（镜像 `mcp.rs` 的
@@ -701,7 +701,7 @@ mod tests {
         }
         async fn submit_external(
             &self,
-            _req: fluxdown_protocol::daemon::DownloadRequest,
+            _req: rinadown_protocol::daemon::DownloadRequest,
         ) -> Result<(), ApiError> {
             Ok(())
         }
@@ -1136,7 +1136,7 @@ mod tests {
             assert_eq!(resp["error"]["code"], 1, "{method}");
             assert_eq!(
                 resp["error"]["message"],
-                format!("{method} is not supported by FluxDown."),
+                format!("{method} is not supported by RinaDown."),
                 "{method}"
             );
         }

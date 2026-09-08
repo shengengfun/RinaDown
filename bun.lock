@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "fluxdown-repo-tooling",
+      "name": "rinadown-repo-tooling",
       "devDependencies": {
         "@commitlint/load": "^18",
       },

@@ -1,5 +1,5 @@
 /**
- * GET /api/themes/:path — fluxdown-themes 仓库静态资源同源代理。
+ * GET /api/themes/:path — rinadown-themes 仓库静态资源同源代理。
  *
  * 主题市场页原先直连 raw.githubusercontent.com 加载 index.json / 截图 /
  * 主题 JSON，大陆访问极慢（LCP 实测 5s+）。改为经本站服务端中转：
@@ -14,7 +14,7 @@ import type { APIRoute } from "astro";
 
 export const prerender = false;
 
-const RAW_BASE = "https://raw.githubusercontent.com/zerx-lab/fluxdown-themes/main";
+const RAW_BASE = "https://raw.githubusercontent.com/zerx-lab/rinadown-themes/main";
 
 /** 仅允许 index.json 或 themes/<id>/<file>.(json|png|jpg|jpeg|webp) */
 const ALLOWED_PATH = /^(index\.json|themes\/[\w.-]+\/[\w.-]+\.(?:json|png|jpe?g|webp))$/;

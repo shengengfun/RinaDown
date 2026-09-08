@@ -151,7 +151,7 @@ pub(crate) struct DownloadTaskView {
 }
 
 impl DownloadTaskView {
-    pub(crate) fn local_with_speed(task: &fluxdown_protocol::TaskDto, speed: Option<i64>) -> Self {
+    pub(crate) fn local_with_speed(task: &rinadown_protocol::TaskDto, speed: Option<i64>) -> Self {
         Self::new(
             task.task_id.clone(),
             TaskSource::Local,
@@ -165,7 +165,7 @@ impl DownloadTaskView {
         )
     }
 
-    pub(crate) fn remote(task: &fluxdown_protocol::RemoteTaskDto) -> Self {
+    pub(crate) fn remote(task: &rinadown_protocol::RemoteTaskDto) -> Self {
         Self::new(
             task.id.clone(),
             TaskSource::Remote,
@@ -176,13 +176,13 @@ impl DownloadTaskView {
             Some(task.speed.max(0) as u64),
             0,
             match task.status {
-                fluxdown_protocol::RemoteTaskStatus::Pending
-                | fluxdown_protocol::RemoteTaskStatus::Accepted => 0,
-                fluxdown_protocol::RemoteTaskStatus::Downloading => 1,
-                fluxdown_protocol::RemoteTaskStatus::Paused => 2,
-                fluxdown_protocol::RemoteTaskStatus::Completed => 3,
-                fluxdown_protocol::RemoteTaskStatus::Failed
-                | fluxdown_protocol::RemoteTaskStatus::Canceled => 4,
+                rinadown_protocol::RemoteTaskStatus::Pending
+                | rinadown_protocol::RemoteTaskStatus::Accepted => 0,
+                rinadown_protocol::RemoteTaskStatus::Downloading => 1,
+                rinadown_protocol::RemoteTaskStatus::Paused => 2,
+                rinadown_protocol::RemoteTaskStatus::Completed => 3,
+                rinadown_protocol::RemoteTaskStatus::Failed
+                | rinadown_protocol::RemoteTaskStatus::Canceled => 4,
             },
         )
     }
@@ -308,7 +308,7 @@ mod tests {
 
     #[test]
     fn local_and_remote_wire_tasks_project_without_placeholders() {
-        let local = serde_json::from_value::<fluxdown_protocol::TaskDto>(json!({
+        let local = serde_json::from_value::<rinadown_protocol::TaskDto>(json!({
             "taskId":"local-1","url":"https://example.com/a","fileName":"a.bin",
             "saveDir":"/tmp","status":1,"downloadedBytes":50,"totalBytes":100,
             "errorMessage":"","createdAt":"7","proxyUrl":"","queueId":"main","checksum":""
@@ -321,7 +321,7 @@ mod tests {
         assert_eq!(local.state, TaskState::Downloading);
         assert!(!local.metadata_pending);
 
-        let remote = serde_json::from_value::<fluxdown_protocol::RemoteTaskDto>(json!({
+        let remote = serde_json::from_value::<rinadown_protocol::RemoteTaskDto>(json!({
             "id":"remote-1","url":"https://example.com/b","fileName":"b.bin",
             "status":"paused","totalBytes":200,"downloadedBytes":20,"speed":0
         }))
@@ -331,7 +331,7 @@ mod tests {
         assert_eq!(remote.source, TaskSource::Remote);
         assert_eq!(remote.state, TaskState::Paused);
 
-        let probing = serde_json::from_value::<fluxdown_protocol::TaskDto>(json!({
+        let probing = serde_json::from_value::<rinadown_protocol::TaskDto>(json!({
             "taskId":"local-2","url":"https://example.com/unknown","fileName":"",
             "saveDir":"/tmp","status":0,"downloadedBytes":0,"totalBytes":0,
             "errorMessage":"","createdAt":"8","proxyUrl":"","queueId":"main","checksum":""

@@ -1,15 +1,15 @@
 ---
 name: release
 description: >-
-  发布 FluxDown 新版本或查看已有版本时使用。校验版本 tag（稳定版 vX.Y.Z / 预览版
+  发布 RinaDown 新版本或查看已有版本时使用。校验版本 tag（稳定版 vX.Y.Z / 预览版
   vX.Y.Z-rc.N）在推送前合法可用，并按渠道/组件快速列出已有版本。关键词：发布, 发版,
   release, publish, 版本, version, tag, 打标签, 稳定版, 预览版, stable, frontier, rc,
   预发布, prerelease, 查看版本, 已有版本, 最新版本, 更新渠道, changelog, git-cliff
 ---
 
-# FluxDown 发布与版本查看
+# RinaDown 发布与版本查看
 
-FluxDown 用 **SemVer 预发布后缀**区分双渠道：**稳定版 `vX.Y.Z`**、**预览版 `vX.Y.Z-rc.N`**。
+RinaDown 用 **SemVer 预发布后缀**区分双渠道：**稳定版 `vX.Y.Z`**、**预览版 `vX.Y.Z-rc.N`**。
 推送 `v*` tag 会**立即触发 GitHub Actions 全平台发布流水线（不可逆）**，同一次 push 自动派生
 各组件 tag。本 skill 覆盖两件事：**发布前校验版本可用** + **快速查看已有版本**。
 

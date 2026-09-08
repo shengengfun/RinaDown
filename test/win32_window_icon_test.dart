@@ -10,7 +10,7 @@
 ///    图标清成空白）。
 ///
 /// 测试窗口用私有窗口类（非 FLUTTER_RUNNER_WIN32_WINDOW），不会与
-/// 开发机上正在运行的 FluxDown 实例发生任何交互。
+/// 开发机上正在运行的 RinaDown 实例发生任何交互。
 @TestOn('windows')
 library;
 
@@ -18,10 +18,10 @@ import 'dart:ffi' show nullptr;
 
 import 'package:ffi/ffi.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/services/native_overlay/win32_layered_window.dart'
+import 'package:rina_down/src/services/native_overlay/win32_layered_window.dart'
     show ensureLayeredWindowClass;
-import 'package:flux_down/src/services/win32_toast/win32_bindings.dart';
-import 'package:flux_down/src/services/win32_window_icon.dart';
+import 'package:rina_down/src/services/win32_toast/win32_bindings.dart';
+import 'package:rina_down/src/services/win32_window_icon.dart';
 
 /// `WM_GETICON`，from `winuser.h`。
 const _wmGetIcon = 0x007F;
@@ -33,7 +33,7 @@ const _icoFixture = 'windows/runner/resources/app_icon.ico';
 
 /// 创建一个不显示的最小测试窗口，返回 HWND。
 int _createHiddenTestWindow() {
-  const className = 'FluxDownIconTest_v1';
+  const className = 'RinaDownIconTest_v1';
   ensureLayeredWindowClass(className);
   final classPtr = className.toNativeUtf16();
   final titlePtr = 'icon test'.toNativeUtf16();

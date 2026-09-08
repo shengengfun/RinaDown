@@ -11,7 +11,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUNDLE_DIR="$ROOT/build/linux/x64/release/bundle"
 PKG_DIR="$ROOT/arch_pkg"
 OUTPUT_DIR="$ROOT/build/installer"
-OUTPUT="${OUTPUT_DIR}/FluxDown-${VERSION}-linux-x64.pkg.tar.zst"
+OUTPUT="${OUTPUT_DIR}/RinaDown-${VERSION}-linux-x64.pkg.tar.zst"
 
 cd "$ROOT"
 
@@ -24,33 +24,33 @@ flutter build linux --release \
 
 # ── 2. Build NMH relay binary ──
 echo "[2/4] Building NMH relay binary..."
-cargo build --release -p fluxdown_nmh
-cp target/release/fluxdown_nmh "$BUNDLE_DIR/"
-chmod +x "$BUNDLE_DIR/fluxdown_nmh"
+cargo build --release -p rinadown_nmh
+cp target/release/rinadown_nmh "$BUNDLE_DIR/"
+chmod +x "$BUNDLE_DIR/rinadown_nmh"
 
 # ── 3. Assemble arch_pkg/ ──
 echo "[3/4] Assembling package layout..."
 
 rm -rf "$PKG_DIR/opt" "$PKG_DIR/usr"
-mkdir -p "$PKG_DIR/opt/fluxdown"
+mkdir -p "$PKG_DIR/opt/rinadown"
 mkdir -p "$PKG_DIR/usr/bin"
 mkdir -p "$PKG_DIR/usr/share/applications"
 mkdir -p "$PKG_DIR/usr/share/icons/hicolor/256x256/apps"
 
-# Flutter bundle → /opt/fluxdown/
-cp -a "$BUNDLE_DIR/." "$PKG_DIR/opt/fluxdown/"
+# Flutter bundle → /opt/rinadown/
+cp -a "$BUNDLE_DIR/." "$PKG_DIR/opt/rinadown/"
 
-# /usr/bin/flux_down wrapper script
-cat > "$PKG_DIR/usr/bin/flux_down" << 'WRAPPER'
+# /usr/bin/rina_down wrapper script
+cat > "$PKG_DIR/usr/bin/rina_down" << 'WRAPPER'
 #!/bin/bash
-exec /opt/fluxdown/flux_down "$@"
+exec /opt/rinadown/rina_down "$@"
 WRAPPER
-chmod 755 "$PKG_DIR/usr/bin/flux_down"
+chmod 755 "$PKG_DIR/usr/bin/rina_down"
 
 # .desktop and icon to standard XDG paths
-cp linux/com.fluxdown.app.desktop "$PKG_DIR/usr/share/applications/"
-cp assets/logo/fluxdown_logo.png \
-  "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/com.fluxdown.app.png"
+cp linux/com.rinadown.app.desktop "$PKG_DIR/usr/share/applications/"
+cp assets/logo/rinadown_logo.png \
+  "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/com.rinadown.app.png"
 
 # ── 4. Write .PKGINFO and pack ──
 echo "[4/4] Creating .pkg.tar.zst..."
@@ -58,12 +58,12 @@ echo "[4/4] Creating .pkg.tar.zst..."
 INSTALLED_SIZE=$(du -sb "$PKG_DIR/opt/" "$PKG_DIR/usr/" | awk '{sum+=$1} END {print sum}')
 
 cat > "$PKG_DIR/.PKGINFO" << EOF
-pkgname = fluxdown
+pkgname = rinadown
 pkgver = ${VERSION}-${PKGREL}
 pkgdesc = Free IDM-alternative download manager
-url = https://fluxdown.zerx.dev
+url = https://rinadown.zerx.dev
 builddate = $(date +%s)
-packager = FluxDown CI <ci@fluxdown.app>
+packager = RinaDown CI <ci@rinadown.app>
 size = ${INSTALLED_SIZE}
 arch = x86_64
 license = custom

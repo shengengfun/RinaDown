@@ -1,16 +1,16 @@
-//! FluxDown Native Messaging Host (NMH) relay binary.
+//! RinaDown Native Messaging Host (NMH) relay binary.
 //!
 //! Chrome/Edge/Firefox launches this process when the browser extension calls
-//! `chrome.runtime.connectNative("com.fluxdown.nmh")`.
+//! `chrome.runtime.connectNative("com.rinadown.nmh")`.
 //!
 //! Communication flow:
 //!   Browser extension <-(stdin/stdout, 4-byte LE length + JSON)-> this process
-//!   this process <-(Named Pipe, 4-byte LE length + JSON)-> FluxDown App
+//!   this process <-(Named Pipe, 4-byte LE length + JSON)-> RinaDown App
 //!
 //! Design:
 //!   - Synchronous, single-threaded, no async runtime.
 //!   - Pipe connection is lazy: established on first message, reconnected on error.
-//!   - When the FluxDown App is not running, NMH automatically launches it and
+//!   - When the RinaDown App is not running, NMH automatically launches it and
 //!     polls for the IPC endpoint at a fixed 50ms interval (up to 10s).
 //!   - The "no-launch" action set (see `NO_LAUNCH_ACTIONS`) — "ping" plus the
 //!     task-panel query/control actions — only checks connectivity and never
@@ -19,7 +19,7 @@
 //!     then are answered locally (never forwarded to the App). The extension
 //!     sends one at download-flow entry so App cold-start overlaps with its
 //!     cookie collection instead of running after it.
-//!   - Diagnostic log is written to `%TEMP%/fluxdown_nmh.log`.
+//!   - Diagnostic log is written to `%TEMP%/rinadown_nmh.log`.
 //!   - Message size limit: 1 MB (Chrome NMH hard limit).
 
 use serde::{Deserialize, Serialize};
@@ -44,14 +44,14 @@ fn is_no_launch_action(action: &str) -> bool {
     NO_LAUNCH_ACTIONS.contains(&action)
 }
 
-/// IPC path for communicating with the FluxDown desktop app.
+/// IPC path for communicating with the RinaDown desktop app.
 /// Windows uses a Named Pipe; Linux/macOS uses a Unix Domain Socket.
 #[cfg(windows)]
-const PIPE_NAME: &str = r"\\.\pipe\fluxdown";
+const PIPE_NAME: &str = r"\\.\pipe\rinadown";
 
-/// FluxDown agent executable name (Windows only).
+/// RinaDown agent executable name (Windows only).
 #[cfg(windows)]
-const APP_EXE_NAME: &str = "fluxdown-agent.exe";
+const APP_EXE_NAME: &str = "rinadown-agent.exe";
 
 /// Maximum time (ms) to wait for the App to start and create its pipe.
 const APP_LAUNCH_TIMEOUT_MS: u64 = 10_000;
@@ -99,7 +99,7 @@ fn respond_status(success: bool, message: &str, msg_id: u64) {
 }
 
 // ---------------------------------------------------------------------------
-// Diagnostic logging (writes to %TEMP%/fluxdown_nmh.log)
+// Diagnostic logging (writes to %TEMP%/rinadown_nmh.log)
 // ---------------------------------------------------------------------------
 
 /// Resolve the NMH log file path.
@@ -109,7 +109,7 @@ fn log_path() -> Option<std::path::PathBuf> {
         std::env::var("TEMP")
             .or_else(|_| std::env::var("TMP"))
             .ok()
-            .map(|tmp| Path::new(&tmp).join("fluxdown_nmh.log"))
+            .map(|tmp| Path::new(&tmp).join("rinadown_nmh.log"))
     }
     #[cfg(target_os = "macos")]
     {
@@ -119,24 +119,24 @@ fn log_path() -> Option<std::path::PathBuf> {
             let dir = home
                 .join("Library")
                 .join("Application Support")
-                .join("fluxdown");
+                .join("rinadown");
             let _ = std::fs::create_dir_all(&dir);
-            return Some(dir.join("fluxdown_nmh.log"));
+            return Some(dir.join("rinadown_nmh.log"));
         }
-        Some(Path::new("/tmp").join("fluxdown_nmh.log"))
+        Some(Path::new("/tmp").join("rinadown_nmh.log"))
     }
     #[cfg(all(not(windows), not(target_os = "macos")))]
     {
-        // Linux: use ~/.local/share/fluxdown/fluxdown_nmh.log
+        // Linux: use ~/.local/share/rinadown/rinadown_nmh.log
         // Consistent with socket_path() — avoids $XDG_RUNTIME_DIR which gets
         // remapped inside Flatpak/Snap sandboxes and may differ between the app
         // process (host) and the NMH process (launched by sandboxed browser).
         if let Some(home) = home_dir() {
-            let dir = home.join(".local").join("share").join("fluxdown");
+            let dir = home.join(".local").join("share").join("rinadown");
             let _ = std::fs::create_dir_all(&dir);
-            return Some(dir.join("fluxdown_nmh.log"));
+            return Some(dir.join("rinadown_nmh.log"));
         }
-        Some(Path::new("/tmp").join("fluxdown_nmh.log"))
+        Some(Path::new("/tmp").join("rinadown_nmh.log"))
     }
 }
 
@@ -342,18 +342,18 @@ mod pipe {
     }
 }
 
-// Non-Windows: connect to FluxDown via Unix Domain Socket.
+// Non-Windows: connect to RinaDown via Unix Domain Socket.
 #[cfg(not(windows))]
 mod pipe {
     use std::io::{self, Read, Write};
     use std::os::unix::net::UnixStream;
 
-    /// Resolve the Unix socket path that the FluxDown app is listening on.
+    /// Resolve the Unix socket path that the RinaDown app is listening on.
     /// Must match the path used in native/hub/src/native_messaging.rs.
     fn socket_path() -> std::path::PathBuf {
         #[cfg(target_os = "macos")]
         {
-            // macOS: ~/Library/Application Support/fluxdown/fluxdown.sock
+            // macOS: ~/Library/Application Support/rinadown/rinadown.sock
             // Must match native/hub/src/native_messaging.rs socket_path().
             // Use home_dir() (getpwuid fallback) instead of $HOME directly,
             // because Chrome/Firefox launch NMH via launchd which strips $HOME.
@@ -361,12 +361,12 @@ mod pipe {
                 let dir = home
                     .join("Library")
                     .join("Application Support")
-                    .join("fluxdown");
+                    .join("rinadown");
                 let _ = std::fs::create_dir_all(&dir);
-                return dir.join("fluxdown.sock");
+                return dir.join("rinadown.sock");
             }
         }
-        // Linux: use ~/.local/share/fluxdown/fluxdown.sock
+        // Linux: use ~/.local/share/rinadown/rinadown.sock
         // This path is accessible from both the host (app process) and Flatpak/Snap
         // sandboxes (which bind-mount ~/.local/share/ into the sandbox), unlike
         // $XDG_RUNTIME_DIR which gets remapped to a sandbox-private path inside
@@ -375,16 +375,16 @@ mod pipe {
         #[cfg(target_os = "linux")]
         {
             if let Some(home) = super::home_dir() {
-                let dir = home.join(".local").join("share").join("fluxdown");
+                let dir = home.join(".local").join("share").join("rinadown");
                 let _ = std::fs::create_dir_all(&dir);
-                return dir.join("fluxdown.sock");
+                return dir.join("rinadown.sock");
             }
         }
         // Fallback for any other Unix-like OS
         if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
-            std::path::Path::new(&dir).join("fluxdown.sock")
+            std::path::Path::new(&dir).join("rinadown.sock")
         } else {
-            std::path::Path::new("/tmp").join("fluxdown.sock")
+            std::path::Path::new("/tmp").join("rinadown.sock")
         }
     }
 
@@ -393,7 +393,7 @@ mod pipe {
     }
 
     impl PipeHandle {
-        /// Connect to the FluxDown Unix socket. Returns None if the app is not running.
+        /// Connect to the RinaDown Unix socket. Returns None if the app is not running.
         pub fn connect(_ignored: &str) -> Option<Self> {
             let path = socket_path();
             let stream = UnixStream::connect(&path).ok()?;
@@ -429,7 +429,7 @@ mod pipe {
 // App auto-launch
 // ---------------------------------------------------------------------------
 
-/// Find the FluxDown App executable.
+/// Find the RinaDown App executable.
 ///
 /// Search order:
 /// 1. Same directory as NMH exe (production + CMake-embedded dev builds)
@@ -465,7 +465,7 @@ fn find_app_exe() -> Option<PathBuf> {
 
 #[cfg(target_os = "macos")]
 fn find_app_exe() -> Option<PathBuf> {
-    const APP_EXE_CANDIDATES: &[&str] = &["fluxdown-agent"];
+    const APP_EXE_CANDIDATES: &[&str] = &["rinadown-agent"];
 
     // 1. Same directory as NMH binary (inside .app bundle: Contents/MacOS/)
     if let Ok(exe) = std::env::current_exe()
@@ -486,7 +486,7 @@ fn find_app_exe() -> Option<PathBuf> {
         .and_then(|path| path.parent());
     if let Some(root) = workspace_root {
         for profile in ["debug", "release"] {
-            let candidate = root.join("target").join(profile).join("fluxdown-agent");
+            let candidate = root.join("target").join(profile).join("rinadown-agent");
             if candidate.exists() {
                 return Some(candidate);
             }
@@ -502,7 +502,7 @@ fn find_app_exe() -> Option<PathBuf> {
     if let Ok(exe) = std::env::current_exe()
         && let Some(dir) = exe.parent()
     {
-        let candidate = dir.join("fluxdown-agent");
+        let candidate = dir.join("rinadown-agent");
         if candidate.exists() {
             return Some(candidate);
         }
@@ -515,7 +515,7 @@ fn find_app_exe() -> Option<PathBuf> {
         .and_then(|path| path.parent());
     if let Some(root) = workspace_root {
         for profile in ["debug", "release"] {
-            let candidate = root.join("target").join(profile).join("fluxdown-agent");
+            let candidate = root.join("target").join(profile).join("rinadown-agent");
             if candidate.exists() {
                 return Some(candidate);
             }
@@ -525,7 +525,7 @@ fn find_app_exe() -> Option<PathBuf> {
     None
 }
 
-/// Launch the FluxDown App as a detached process.
+/// Launch the RinaDown App as a detached process.
 #[cfg(windows)]
 fn launch_app(app_exe: &Path) -> bool {
     use std::os::windows::process::CommandExt;
@@ -697,12 +697,12 @@ fn main() {
     let cli_args: Vec<String> = std::env::args().skip(1).collect();
     if let Some(action) = classify_cli_invocation(&cli_args) {
         match action {
-            CliAction::Version => println!("fluxdown_nmh {}", env!("CARGO_PKG_VERSION")),
+            CliAction::Version => println!("rinadown_nmh {}", env!("CARGO_PKG_VERSION")),
             CliAction::Help => println!(
-                "fluxdown_nmh {} — FluxDown Native Messaging Host\n\
+                "rinadown_nmh {} — RinaDown Native Messaging Host\n\
                  \n\
                  Relays messages between a browser extension (stdin/stdout)\n\
-                 and the FluxDown app (named pipe / unix socket). Launched\n\
+                 and the RinaDown app (named pipe / unix socket). Launched\n\
                  by the browser via Native Messaging; not meant to be run\n\
                  directly.\n\
                  \n\
@@ -842,7 +842,7 @@ mod tests {
             None
         );
         assert_eq!(
-            classify_cli_invocation(&["/path/to/com.fluxdown.nmh.json", "fluxdown@zerx.dev"]),
+            classify_cli_invocation(&["/path/to/com.rinadown.nmh.json", "rinadown@zerx.dev"]),
             None
         );
     }

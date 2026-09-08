@@ -16,11 +16,11 @@ use std::net::TcpListener;
 use std::sync::Arc;
 use std::time::Duration;
 
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
 
-const FILE_BODY: &[u8] = b"fluxdown plugin lazy resolve integration payload body!!\n";
+const FILE_BODY: &[u8] = b"rinadown plugin lazy resolve integration payload body!!\n";
 
 /// 本地 HTTP/1.1 服务器：支持 HEAD（Content-Length + Accept-Ranges）与 GET（全量）。
 fn spawn_server() -> (u16, std::thread::JoinHandle<()>) {
@@ -101,7 +101,7 @@ fn engine_config(work: &std::path::Path) -> EngineConfig {
 async fn create(engine: &mut Engine, url: &str, save_dir: &str, name: &str) -> String {
     engine
         .manager
-        .create_task(fluxdown_engine::download_manager::NewTaskSpec {
+        .create_task(rinadown_engine::download_manager::NewTaskSpec {
             url: url.to_string(),
             save_dir: save_dir.to_string(),
             file_name: name.to_string(),
@@ -114,7 +114,7 @@ async fn create(engine: &mut Engine, url: &str, save_dir: &str, name: &str) -> S
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn lazy_resolve_rewrites_and_downloads() {
-    let work = std::env::temp_dir().join(format!("fluxdown-plugin-it-{}", uuid_like()));
+    let work = std::env::temp_dir().join(format!("rinadown-plugin-it-{}", uuid_like()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir work");
     let (port, _srv) = spawn_server();
     let real_url = format!("http://127.0.0.1:{port}/real.bin");
@@ -180,7 +180,7 @@ async fn lazy_resolve_rewrites_and_downloads() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn disabled_plugin_passes_through() {
-    let work = std::env::temp_dir().join(format!("fluxdown-plugin-dis-{}", uuid_like()));
+    let work = std::env::temp_dir().join(format!("rinadown-plugin-dis-{}", uuid_like()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir work");
     let (port, _srv) = spawn_server();
     let real_url = format!("http://127.0.0.1:{port}/real.bin");
@@ -230,7 +230,7 @@ async fn disabled_plugin_passes_through() {
 /// resolve 并完成**——不得因 DB status==4 被 on_resolve_ready 误判为「窗口内已取消」而放弃。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn resume_of_errored_resolver_task_reresolves() {
-    let work = std::env::temp_dir().join(format!("fluxdown-plugin-resume-{}", uuid_like()));
+    let work = std::env::temp_dir().join(format!("rinadown-plugin-resume-{}", uuid_like()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir work");
     let (port, _srv) = spawn_server();
     let real_url = format!("http://127.0.0.1:{port}/real.bin");
@@ -338,7 +338,7 @@ async fn write_slow_rewrite_plugin(dir: &std::path::Path, busy_ms: u64, match_ur
 /// B 必须正常分派 resume 并完成下载。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn pause_resume_during_resolve_window_dispatches_resume() {
-    let work = std::env::temp_dir().join(format!("fluxdown-plugin-race-{}", uuid_like()));
+    let work = std::env::temp_dir().join(format!("rinadown-plugin-race-{}", uuid_like()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir work");
     let (port, _srv) = spawn_server();
     let real_url = format!("http://127.0.0.1:{port}/real.bin");
@@ -477,7 +477,7 @@ async fn write_header_plugin(dir: &std::path::Path) {
 /// start 与 resume 两条路径都必须注入下载请求——resume 丢头会 401。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn resume_applies_fresh_resolver_extra_headers() {
-    let work = std::env::temp_dir().join(format!("fluxdown-plugin-hdr-{}", uuid_like()));
+    let work = std::env::temp_dir().join(format!("rinadown-plugin-hdr-{}", uuid_like()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir work");
     let (port, _srv) = spawn_auth_server();
     let real_url = format!("http://127.0.0.1:{port}/real.bin");
@@ -566,7 +566,7 @@ async fn resume_applies_fresh_resolver_extra_headers() {
 /// `tasks.resolver_plugin_id`，之后 resume 按原始链接直下（等价批量逃生舱）。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn uninstall_clears_task_resolver_binding() {
-    let work = std::env::temp_dir().join(format!("fluxdown-plugin-uninst-{}", uuid_like()));
+    let work = std::env::temp_dir().join(format!("rinadown-plugin-uninst-{}", uuid_like()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir work");
     let (port, _srv) = spawn_server();
     let real_url = format!("http://127.0.0.1:{port}/real.bin");
@@ -630,7 +630,7 @@ async fn uninstall_clears_task_resolver_binding() {
 /// 把原始页面 HTML 当媒体文件下载。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn resume_with_disabled_plugin_fails_closed() {
-    let work = std::env::temp_dir().join(format!("fluxdown-plugin-failclosed-{}", uuid_like()));
+    let work = std::env::temp_dir().join(format!("rinadown-plugin-failclosed-{}", uuid_like()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir work");
     let (port, _srv) = spawn_server();
     let real_url = format!("http://127.0.0.1:{port}/real.bin");

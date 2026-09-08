@@ -6,7 +6,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flux_down/src/services/cloud/cloud_models.dart';
+import 'package:rina_down/src/services/cloud/cloud_models.dart';
 
 void main() {
   test('CloudReferralSummary 快照经 jsonEncode/Decode 往返后字段逐项一致', () {

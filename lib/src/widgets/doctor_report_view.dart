@@ -281,12 +281,12 @@ class _DoctorReportViewState extends State<DoctorReportView> {
       case 'url_protocol':
         // `magnet`/`ed2k` 经 provider：那两个开关还带 `*_assoc_user_disabled`
         // 退出标记，绕过 provider 直发信号会让设置页和现实对不上。
-        // `fluxdown` 没有用户开关（启动自动注册），直发信号即可。
+        // `rinadown` 没有用户开关（启动自动注册），直发信号即可。
         final VoidCallback? register = switch (check.target) {
           'magnet' => () => sp.setMagnetProtocolAssociation(true),
           'ed2k' => () => sp.setEd2kProtocolAssociation(true),
-          'fluxdown' => () =>
-              SetUrlProtocol(scheme: 'fluxdown', enable: true).sendSignalToRust(),
+          'rinadown' => () =>
+              SetUrlProtocol(scheme: 'rinadown', enable: true).sendSignalToRust(),
           _ => null,
         };
         if (register == null) return null;
@@ -311,7 +311,7 @@ class _DoctorReportViewState extends State<DoctorReportView> {
 
   /// 拼纯文本报告：等级前缀用大写 wire 值，标题走当前语言，细节原样。
   String _buildReportText(S s, DiagnosticsReport report, String appLog) {
-    final b = StringBuffer('FluxDown Doctor Report\n---\n');
+    final b = StringBuffer('RinaDown Doctor Report\n---\n');
     for (final line in report.environment) {
       b.writeln(line);
     }

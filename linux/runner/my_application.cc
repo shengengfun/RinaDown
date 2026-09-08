@@ -17,7 +17,7 @@ struct _MyApplication {
   // the MethodChannel when a second instance opens files.  Not owned here —
   // the GTK widget tree owns the FlView.
   FlView* view;
-  // Native controller for the com.fluxdown/floating_ball channel (S3.4/A6).
+  // Native controller for the com.rinadown/floating_ball channel (S3.4/A6).
   // Created once in my_application_activate() and owned here.
   FloatingBallWindow* floating_ball;
   // 外部唤起下载小窗的原生宿主（跨端弹窗契约 v1）。同样在
@@ -76,11 +76,11 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "FluxDown");
+    gtk_header_bar_set_title(header_bar, "RinaDown");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "FluxDown");
+    gtk_window_set_title(window, "RinaDown");
   }
 
   gtk_window_set_default_size(window, 1280, 720);
@@ -89,7 +89,7 @@ static void my_application_activate(GApplication* application) {
   // both X11 and Wayland compositors (including KDE Plasma) can resolve the
   // application icon by name via the standard XDG icon-theme lookup.
   gtk_icon_theme_add_resource_path(gtk_icon_theme_get_default(),
-                                   "/com/fluxdown/app");
+                                   "/com/rinadown/app");
   gtk_window_set_icon_name(window, APPLICATION_ID);
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
@@ -143,7 +143,7 @@ static void my_application_activate(GApplication* application) {
 //    to create the window via activate(); Dart will pick up the args normally.
 //
 // B) Second instance forwarded to existing primary (window already running):
-//    Send the file URIs to Dart via the com.fluxdown/single_instance
+//    Send the file URIs to Dart via the com.rinadown/single_instance
 //    MethodChannel (same channel Windows uses via WM_COPYDATA).
 static void my_application_open(GApplication* application,
                                  GFile** files,
@@ -158,7 +158,7 @@ static void my_application_open(GApplication* application,
     g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
     g_autoptr(FlMethodChannel) channel = fl_method_channel_new(
         fl_engine_get_binary_messenger(fl_view_get_engine(self->view)),
-        "com.fluxdown/single_instance",
+        "com.rinadown/single_instance",
         FL_METHOD_CODEC(codec));
 
     g_autoptr(FlValue) args_list = fl_value_new_list();

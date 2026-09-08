@@ -19,7 +19,7 @@ const BUILD_TIME = new Date().toISOString();
 
 // 首页语言变体簇(与 src/lib/seo.ts HOME_ALTERNATES 一致;config 无法 import TS 常量,
 // 双处以注释互指)。sitemap xhtml:link 是 Google 认可的 hreflang 三种载体之一。
-const SITE = "https://fluxdown.zerx.dev";
+const SITE = "https://rinadown.zerx.dev";
 const HOME_VARIANT_PATHS = new Set(["/", "/zh/", "/ja/"]);
 const HOME_SITEMAP_LINKS = [
   { url: `${SITE}/`, lang: "en" },
@@ -30,7 +30,7 @@ const HOME_SITEMAP_LINKS = [
 
 // https://astro.com/docs/en/guides/environment-variables/
 export default defineConfig({
-  site: "https://fluxdown.zerx.dev",
+  site: "https://rinadown.zerx.dev",
   adapter: node({ mode: "standalone" }),
   integrations: [
     react(),
@@ -148,7 +148,7 @@ export default defineConfig({
       SPONSOR_WALL_REPO: envField.string({
         context: "server",
         access: "secret",
-        default: "zerx-lab/FluxDown",
+        default: "zerx-lab/RinaDown",
       }),
       SPONSOR_WALL_ISSUE: envField.number({
         context: "server",

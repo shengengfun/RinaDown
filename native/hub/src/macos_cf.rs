@@ -112,7 +112,7 @@ pub fn cf_to_string(cf: CFStringRef) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// Return this app's bundle identifier (e.g. `dev.zerx.fluxdown`).
+/// Return this app's bundle identifier (e.g. `dev.zerx.rinadown`).
 pub fn main_bundle_id() -> Option<String> {
     // SAFETY: `CFBundleGetMainBundle` returns a borrowed (non-owned) ref or
     // null; `CFBundleGetIdentifier` likewise returns a borrowed ref — neither

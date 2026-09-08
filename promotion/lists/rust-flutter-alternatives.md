@@ -2,36 +2,36 @@
 
 调研日期：2026-07-27。所有结论均直接读取目标仓库 `README.md` / `CONTRIBUTING.md` / `contributing.md` / PR 模板原文，并用 `gh api` 查询 star 数与「最近一次合并 PR」时间核实活跃度。
 
-**FluxDown 事实基线（已核实）**
+**RinaDown 事实基线（已核实）**
 
 | 项 | 值 | 依据 |
 |---|---|---|
-| 仓库 | `zerx-lab/FluxDown` | — |
-| Star | **1002**（fork 51） | `gh api repos/zerx-lab/FluxDown` |
+| 仓库 | `zerx-lab/RinaDown` | — |
+| Star | **1002**（fork 51） | `gh api repos/zerx-lab/RinaDown` |
 | License | AGPL-3.0 | 同上 |
-| 官网 | https://fluxdown.zerx.dev（README 第 19 行的 Website 链接） | `FluxDown/README.md:19` |
-| GitHub 仓库 homepage 字段 | `https://www.fluxdown.com` | `gh api` — 两个域名均实测 HTTP 200 |
-| crates.io | **无 crate**（`crates.io/api/v1/crates/fluxdown` → "crate `fluxdown` does not exist"） | 实测 |
-| 定位 | Rust + Tokio 引擎 / Flutter UI 的多协议下载管理器，开源 IDM 替代 | `FluxDown/README.md:9`、`:29-35` |
+| 官网 | https://rinadown.zerx.dev（README 第 19 行的 Website 链接） | `RinaDown/README.md:19` |
+| GitHub 仓库 homepage 字段 | `https://www.rinadown.com` | `gh api` — 两个域名均实测 HTTP 200 |
+| crates.io | **无 crate**（`crates.io/api/v1/crates/rinadown` → "crate `rinadown` does not exist"） | 实测 |
+| 定位 | Rust + Tokio 引擎 / Flutter UI 的多协议下载管理器，开源 IDM 替代 | `RinaDown/README.md:9`、`:29-35` |
 | aria2 JSON-RPC 兼容 | **真实存在**：`native/api/src/aria2.rs:633-670` 的 `METHOD_NAMES` 共 36 项（33 个 `aria2.*` + `system.multicall/listMethods/listNotifications`），`native/api/src/jsonrpc.rs:139-159` 逐条分发，另有 WS 通知帧 | 已读源码核实，可安全宣称「aria2-compatible JSON-RPC」 |
 
 ---
 
 ## 总览表
 
-| 清单仓库 | star 量级 | 最近活跃（最近一次合并 PR） | FluxDown 是否够格 | 是否禁 AI-PR | 优先级 |
+| 清单仓库 | star 量级 | 最近活跃（最近一次合并 PR） | RinaDown 是否够格 | 是否禁 AI-PR | 优先级 |
 |---|---|---|---|---|---|
 | [rust-unofficial/awesome-rust](https://github.com/rust-unofficial/awesome-rust) | 58.5k | **2026-07-25**（PR #2668 `feat: add gaze`） | ✅ 够格（1002 star > 50 门槛） | 全文未见任何 AI/机器生成 PR 的禁令 | **P0** |
 | [TaKO8Ki/awesome-alternatives-in-rust](https://github.com/TaKO8Ki/awesome-alternatives-in-rust) | 4.1k | **2026-07-13**（PR #146 `Add pgrust`） | ✅ 够格（无 star 门槛，定位就是「Rust 写的现有软件替代品」） | 未见禁令 | **P0** |
 | [fluttergems/awesome-open-source-flutter-apps](https://github.com/fluttergems/awesome-open-source-flutter-apps) | 3.0k | 2026-05-01（PR #757） | ✅ 够格（唯一硬门槛「3 年内有更新」满足） | 未见禁令 | **P1** |
-| [Solido/awesome-flutter](https://github.com/Solido/awesome-flutter) | 60.7k | 2026-04-21（PR #999/#1001/#1010，批量合并） | ✅ 够格（35 star 门槛，FluxDown 1002） | 未见禁令 | **P1** |
+| [Solido/awesome-flutter](https://github.com/Solido/awesome-flutter) | 60.7k | 2026-04-21（PR #999/#1001/#1010，批量合并） | ✅ 够格（35 star 门槛，RinaDown 1002） | 未见禁令 | **P1** |
 | [RunaCapital/awesome-oss-alternatives](https://github.com/RunaCapital/awesome-oss-alternatives) | 19.4k | 2025-09-03（PR #243 `Add OpenStatus`），134 open issue 积压 | ❌ **不够格**（收录标准第 3 条要求「private for-profit company」，且对标必须是 SaaS） | 未见禁令 | 不提交 |
-| [GorvGoyl/Clone-Wars](https://github.com/GorvGoyl/Clone-Wars) | 36.3k | **2024-08-06**（PR #255），此后近 2 年零合并 | ⛔ **事实停更**（且 FluxDown 不是「某站点的 clone」） | 未见禁令 | 不提交 |
+| [GorvGoyl/Clone-Wars](https://github.com/GorvGoyl/Clone-Wars) | 36.3k | **2024-08-06**（PR #255），此后近 2 年零合并 | ⛔ **事实停更**（且 RinaDown 不是「某站点的 clone」） | 未见禁令 | 不提交 |
 | [fluttergems/fluttergems](https://github.com/fluttergems/fluttergems) | 242 | 2026-07-20 | ❌ **品类不符**：只收 pub.dev **package**；app 提交已官方迁至上面的兄弟仓 | 未见禁令 | 不提交（改投兄弟仓） |
 
 > **AI-PR 禁令核查方式**：对上述全部 CONTRIBUTING / PR 模板 / README 贡献章节做了 `AI|LLM|ChatGPT|Copilot|AI-generated|machine.generated|bot` 正则全文检索，**零命中**（命中的都是收录条目自身描述里的 "AI"，例如 awesome-rust 的 TabbyML 条目）。即：**目前无一家明文禁止 AI 生成 PR**；但也没有一家明文允许，仍应以人工署名、单条目单 PR 的方式提交。
 
-> **「收录库」vs「收录应用」的判别结论**：FluxDown 是**应用（application）**，不是 crate / package。
+> **「收录库」vs「收录应用」的判别结论**：RinaDown 是**应用（application）**，不是 crate / package。
 > - awesome-rust 同时收录二者，但分处 `## Applications` 与 `## Libraries` 两个顶层区块 → 必须进 `## Applications`。
 > - awesome-alternatives-in-rust 同样分 `## Applications` / `## Libraries` → 进 `## Applications`。
 > - Solido/awesome-flutter 主体是 package，但设有 `## Open Source Apps` 专区 → 只能进该专区。
@@ -73,19 +73,19 @@ PR 模板（`.github/pull_request_template.md`）全文只有一行勾选项：
 - `* [YueMiyuki/Risuko](https://github.com/YueMiyuki/Risuko) - A full-featured download manager. …`（README:811，**下载管理器**）
 - `* [suckit](https://github.com/Skallwar/suckit) - Recursively visit and download a website's content to your disk. …`（README:794）
 
-字母序（不区分大小写）：`… wthrr → YAKC → YueMiyuki/Risuko → **zerx-lab/FluxDown**`。
-→ **`zerx-lab/FluxDown` 排在 `### Utilities` 最末**，紧跟 `YueMiyuki/Risuko` 那一行之后、`### Video` 标题之前。
+字母序（不区分大小写）：`… wthrr → YAKC → YueMiyuki/Risuko → **zerx-lab/RinaDown**`。
+→ **`zerx-lab/RinaDown` 排在 `### Utilities` 最末**，紧跟 `YueMiyuki/Risuko` 那一行之后、`### Video` 标题之前。
 
 ### 可直接复制粘贴的条目文本
 
 ```markdown
-* [zerx-lab/FluxDown](https://github.com/zerx-lab/FluxDown) - A multi-protocol download manager with a Rust/Tokio engine, supporting HTTP/FTP, BitTorrent, eD2K, HLS and DASH, with IDM-style dynamic segmentation, browser extensions and an aria2-compatible JSON-RPC endpoint.
+* [zerx-lab/RinaDown](https://github.com/zerx-lab/RinaDown) - A multi-protocol download manager with a Rust/Tokio engine, supporting HTTP/FTP, BitTorrent, eD2K, HLS and DASH, with IDM-style dynamic segmentation, browser extensions and an aria2-compatible JSON-RPC endpoint.
 ```
 
-**关于 CI badge（建议省略）**：CONTRIBUTING 只说「if you have a CI build」，是可选项，`### Utilities` 中绝大多数条目也没有 badge。FluxDown 的 workflow 只有 `release.yml` / `website-ci.yml` / `signing-test.yml` 等，`release.yml` 最近一次运行在 tag 分支 `v0.2.5-rc.2`（success），**默认分支上可能显示 "no status"**，加了反而难看。若仍要加，用与 Risuko 同款写法并显式钉 branch：
+**关于 CI badge（建议省略）**：CONTRIBUTING 只说「if you have a CI build」，是可选项，`### Utilities` 中绝大多数条目也没有 badge。RinaDown 的 workflow 只有 `release.yml` / `website-ci.yml` / `signing-test.yml` 等，`release.yml` 最近一次运行在 tag 分支 `v0.2.5-rc.2`（success），**默认分支上可能显示 "no status"**，加了反而难看。若仍要加，用与 Risuko 同款写法并显式钉 branch：
 
 ```markdown
- [![Release](https://github.com/zerx-lab/FluxDown/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/zerx-lab/FluxDown/actions/workflows/release.yml)
+ [![Release](https://github.com/zerx-lab/RinaDown/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/zerx-lab/RinaDown/actions/workflows/release.yml)
 ```
 （前置一个空格接在描述之后 —— CONTRIBUTING 原文：「Put the image after the description, separated by a space」）
 
@@ -125,7 +125,7 @@ PR 模板（`.github/pull_request_template.md`）全文只有一行勾选项：
 ```markdown
 #### Internet Download Manager
 
-* [FluxDown](https://github.com/zerx-lab/FluxDown) - A multi-protocol download manager with IDM-style dynamic segmentation, written in Rust
+* [RinaDown](https://github.com/zerx-lab/RinaDown) - A multi-protocol download manager with IDM-style dynamic segmentation, written in Rust
 ```
 
 同时需要在文件顶部 `## Table of contents` 中同步（现有 ToC 只到 `### 分类` 层级，`####` 层级不入 ToC，因此**无需改 ToC**——`- [Utilities](#utilities)` 已存在于第 22 行）。
@@ -152,7 +152,7 @@ PR 模板（`.github/pull_request_template.md`）全文只有一行勾选项：
 
 > ### Do not raise issues or send PRs for changing issue template, adding header-footer, badges or any buttons.
 
-**无 star 门槛**；唯一硬门槛「3 年内有更新」FluxDown 显然满足。**必须先开 issue 再发 PR**，这是与其它清单最大的流程差异。
+**无 star 门槛**；唯一硬门槛「3 年内有更新」RinaDown 显然满足。**必须先开 issue 再发 PR**，这是与其它清单最大的流程差异。
 
 ### 插入位置（两选一，均为表格行）
 
@@ -160,15 +160,15 @@ PR 模板（`.github/pull_request_template.md`）全文只有一行勾选项：
 
 **首选：`### Tools & Utilities`** —— 最贴近的同类条目 Gopeed 就在这里：
 `| Gopeed | [Link](https://github.com/GopeedLab/gopeed) | A modern download manager that supports all platforms |`
-字母序：`Floating Volume → **FluxDown** → Frigoligo`（插在 Floating Volume 行之后、Frigoligo 行之前）。
+字母序：`Floating Volume → **RinaDown** → Frigoligo`（插在 Floating Volume 行之后、Frigoligo 行之前）。
 
 ```markdown
-| FluxDown | [Link](https://github.com/zerx-lab/FluxDown) | Multi-protocol download manager powered by a Rust engine, supporting HTTP/FTP, BitTorrent, eD2K, HLS and DASH with IDM-style dynamic segmentation and browser integration |
+| RinaDown | [Link](https://github.com/zerx-lab/RinaDown) | Multi-protocol download manager powered by a Rust engine, supporting HTTP/FTP, BitTorrent, eD2K, HLS and DASH with IDM-style dynamic segmentation and browser integration |
 ```
 
 **备选：`### Network, Bluetooth & Sharing`** —— 另一款下载管理器 Brisk 在这里：
 `| Brisk | [Link](https://github.com/BrisklyDev/brisk) | Fast, multithreaded, cross-platform download manager |`
-字母序：`Destiny → **FluxDown** → foldie`（插在 Destiny 行之后、foldie 行之前）。行文本同上。
+字母序：`Destiny → **RinaDown** → foldie`（插在 Destiny 行之后、foldie 行之前）。行文本同上。
 
 > 两个分类各有先例，**不要同时提交两处**（CONTRIBUTING 要求一条一 PR 的流程语义）。建议在 Step 1 的 issue 里直接问维护者放哪一栏，把选择权交给他们。
 
@@ -219,10 +219,10 @@ PR 模板（`.github/pull_request_template.md`）勾选项：
 `source.md` 的排版包含一个 HTML 注释占位符 `<!--stargazers:owner/repo-->`，star 数由构建脚本注入 README，**手写时必须带上这个注释**：
 
 ```markdown
-- [FluxDown](https://github.com/zerx-lab/FluxDown) <!--stargazers:zerx-lab/FluxDown--> - Multi-protocol download manager and free IDM alternative, powered by a Rust engine by [zerx-lab](https://github.com/zerx-lab)
+- [RinaDown](https://github.com/zerx-lab/RinaDown) <!--stargazers:zerx-lab/RinaDown--> - Multi-protocol download manager and free IDM alternative, powered by a Rust engine by [zerx-lab](https://github.com/zerx-lab)
 ```
 
-PR 标题（title-case，AP style）建议：`Add FluxDown to "Open Source Apps/Top" Section`（对齐已合并的 PR #999 `Add Table Habit to "Open Source Apps/Top" section`）。
+PR 标题（title-case，AP style）建议：`Add RinaDown to "Open Source Apps/Top" Section`（对齐已合并的 PR #999 `Add Table Habit to "Open Source Apps/Top" section`）。
 PR 正文里附截图/动图（contributing 明确要求 "use screenshots and animated media"）。
 
 ---
@@ -240,7 +240,7 @@ README `## Criteria` 原文（https://github.com/RunaCapital/awesome-oss-alterna
 > 4. Its repo has 100+ stars on GitHub
 
 **否决理由**：
-1. 第 3 条要求条目主体是**私营营利性公司**，FluxDown 是 AGPL-3.0 开源项目，不是公司产品；表格里 "Company" 一列填的都是公司名 + 商业官网。
+1. 第 3 条要求条目主体是**私营营利性公司**，RinaDown 是 AGPL-3.0 开源项目，不是公司产品；表格里 "Company" 一列填的都是公司名 + 商业官网。
 2. 全表 `Alternative to` 一列指向的全是 **SaaS**（Postman / Auth0 / Firebase / DataDog…）。IDM 是买断制桌面软件，不是 SaaS —— 整个清单标题就是 "Awesome open-source alternatives to **SaaS**"。
 3. 活跃度：最近一次合并 PR 是 2025-09-03（PR #243），近 11 个月零合并，134 个 open issue、多条 `Add xxx` PR 长期挂着未处理。
 
@@ -254,7 +254,7 @@ README `## Criteria` 原文（https://github.com/RunaCapital/awesome-oss-alterna
 > - It should be a clone/alternative of some popular software or app.
 > - Project must have at least minimal functionality, please do not submit any 'UI only' clone.
 
-  FluxDown 严格说算 IDM 的 alternative，勉强能套；但表格列结构强制要求 **Demo 列**（一个可点开的在线 demo 站点），桌面下载管理器无法提供网页 demo（Repo 列另有，Demo 列全表都填的是可访问站点）。
+  RinaDown 严格说算 IDM 的 alternative，勉强能套；但表格列结构强制要求 **Demo 列**（一个可点开的在线 demo 站点），桌面下载管理器无法提供网页 demo（Repo 列另有，Demo 列全表都填的是可访问站点）。
 
 **结论：不投**。若未来该仓库恢复维护再重新评估。
 
@@ -265,7 +265,7 @@ README 原文（https://github.com/fluttergems/fluttergems）：
 > ## How to add a new open source Flutter App/Project to Flutter Gems?
 > We have migrated open source Flutter app submissions to [fluttergems/awesome-open-source-flutter-apps](https://github.com/fluttergems/awesome-open-source-flutter-apps)
 
-其 `CONTRIB.md` 流程通篇针对「pub.dev 上的 package」。FluxDown 不发 pub package → **直接改投上面的 P1-1 兄弟仓**，本仓不提交。
+其 `CONTRIB.md` 流程通篇针对「pub.dev 上的 package」。RinaDown 不发 pub package → **直接改投上面的 P1-1 兄弟仓**，本仓不提交。
 
 ### （附）已排查、无需另投的同名/近名仓库
 
@@ -276,8 +276,8 @@ README 原文（https://github.com/fluttergems/fluttergems）：
 
 ## 提交前的收尾检查（跨清单通用）
 
-1. **去重**：对 4 个目标仓库的 README/source.md 做过 `fluxdown|zerx` 全文检索，**零命中** —— 目前均未收录，不会撞重复条目。
-2. **homepage 字段口径不一致**：GitHub 仓库 homepage 字段是 `https://www.fluxdown.com`，而 README 正文链接的是 `https://fluxdown.zerx.dev`（两者实测均 HTTP 200）。审阅者通常点仓库右侧的 homepage，建议提交前统一成一个域名，避免「链接对不上」的观感问题。
+1. **去重**：对 4 个目标仓库的 README/source.md 做过 `rinadown|zerx` 全文检索，**零命中** —— 目前均未收录，不会撞重复条目。
+2. **homepage 字段口径不一致**：GitHub 仓库 homepage 字段是 `https://www.rinadown.com`，而 README 正文链接的是 `https://rinadown.zerx.dev`（两者实测均 HTTP 200）。审阅者通常点仓库右侧的 homepage，建议提交前统一成一个域名，避免「链接对不上」的观感问题。
 3. **一条目一 PR**：awesome-rust、awesome-flutter、awesome-oss-alternatives 均明文要求 individual PR，不要合并提交。
 4. **不要自动化批量投**：4 个仓库全部由个人维护者人工 review，同一账号同日群发多仓 PR 极易被判定为 spam。建议按 P0 → P1 分批、间隔提交。
 
@@ -285,7 +285,7 @@ README 原文（https://github.com/fluttergems/fluttergems）：
 
 ## 提交记录（2026-07-27）
 
-全部由 `zerx-lab` 账号提交，外部仓库均走 fork → 分支 → 单条目 minimal diff → PR 流程，FluxDown 主仓未做任何改动。
+全部由 `zerx-lab` 账号提交，外部仓库均走 fork → 分支 → 单条目 minimal diff → PR 流程，RinaDown 主仓未做任何改动。
 
 | # | 目标仓库 | 类型 | 链接 | 状态 |
 |---|---|---|---|---|
@@ -296,34 +296,34 @@ README 原文（https://github.com/fluttergems/fluttergems）：
 
 ### P0-2 · awesome-alternatives-in-rust PR #148
 
-- 分支 `zerx-lab:add-fluxdown` → `main`；commit `Add FluxDown as an Internet Download Manager alternative`。
+- 分支 `zerx-lab:add-rinadown` → `main`；commit `Add RinaDown as an Internet Download Manager alternative`。
 - 唯一改动 `README.md`，+4 行：在 `#### [codemod]` 块之后、`#### [jq]` 之前新建**未加链接**的 `#### Internet Download Manager` 小节。
 - 按调研结论用了 README 实际排版的 ` - ` 分隔符（非 CONTRIBUTING 写的 `—`），并在 PR 正文里说明了这一取舍；同时说明了 IDM 无仓库可链、标题走纯文本的先例。
 - **未新建** Networking / Download managers 分类。ToC 未动（`####` 层级本就不入 ToC）。
-- ⚠️ 该仓 CI 的 `cargo run`（死链检查器）**在未改动的 upstream README 上同样崩溃**，报 `serializing nested enums in YAML is not supported yet`：`src/main.rs:354` 用 `serde_yaml::to_string` 序列化 `Working::No(CheckerError::…)` 这一嵌套 enum，只要全表出现任意一条死链就会 panic。已实测对比 upstream/main 原始 README 复现同样报错 → **与本次改动无关的既有缺陷**，不必修。新增的 `https://github.com/zerx-lab/FluxDown` 实测 HTTP 200。
+- ⚠️ 该仓 CI 的 `cargo run`（死链检查器）**在未改动的 upstream README 上同样崩溃**，报 `serializing nested enums in YAML is not supported yet`：`src/main.rs:354` 用 `serde_yaml::to_string` 序列化 `Working::No(CheckerError::…)` 这一嵌套 enum，只要全表出现任意一条死链就会 panic。已实测对比 upstream/main 原始 README 复现同样报错 → **与本次改动无关的既有缺陷**，不必修。新增的 `https://github.com/zerx-lab/RinaDown` 实测 HTTP 200。
 
 ### P1-1 · awesome-open-source-flutter-apps Issue #777
 
 - 按 CONTRIBUTING 的 Step 1 **只开 issue，未提 PR**（该仓强制先 issue 后 PR）。
-- 标题 `Add FluxDown - Multi-protocol download manager (open-source IDM alternative)`，沿用该仓现有 issue 的 `Add <Name> - <tagline>` 命名习惯。
+- 标题 `Add RinaDown - Multi-protocol download manager (open-source IDM alternative)`，沿用该仓现有 issue 的 `Add <Name> - <tagline>` 命名习惯。
 - 正文列出项目事实 + 3 年活跃度达标说明，并**把分类选择权交给维护者**：`Tools & Utilities`（Gopeed 先例，插 Floating Volume 与 Frigoligo 之间）vs `Network, Bluetooth & Sharing`（Brisk 先例，插 Destiny 与 foldie 之间），两处的字母序位置都已给出。
 - **待办**：维护者回复分类后，再按 Step 2–4 fork 改 `README.md` 表格并提 PR。
 
 ### P1-2 · awesome-flutter PR #1055
 
-- 分支 `zerx-lab:add-fluxdown` → `master`；commit `Add FluxDown to Open Source Apps/Top`（**刻意避开 contributing 明令禁止的 "Update source.md"**）。
+- 分支 `zerx-lab:add-rinadown` → `master`；commit `Add RinaDown to Open Source Apps/Top`（**刻意避开 contributing 明令禁止的 "Update source.md"**）。
 - 唯一改动 `source.md`，+1/-0；`README.md` **零改动**（已用 `gh pr view --json files` 核实 `changedFiles: 1`）。
 - 位置：`## Open Source Apps` → `### Top` 的**最末行**（`Table Habit` 之后、空行 + `## Utilities` 之前），按要求追加到分类底部而非字母序。
 - 落地条目：
 
   ```markdown
-  - [FluxDown](https://github.com/zerx-lab/FluxDown) <!--stargazers:zerx-lab/FluxDown--> - Multi-protocol download manager and free IDM alternative, powered by a Rust engine by [zerx-lab](https://github.com/zerx-lab)
+  - [RinaDown](https://github.com/zerx-lab/RinaDown) <!--stargazers:zerx-lab/RinaDown--> - Multi-protocol download manager and free IDM alternative, powered by a Rust engine by [zerx-lab](https://github.com/zerx-lab)
   ```
 
-- 自查（对 `git diff upstream/master...add-fluxdown` 的 added 行做正则统计）：`/flutter/gi` 命中数 **0**，`<!--stargazers:zerx-lab/FluxDown-->` 占位符存在，touched files 仅 `source.md`。
+- 自查（对 `git diff upstream/master...add-rinadown` 的 added 行做正则统计）：`/flutter/gi` 命中数 **0**，`<!--stargazers:zerx-lab/RinaDown-->` 占位符存在，touched files 仅 `source.md`。
 - PR 模板三个复选框（含 `I edited the SOURCE.md file only`）全部勾选；正文附了官网 UI 展示链接与 og 图。
 
 ### 遗留事项
 
 - awesome-open-source-flutter-apps 需等 issue #777 的分类答复后补提 PR。
-- 收尾检查第 2 条（GitHub homepage 字段 `www.fluxdown.com` 与 README 的 `fluxdown.zerx.dev` 不一致）**仍未处理**；本次全部对外提交统一使用 `https://fluxdown.zerx.dev`。
+- 收尾检查第 2 条（GitHub homepage 字段 `www.rinadown.com` 与 README 的 `rinadown.zerx.dev` 不一致）**仍未处理**；本次全部对外提交统一使用 `https://rinadown.zerx.dev`。

@@ -1,8 +1,8 @@
 //! Named Pipe server for browser extension communication via Native Messaging.
 //!
 //! Architecture:
-//!   - FluxDown main process creates a Named Pipe server at `\\.\pipe\fluxdown`.
-//!   - The NMH relay binary (`fluxdown_nmh.exe`) connects to this pipe.
+//!   - RinaDown main process creates a Named Pipe server at `\\.\pipe\rinadown`.
+//!   - The NMH relay binary (`rinadown_nmh.exe`) connects to this pipe.
 //!   - Messages use a 4-byte LE length prefix + JSON payload.
 //!
 //! Message protocol (mirrors the no-launch action set in
@@ -27,8 +27,8 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
-use fluxdown_api::service::{ApiHost, LiveSpeed};
-use fluxdown_protocol::daemon::{DownloadRequest, TaskDto};
+use rinadown_api::service::{ApiHost, LiveSpeed};
+use rinadown_protocol::daemon::{DownloadRequest, TaskDto};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
@@ -36,7 +36,7 @@ use crate::logger::{log_error, log_info};
 
 /// Named Pipe path for the NMH relay to connect to.
 #[cfg(windows)]
-const PIPE_NAME: &str = r"\\.\pipe\fluxdown";
+const PIPE_NAME: &str = r"\\.\pipe\rinadown";
 
 /// Maximum message size: 1 MB.
 const MAX_MESSAGE_SIZE: u32 = 1024 * 1024;
@@ -486,8 +486,8 @@ mod server {
     }
 
     /// Windows pipe security: grant Everyone read/write and stamp a Low
-    /// mandatory integrity label so a Medium-IL `fluxdown_nmh.exe` (spawned by
-    /// the browser) can connect even when FluxDown runs elevated (High IL).
+    /// mandatory integrity label so a Medium-IL `rinadown_nmh.exe` (spawned by
+    /// the browser) can connect even when RinaDown runs elevated (High IL).
     /// Without it the pipe inherits the creator's High IL and the no-write-up
     /// rule silently rejects the relay — browser interception dies until the
     /// app next runs unelevated.
@@ -576,7 +576,7 @@ mod server {
 
     /// Create one pipe server instance with a hardened security descriptor
     /// (Everyone R/W + Low integrity label) so a Medium-IL NMH relay can
-    /// connect even when FluxDown runs elevated. Falls back to default security
+    /// connect even when RinaDown runs elevated. Falls back to default security
     /// if the descriptor cannot be built, never breaking the unelevated path.
     fn create_instance(
         first: bool,
@@ -718,14 +718,14 @@ mod server {
 
     /// Returns the Unix socket path for the NMH relay to connect to.
     ///
-    /// - macOS: `~/Library/Application Support/fluxdown/fluxdown.sock`
+    /// - macOS: `~/Library/Application Support/rinadown/rinadown.sock`
     ///   (avoids /tmp sandbox isolation and $TMPDIR per-app randomisation;
     ///   uses getpwuid fallback so launchd-launched NMH also finds it)
-    /// - Linux:  `~/.local/share/fluxdown/fluxdown.sock`
+    /// - Linux:  `~/.local/share/rinadown/rinadown.sock`
     ///   (avoids $XDG_RUNTIME_DIR sandbox remapping inside Flatpak/Snap;
     ///   ~/.local/share/ is bind-mounted into the sandbox so both the host
     ///   app and the browser-spawned NMH see the same path)
-    /// - Other Unix: `$XDG_RUNTIME_DIR/fluxdown.sock` → `/tmp/fluxdown.sock`
+    /// - Other Unix: `$XDG_RUNTIME_DIR/rinadown.sock` → `/tmp/rinadown.sock`
     pub fn socket_path() -> std::path::PathBuf {
         #[cfg(target_os = "macos")]
         {
@@ -733,12 +733,12 @@ mod server {
                 let dir = home
                     .join("Library")
                     .join("Application Support")
-                    .join("fluxdown");
+                    .join("rinadown");
                 let _ = std::fs::create_dir_all(&dir);
-                return dir.join("fluxdown.sock");
+                return dir.join("rinadown.sock");
             }
         }
-        // Linux: use ~/.local/share/fluxdown/fluxdown.sock
+        // Linux: use ~/.local/share/rinadown/rinadown.sock
         // This path is accessible from both the host (app process) and Flatpak/Snap
         // sandboxes (which bind-mount ~/.local/share/ into the sandbox), unlike
         // $XDG_RUNTIME_DIR which gets remapped to a sandbox-private path inside
@@ -751,16 +751,16 @@ mod server {
                 let dir = std::path::Path::new(&home)
                     .join(".local")
                     .join("share")
-                    .join("fluxdown");
+                    .join("rinadown");
                 let _ = std::fs::create_dir_all(&dir);
-                return dir.join("fluxdown.sock");
+                return dir.join("rinadown.sock");
             }
         }
         // Fallback for any other Unix-like OS
         if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
-            std::path::Path::new(&dir).join("fluxdown.sock")
+            std::path::Path::new(&dir).join("rinadown.sock")
         } else {
-            std::path::Path::new("/tmp").join("fluxdown.sock")
+            std::path::Path::new("/tmp").join("rinadown.sock")
         }
     }
 
@@ -1102,7 +1102,7 @@ async fn rebind(
 }
 
 // wire 类型（DownloadRequest/RequestBody）的反序列化测试随类型迁移至
-// fluxdown_api crate（native/api/src/types.rs 的所有者测试）。
+// rinadown_api crate（native/api/src/types.rs 的所有者测试）。
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]

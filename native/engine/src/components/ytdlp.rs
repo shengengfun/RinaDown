@@ -56,7 +56,7 @@ fn ytdlp_binary_name() -> &'static str {
 
 /// 当前平台对应的 yt-dlp 官方 Release 资产名。`None` = 无官方构建（几乎不
 /// 会命中——yt-dlp 覆盖所有主流桌面/服务器平台）。musl 目标选 musllinux
-/// 构建（FluxDown Linux 发行版为 musl-static），glibc 目标选普通 linux 构建。
+/// 构建（RinaDown Linux 发行版为 musl-static），glibc 目标选普通 linux 构建。
 fn platform_asset() -> Option<&'static str> {
     if cfg!(all(target_os = "windows", target_arch = "x86_64")) {
         Some("yt-dlp.exe")

@@ -101,9 +101,9 @@ class ExternalDownloadService {
     }
   }
 
-  /// 桌面端 `fluxdown://` 协议唤起入口（启动参数 / 第二实例转发）。
+  /// 桌面端 `rinadown://` 协议唤起入口（启动参数 / 第二实例转发）。
   ///
-  /// Windows 上 `protocol_registry` 把 `fluxdown://` 注册到本 exe，浏览器
+  /// Windows 上 `protocol_registry` 把 `rinadown://` 注册到本 exe，浏览器
   /// 扩展协议模式或任何第三方唤起都会以协议 URL 作为启动参数进来。构造与
   /// 浏览器扩展请求同构的 [ExternalDownloadRequest]，复用同一条
   /// 免打扰 / 独立小窗 / 主窗口对话框处理链。服务未初始化时丢弃并记日志。
@@ -144,7 +144,7 @@ class ExternalDownloadService {
     // 音视频轨对（浏览器扩展嗅探到离散 video/audio 轨，通用语义，非站点
     // 特判）：browser 侧已完成清晰度确认。免打扰开启时宿主直接建任务
     // （不拆分为多任务，audioUrl 原样传 Rust 走离散轨道下载 + mux 旁路）；
-    // 免打扰关闭时落入下方弹窗路径，让用户在 FluxDown 内二次确认（audioUrl
+    // 免打扰关闭时落入下方弹窗路径，让用户在 RinaDown 内二次确认（audioUrl
     // 经弹窗/小窗独立通道透传，不进 URL 文本、不被换行拆分）。
     final trackPairSilent = readySettings.silentDownloadEnabled;
     if (req.audioUrl.isNotEmpty && trackPairSilent) {

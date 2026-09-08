@@ -1,4 +1,4 @@
-use fluxdown_ui_i18n::{Translator, keys};
+use rinadown_ui_i18n::{Translator, keys};
 use gpui::SharedString;
 
 #[derive(Clone)]

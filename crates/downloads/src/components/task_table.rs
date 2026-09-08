@@ -1,7 +1,7 @@
 use std::{cmp::Ordering, collections::HashSet};
 
-use fluxdown_ui_components::toolbar_action_button;
-use fluxdown_ui_theme::active_theme;
+use rinadown_ui_components::toolbar_action_button;
+use rinadown_ui_theme::active_theme;
 use gpui::{
     AnyElement, App, AppContext as _, ClickEvent, Context, Div, InteractiveElement as _,
     IntoElement, Modifiers, MouseButton, ParentElement, Render, SharedString, Stateful,
@@ -1103,11 +1103,11 @@ impl DownloadView {
     fn resolve_selection(
         &mut self,
         request_id: String,
-        outcome: fluxdown_protocol::SelectionOutcome,
+        outcome: rinadown_protocol::SelectionOutcome,
         cx: &mut Context<Self>,
     ) {
         let future = self.controller.execute(DownloadsCommand::ResolveSelection(
-            fluxdown_protocol::SelectionResolutionDto {
+            rinadown_protocol::SelectionResolutionDto {
                 request_id,
                 outcome,
             },
@@ -1124,14 +1124,14 @@ impl DownloadView {
 
     fn render_pending_selection(
         &self,
-        request: fluxdown_protocol::SelectionRequestDto,
+        request: rinadown_protocol::SelectionRequestDto,
         cx: &mut Context<Self>,
     ) -> Div {
         let tokens = active_theme(cx).tokens();
         let confirm_id = request.request_id.clone();
         let confirm_outcome = request.default_choice.clone();
         let cancel_id = request.request_id.clone();
-        let cancellable = !matches!(request.kind, fluxdown_protocol::SelectionKind::Hls { .. });
+        let cancellable = !matches!(request.kind, rinadown_protocol::SelectionKind::Hls { .. });
         h_flex()
             .w_full()
             .items_center()
@@ -1167,7 +1167,7 @@ impl DownloadView {
                         .on_click(cx.listener(move |this, _, _, cx| {
                             this.resolve_selection(
                                 cancel_id.clone(),
-                                fluxdown_protocol::SelectionOutcome::Cancelled,
+                                rinadown_protocol::SelectionOutcome::Cancelled,
                                 cx,
                             );
                         })),
@@ -1232,7 +1232,7 @@ impl DownloadView {
 mod tests {
     use std::{collections::HashSet, sync::Arc};
 
-    use fluxdown_ui_i18n::{I18nCatalog, I18nError};
+    use rinadown_ui_i18n::{I18nCatalog, I18nError};
 
     use super::DownloadTableDelegate;
     use crate::{model::DownloadTaskView, strings::DownloadStrings};
@@ -1245,7 +1245,7 @@ mod tests {
         let tasks = (0..3)
             .map(|index| {
                 let task =
-                    serde_json::from_value::<fluxdown_protocol::TaskDto>(serde_json::json!({
+                    serde_json::from_value::<rinadown_protocol::TaskDto>(serde_json::json!({
                         "taskId": format!("t{index}"),
                         "url": "https://example.com/file",
                         "fileName": format!("f{index}.bin"),

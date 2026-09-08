@@ -15,7 +15,7 @@ export const prerender = false;
 // list tracking comments. POST (vote/unvote/propose) patches the cached view.
 // ─────────────────────────────────────────────
 
-const VOTES_ISSUE_TITLE = "[FluxDown] Feature Vote Records";
+const VOTES_ISSUE_TITLE = "[RinaDown] Feature Vote Records";
 const FEATURE_LABEL = "enhancement";
 
 const CACHE_TTL = 30_000; // 30 s
@@ -194,7 +194,7 @@ async function findOrCreateVotesIssue(): Promise<number> {
       body: JSON.stringify({
         title: VOTES_ISSUE_TITLE,
         body: [
-          "## FluxDown Feature Vote Records",
+          "## RinaDown Feature Vote Records",
           "",
           "This issue stores all feature vote comments.",
           "Each comment is a JSON record: `{ featureId, ip, action, date }`.",
@@ -329,7 +329,7 @@ function extractDescription(body: string | null): string {
   const content = sepIdx >= 0 ? body.slice(0, sepIdx) : body;
   const cleaned = content
     .replace(/^#{1,6}\s+.*$/gm, "")
-    .replace(/<!--\s*fluxdown:feature-meta[\s\S]*?-->/g, "")
+    .replace(/<!--\s*rinadown:feature-meta[\s\S]*?-->/g, "")
     .replace(/```json\s*[\s\S]*?```/g, "")
     .trim();
   return cleaned.length > 300 ? `${cleaned.slice(0, 300)}…` : cleaned;

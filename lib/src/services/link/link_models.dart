@@ -1,4 +1,4 @@
-// FluxDown 本地设备互联（局域网配对）—— 客户端领域模型。
+// RinaDown 本地设备互联（局域网配对）—— 客户端领域模型。
 //
 // 字段严格对照 Rust 端信号 payload（见 ../../bindings/signals/link_*.dart，
 // 由 rinf 从 native/hub/src/signals/mod.rs 生成），本文件只做「生成类型 →

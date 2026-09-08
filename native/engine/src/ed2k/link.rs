@@ -26,7 +26,7 @@ pub struct Ed2kLink {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::link::is_ed2k_url;
+/// use rinadown_engine::ed2k::link::is_ed2k_url;
 /// assert!(is_ed2k_url("ed2k://|file|a|1|00000000000000000000000000000000|/"));
 /// assert!(is_ed2k_url("ED2K://|file|a|1|00000000000000000000000000000000|/"));
 /// assert!(!is_ed2k_url("http://example.com/a"));
@@ -90,7 +90,7 @@ fn percent_decode_bytes(s: &str) -> Vec<u8> {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::link::parse_ed2k_link;
+/// use rinadown_engine::ed2k::link::parse_ed2k_link;
 /// let link = parse_ed2k_link(
 ///     "ed2k://|file|movie.iso|5044211712|1555B7DCA052B5958EE68DB58A42408D|/",
 /// )

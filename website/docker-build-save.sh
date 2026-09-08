@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────
 # docker-build-save.sh
-# 构建 fluxdown-website Docker 镜像并将其保存为 .tar 文件
+# 构建 rinadown-website Docker 镜像并将其保存为 .tar 文件
 #
 # 用法:
 #   ./docker-build-save.sh [TAG] [OUTPUT_FILE]
 #
 # 参数:
 #   TAG         镜像标签，默认为 latest
-#   OUTPUT_FILE 输出文件路径，默认为 fluxdown-website-<TAG>.tar
+#   OUTPUT_FILE 输出文件路径，默认为 rinadown-website-<TAG>.tar
 #
 # 示例:
 #   ./docker-build-save.sh
@@ -17,7 +17,7 @@
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
 
-IMAGE_NAME="fluxdown-website"
+IMAGE_NAME="rinadown-website"
 TAG="${1:-latest}"
 FULL_IMAGE="${IMAGE_NAME}:${TAG}"
 OUTPUT_FILE="${2:-${IMAGE_NAME}-${TAG}.tar}"
@@ -25,7 +25,7 @@ OUTPUT_FILE="${2:-${IMAGE_NAME}-${TAG}.tar}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "=========================================="
-echo "  FluxDown Website — Docker Build & Save"
+echo "  RinaDown Website — Docker Build & Save"
 echo "=========================================="
 echo "  镜像名称 : ${FULL_IMAGE}"
 echo "  输出文件 : ${OUTPUT_FILE}"

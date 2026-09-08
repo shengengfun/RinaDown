@@ -5,7 +5,7 @@
 //! # Why this exists
 //!
 //! `installer/windows/setup.iss`'s `[Icons]` section creates shortcuts with
-//! `Filename: "{app}\flux_down.exe"` and no explicit `IconFilename` — Inno
+//! `Filename: "{app}\rina_down.exe"` and no explicit `IconFilename` — Inno
 //! Setup then defaults `IconLocation` to the target exe itself (icon index
 //! 0), which is the icon compiled into the exe's PE resources
 //! (`windows/runner/Runner.rc` → `app_icon.ico`). That reference is written
@@ -29,7 +29,7 @@
 //! `CoCreateInstance(CLSID_ShellLink)` → `QueryInterface(IPersistFile)` →
 //! `Load` the existing `.lnk` → verify its target resolves to this app's
 //! exe (guards the taskbar pin folder, which holds pins for every app, not
-//! just FluxDown) → `SetIconLocation` → `Save` → `SHChangeNotify` to make
+//! just RinaDown) → `SetIconLocation` → `Save` → `SHChangeNotify` to make
 //! Explorer refresh that item's icon immediately.
 //!
 //! The target check fails **closed**: shortcuts whose target cannot be
@@ -37,14 +37,14 @@
 //! PIDL-only pins — the taskbar's own "File Explorer" pin and UWP app pins
 //! have no filesystem target at all (`IShellLinkW::GetPath` returns
 //! `S_FALSE` with an empty buffer). A previous version failed *open* here
-//! and stamped the FluxDown icon onto the Explorer pin; `listen` therefore
+//! and stamped the RinaDown icon onto the Explorer pin; `listen` therefore
 //! also runs a startup repair sweep that clears any foreign shortcut whose
-//! `IconLocation` still points at a FluxDown-owned icon file.
+//! `IconLocation` still points at a RinaDown-owned icon file.
 //!
 //! Linux/macOS handle the equivalent problem differently (see
 //! `AppIconService._applyIcon`): Linux overwrites the user's XDG icon-theme
 //! override, macOS uses `NSWorkspace.setIcon` via the native
-//! `com.fluxdown/window` channel. Neither needs a Rust-side component, so
+//! `com.rinadown/window` channel. Neither needs a Rust-side component, so
 //! this module is Windows-only.
 
 #[cfg(target_os = "windows")]
@@ -410,9 +410,9 @@ mod inner {
 
     /// What `update_one` did with a shortcut.
     enum Outcome {
-        /// FluxDown-owned shortcut — `IconLocation` rewritten to the new icon.
+        /// RinaDown-owned shortcut — `IconLocation` rewritten to the new icon.
         Updated,
-        /// Foreign shortcut whose `IconLocation` a past FluxDown version
+        /// Foreign shortcut whose `IconLocation` a past RinaDown version
         /// hijacked (old fail-open guard) — icon reference cleared so the
         /// shell derives the icon from the target again.
         Repaired,
@@ -424,7 +424,7 @@ mod inner {
     struct Context {
         /// Canonical path of this app's exe.
         exe: PathBuf,
-        /// New icon to stamp onto FluxDown-owned shortcuts; `None` for a
+        /// New icon to stamp onto RinaDown-owned shortcuts; `None` for a
         /// repair-only sweep (startup).
         icon_wide: Option<Vec<u16>>,
         /// `<data_dir>/icons` — where bolt/custom `.ico` files live.
@@ -434,20 +434,20 @@ mod inner {
     }
 
     impl Context {
-        /// Whether `icon` is a FluxDown-owned icon file — i.e. something
+        /// Whether `icon` is a RinaDown-owned icon file — i.e. something
         /// only this app would have written into a shortcut.
         ///
         /// Exact-path checks cover the running instance's own locations, but
-        /// hijacked pins may reference a *different* FluxDown location than
+        /// hijacked pins may reference a *different* RinaDown location than
         /// the one currently executing (e.g. the installed copy under
-        /// `…\Programs\FluxDown\app_icon.ico` while a dev/portable build runs
+        /// `…\Programs\RinaDown\app_icon.ico` while a dev/portable build runs
         /// the sweep). Location-independent heuristics cover those:
-        /// - `app_icon.ico` sitting next to a `flux_down.exe`, or in a
-        ///   directory literally named `FluxDown` (uninstalled leftovers);
-        /// - `bolt_icon.ico`/`custom_icon.ico` inside a `FluxDown\icons`
+        /// - `app_icon.ico` sitting next to a `rina_down.exe`, or in a
+        ///   directory literally named `RinaDown` (uninstalled leftovers);
+        /// - `bolt_icon.ico`/`custom_icon.ico` inside a `RinaDown\icons`
         ///   data directory.
         ///
-        /// Both anchor on FluxDown-specific names, so another app's
+        /// Both anchor on RinaDown-specific names, so another app's
         /// (Flutter-default) `app_icon.ico` never matches.
         fn is_owned_icon(&self, icon: &Path) -> bool {
             if paths_match(icon, &self.default_ico) {
@@ -470,14 +470,14 @@ mod inner {
                     .is_some_and(|f| f.eq_ignore_ascii_case(name))
             };
             if file.eq_ignore_ascii_case("app_icon.ico") {
-                let beside_our_exe = parent.is_some_and(|p| p.join("flux_down.exe").is_file());
-                return beside_our_exe || dir_named(parent, "FluxDown");
+                let beside_our_exe = parent.is_some_and(|p| p.join("rina_down.exe").is_file());
+                return beside_our_exe || dir_named(parent, "RinaDown");
             }
             if file.eq_ignore_ascii_case("bolt_icon.ico")
                 || file.eq_ignore_ascii_case("custom_icon.ico")
             {
                 return dir_named(parent, "icons")
-                    && dir_named(parent.and_then(Path::parent), "FluxDown");
+                    && dir_named(parent.and_then(Path::parent), "RinaDown");
             }
             false
         }
@@ -485,7 +485,7 @@ mod inner {
 
     /// Visits one `.lnk`: rewrites its `IconLocation` if its resolved target
     /// matches our exe, repairs it if it is foreign but still carries a
-    /// FluxDown-owned icon, otherwise leaves it alone.
+    /// RinaDown-owned icon, otherwise leaves it alone.
     unsafe fn update_one(lnk_path: &Path, ctx: &Context) -> Result<Outcome, String> {
         unsafe {
             let lnk_wide = to_wide(&lnk_path.to_string_lossy());
@@ -546,7 +546,7 @@ mod inner {
 
                 // Foreign shortcut: undo damage from the old fail-open guard.
                 // Only touch it when its IconLocation clearly points at a
-                // FluxDown-owned icon file — with one extra case: the "File
+                // RinaDown-owned icon file — with one extra case: the "File
                 // Explorer" pin (identified by AUMID; its file name is
                 // localized) ships with an explicit `%windir%\explorer.exe,0`
                 // icon, so an *empty* IconLocation there is also our damage
@@ -599,10 +599,10 @@ mod inner {
         unsafe {
             let mut targets = Vec::new();
             if let Some(desktop) = known_folder_dir(&FOLDERID_Desktop) {
-                targets.push(desktop.join("FluxDown.lnk"));
+                targets.push(desktop.join("RinaDown.lnk"));
             }
             if let Some(programs) = known_folder_dir(&FOLDERID_Programs) {
-                targets.push(programs.join("FluxDown").join("FluxDown.lnk"));
+                targets.push(programs.join("RinaDown").join("RinaDown.lnk"));
             }
             if let Some(quick_launch) = known_folder_dir(&FOLDERID_QuickLaunch) {
                 let taskbar_dir = quick_launch.join("User Pinned").join("TaskBar");
@@ -626,8 +626,8 @@ mod inner {
     }
 
     /// Sweeps all candidate shortcuts. `icon_path = Some(..)` applies that
-    /// icon to FluxDown-owned shortcuts; `None` is a repair-only pass. Both
-    /// modes clear FluxDown icons hijacked onto foreign shortcuts.
+    /// icon to RinaDown-owned shortcuts; `None` is a repair-only pass. Both
+    /// modes clear RinaDown icons hijacked onto foreign shortcuts.
     fn update_all(icon_path: Option<&str>) {
         let exe = match exe_path() {
             Ok(p) => p,
@@ -638,7 +638,7 @@ mod inner {
         };
         let ctx = Context {
             icon_wide: icon_path.map(to_wide),
-            owned_icons_dir: fluxdown_engine::data_dir::resolve_data_dir(None)
+            owned_icons_dir: rinadown_engine::data_dir::resolve_data_dir(None)
                 .ok()
                 .map(|d| d.join("icons")),
             default_ico: exe
@@ -723,7 +723,7 @@ mod inner {
         /// pid-suffixed pattern as the engine's bt_downloader tests).
         fn test_dir(tag: &str) -> PathBuf {
             let dir = std::env::temp_dir().join(format!(
-                "fluxdown_shortcut_icon_{tag}_{}",
+                "rinadown_shortcut_icon_{tag}_{}",
                 std::process::id()
             ));
             std::fs::create_dir_all(&dir).unwrap();
@@ -860,7 +860,7 @@ mod inner {
         }
 
         /// 核心回归契约：无文件系统目标的快捷方式（资源管理器/UWP 任务栏
-        /// pin 的形态）绝不能被盖上 FluxDown 图标——旧守卫在这里 fail-open,
+        /// pin 的形态）绝不能被盖上 RinaDown 图标——旧守卫在这里 fail-open,
         /// 把 Explorer pin 的图标改成了 FD icon。
         #[test]
         fn pidl_style_shortcut_is_never_stamped() {
@@ -877,7 +877,7 @@ mod inner {
             std::fs::remove_dir_all(&dir).ok();
         }
 
-        /// 自愈契约：外来快捷方式的 IconLocation 若指向 FluxDown 自有图标
+        /// 自愈契约：外来快捷方式的 IconLocation 若指向 RinaDown 自有图标
         /// （旧 bug 留下的劫持），必须被清空恢复目标默认图标。
         #[test]
         fn hijacked_foreign_shortcut_is_repaired() {
@@ -894,7 +894,7 @@ mod inner {
             std::fs::remove_dir_all(&dir).ok();
         }
 
-        /// 外来快捷方式带无关图标：目标不匹配、图标非 FluxDown 所有,
+        /// 外来快捷方式带无关图标：目标不匹配、图标非 RinaDown 所有,
         /// 必须原样保留（不许动别的应用的 pin）。
         #[test]
         fn foreign_shortcut_with_unrelated_icon_untouched() {
@@ -921,7 +921,7 @@ mod inner {
         fn own_shortcut_gets_new_icon() {
             let _com = ComGuard::init();
             let dir = test_dir("own");
-            let lnk = dir.join("fluxdown.lnk");
+            let lnk = dir.join("rinadown.lnk");
             create_lnk(&lnk, Some(&std::env::current_exe().unwrap()), None);
 
             let new_icon = dir.join("icons").join("bolt_icon.ico");
@@ -935,17 +935,17 @@ mod inner {
             std::fs::remove_dir_all(&dir).ok();
         }
 
-        /// 跨位置自愈契约：劫持图标指向**另一处** FluxDown 安装
-        /// （`…\FluxDown\app_icon.ico`，旁有 flux_down.exe），而当前进程
+        /// 跨位置自愈契约：劫持图标指向**另一处** RinaDown 安装
+        /// （`…\RinaDown\app_icon.ico`，旁有 rina_down.exe），而当前进程
         /// 从别的目录运行（ctx 的精确路径都不命中）——仍必须被修复。
         /// 复刻实机案例：dev 构建启动时清理安装版留下的 Explorer pin 劫持。
         #[test]
-        fn hijack_from_other_fluxdown_install_is_repaired() {
+        fn hijack_from_other_rinadown_install_is_repaired() {
             let _com = ComGuard::init();
             let dir = test_dir("xinstall");
-            let install = dir.join("Programs").join("FluxDown");
+            let install = dir.join("Programs").join("RinaDown");
             std::fs::create_dir_all(&install).unwrap();
-            std::fs::write(install.join("flux_down.exe"), b"").unwrap();
+            std::fs::write(install.join("rina_down.exe"), b"").unwrap();
             let lnk = dir.join("explorer_pin.lnk");
             create_lnk(&lnk, None, Some(&install.join("app_icon.ico")));
 
@@ -958,14 +958,14 @@ mod inner {
             std::fs::remove_dir_all(&dir).ok();
         }
 
-        /// 卸载残留场景：FluxDown 已卸载（app_icon.ico 与 flux_down.exe 都
-        /// 不在了），仅凭父目录名 `FluxDown` 也要能修复。
+        /// 卸载残留场景：RinaDown 已卸载（app_icon.ico 与 rina_down.exe 都
+        /// 不在了），仅凭父目录名 `RinaDown` 也要能修复。
         #[test]
-        fn hijack_from_uninstalled_fluxdown_is_repaired() {
+        fn hijack_from_uninstalled_rinadown_is_repaired() {
             let _com = ComGuard::init();
             let dir = test_dir("uninst");
             let lnk = dir.join("explorer_pin.lnk");
-            let gone = dir.join("FluxDown").join("app_icon.ico");
+            let gone = dir.join("RinaDown").join("app_icon.ico");
             create_lnk(&lnk, None, Some(&gone));
 
             let outcome = unsafe { update_one(&lnk, &ctx(&dir.join("elsewhere"), None)) }.unwrap();
@@ -975,8 +975,8 @@ mod inner {
             std::fs::remove_dir_all(&dir).ok();
         }
 
-        /// 反例：别的 Flutter 应用同名 `app_icon.ico`（目录非 FluxDown、
-        /// 旁边没有 flux_down.exe）绝不能被误清。
+        /// 反例：别的 Flutter 应用同名 `app_icon.ico`（目录非 RinaDown、
+        /// 旁边没有 rina_down.exe）绝不能被误清。
         #[test]
         fn other_apps_app_icon_ico_is_not_repaired() {
             let _com = ComGuard::init();
@@ -1004,7 +1004,7 @@ mod inner {
         fn repair_sweep_leaves_own_shortcut_alone() {
             let _com = ComGuard::init();
             let dir = test_dir("sweep");
-            let lnk = dir.join("fluxdown.lnk");
+            let lnk = dir.join("rinadown.lnk");
             let existing = dir.join("icons").join("custom_icon.ico");
             create_lnk(
                 &lnk,
@@ -1029,7 +1029,7 @@ mod inner {
         fn hijacked_explorer_pin_restores_factory_icon() {
             let _com = ComGuard::init();
             let dir = test_dir("exppin");
-            let install = dir.join("FluxDown");
+            let install = dir.join("RinaDown");
             std::fs::create_dir_all(&install).unwrap();
             let lnk = dir.join("File Explorer.lnk");
             create_pin(&lnk, Some(&install.join("app_icon.ico")), EXPLORER_AUMID);
@@ -1099,7 +1099,7 @@ mod inner {
         fn hijacked_uwp_pin_is_cleared() {
             let _com = ComGuard::init();
             let dir = test_dir("uwphij");
-            let install = dir.join("FluxDown");
+            let install = dir.join("RinaDown");
             std::fs::create_dir_all(&install).unwrap();
             let lnk = dir.join("Some App.lnk");
             create_pin(

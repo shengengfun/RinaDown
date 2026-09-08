@@ -367,7 +367,7 @@ pub(crate) fn apply_extra_headers(
 // RequestSpec: 完整 HTTP 请求事务的内部表示
 // ---------------------------------------------------------------------------
 //
-// 设计动机：FluxDown 早期把每个下载视为"URL → 内容"的简化模型，所有
+// 设计动机：RinaDown 早期把每个下载视为"URL → 内容"的简化模型，所有
 // HTTP 请求都通过 `client.get(url)` 重发。这个假设在以下场景全部失败：
 //   - form POST 触发的下载（uupdump.net）：服务器对 GET 返回 HTML 页面
 //   - 一次性签名 URL：被 probe 消费后再请求拿到 403/HTML
@@ -532,7 +532,7 @@ impl RequestSpec {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::downloader::is_valid_referrer;
+/// use rinadown_engine::downloader::is_valid_referrer;
 ///
 /// assert!(is_valid_referrer("https://example.com/page"));
 /// assert!(is_valid_referrer("http://example.com"));
@@ -823,12 +823,12 @@ pub fn maybe_decompress_stream(
 /// Cloudflare-protected CDNs also work (see [`resolve_file_info`]).
 ///
 /// **Version rule（同 aria2 的 `aria2/<版本>`）**：release 构建为
-/// `FluxDown/<pubspec 版本号>`（build.rs 注入 `FLUXDOWN_APP_VERSION`），
-/// debug 构建固定 `FluxDown/1.0`。
+/// `RinaDown/<pubspec 版本号>`（build.rs 注入 `RINADOWN_APP_VERSION`），
+/// debug 构建固定 `RinaDown/1.0`。
 const DEFAULT_UA: &str = if cfg!(debug_assertions) {
-    "FluxDown/1.0"
+    "RinaDown/1.0"
 } else {
-    concat!("FluxDown/", env!("FLUXDOWN_APP_VERSION"))
+    concat!("RinaDown/", env!("RINADOWN_APP_VERSION"))
 };
 
 /// Build a properly configured HTTP client with strict TLS certificate validation.
@@ -1107,7 +1107,7 @@ pub async fn resolve_file_info(
     let mut last_err = None;
     for attempt in 0..PROBE_MAX_RETRIES {
         // Last attempt: if extra_headers carried a browser UA, drop it so
-        // the request falls back to DEFAULT_UA ("FluxDown/<version>").  This
+        // the request falls back to DEFAULT_UA ("RinaDown/<version>").  This
         // avoids Cloudflare's TLS-fingerprint-vs-UA bot detection.
         let use_downgraded_ua = has_browser_ua && attempt + 1 == PROBE_MAX_RETRIES;
         let attempt_spec = if use_downgraded_ua {
@@ -3176,7 +3176,7 @@ async fn run_download_inner(p: &DownloadParams) -> Result<(i64, Option<String>),
                 // its own Content-Length that matches the actual file.  This
                 // handles servers (e.g. CNKI) where the browser-extension hint
                 // size differs from what the server actually delivers to
-                // FluxDown's own request (dynamic tokens, re-generated PDFs,
+                // RinaDown's own request (dynamic tokens, re-generated PDFs,
                 // slight header drift, etc.).
                 let resp_cl = single_result
                     .as_ref()
@@ -4797,7 +4797,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_no_conflict() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_no_conflict");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_no_conflict");
         let _ = tokio::fs::create_dir_all(&dir).await;
         // Clean up any leftover
         let _ = tokio::fs::remove_file(dir.join("test.txt")).await;
@@ -4818,7 +4818,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_with_conflict() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_conflict");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_conflict");
         let _ = tokio::fs::create_dir_all(&dir).await;
         // Create conflicting file
         tokio::fs::write(dir.join("test.txt"), b"")
@@ -4841,7 +4841,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_case_folds_across_disk_variants() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_case_fold");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_case_fold");
         let _ = tokio::fs::create_dir_all(&dir).await;
         // Exact-case entry forces Phase 1's `try_exists()` probe to see a
         // conflict on every platform (Linux's exists() is case-sensitive,
@@ -4876,7 +4876,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_temp_file_conflict() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_temp");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_temp");
         let _ = tokio::fs::create_dir_all(&dir).await;
         // Create a .fdownloading temp file — should also be considered a conflict
         tokio::fs::write(dir.join(format!("test.txt{TEMP_EXT}")), b"")
@@ -4898,7 +4898,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_no_extension() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_noext");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_noext");
         let _ = tokio::fs::create_dir_all(&dir).await;
         tokio::fs::write(dir.join("README"), b"")
             .await
@@ -4923,7 +4923,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_reserved_set_avoids_collision() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_reserved");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_reserved");
         let _ = tokio::fs::create_dir_all(&dir).await;
         // No file exists on disk, but the temp path is already reserved
         // by a sibling task (simulating a batch download in progress).
@@ -4947,7 +4947,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_reserved_set_phase2_collision() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_reserved_p2");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_reserved_p2");
         let _ = tokio::fs::create_dir_all(&dir).await;
         // video.mp4 exists on disk AND video (1).mp4.fdownloading is reserved.
         tokio::fs::write(dir.join("video.mp4"), b"")
@@ -4981,8 +4981,8 @@ mod tests {
     //
     // 旧 bug：manager 同步段先 insert(self) 再 clone snapshot，spawned task
     //         拿到的 snapshot 包含自己，dedup 误判冲突 → 所有浏览器扩展下载
-    //         都被加 (1)（用户日志：FluxDown-0.1.40-windows-x64-setup.exe →
-    //         FluxDown-0.1.40-windows-x64-setup (1).exe，磁盘并无原名文件）。
+    //         都被加 (1)（用户日志：RinaDown-0.1.40-windows-x64-setup.exe →
+    //         RinaDown-0.1.40-windows-x64-setup (1).exe，磁盘并无原名文件）。
     //
     // 新设计中 spawned task 完全不再调 dedup_filename；这里仍然保留 sync
     // 与 async 两个测试，作为底层契约——"reserved 集合不含本任务名"时必须
@@ -4991,7 +4991,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_async_no_self_conflict_when_alone() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_no_self_conflict_async");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_no_self_conflict_async");
         let _ = tokio::fs::remove_dir_all(&dir).await;
         let _ = tokio::fs::create_dir_all(&dir).await;
 
@@ -5023,7 +5023,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_overwrite_keeps_name_when_only_final_exists() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_ow_final");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_ow_final");
         let _ = tokio::fs::remove_dir_all(&dir).await;
         let _ = tokio::fs::create_dir_all(&dir).await;
         tokio::fs::write(dir.join("test.txt"), b"old")
@@ -5048,7 +5048,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_overwrite_temp_file_still_conflicts() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_ow_temp");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_ow_temp");
         let _ = tokio::fs::remove_dir_all(&dir).await;
         let _ = tokio::fs::create_dir_all(&dir).await;
         // 在途下载的临时文件是硬冲突——绝不覆盖其他任务的在途产物。
@@ -5071,7 +5071,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_overwrite_reserved_and_avoid_still_conflict() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_ow_reserved");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_ow_reserved");
         let _ = tokio::fs::remove_dir_all(&dir).await;
         let _ = tokio::fs::create_dir_all(&dir).await;
 
@@ -5106,7 +5106,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_overwrite_directory_still_conflicts() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_ow_dir");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_ow_dir");
         let _ = tokio::fs::remove_dir_all(&dir).await;
         let _ = tokio::fs::create_dir_all(dir.join("data.bin")).await;
 
@@ -5958,7 +5958,7 @@ mod tests {
 
     #[tokio::test]
     async fn claim_rename_succeeds_when_dst_free() {
-        let dir = std::env::temp_dir().join("fluxdown_test_claim_rename_free");
+        let dir = std::env::temp_dir().join("rinadown_test_claim_rename_free");
         let _ = tokio::fs::remove_dir_all(&dir).await;
         let _ = tokio::fs::create_dir_all(&dir).await;
         let src = dir.join("src.bin");
@@ -5978,7 +5978,7 @@ mod tests {
 
     #[tokio::test]
     async fn claim_rename_fails_when_dst_exists_preserves_both() {
-        let dir = std::env::temp_dir().join("fluxdown_test_claim_rename_exists");
+        let dir = std::env::temp_dir().join("rinadown_test_claim_rename_exists");
         let _ = tokio::fs::remove_dir_all(&dir).await;
         let _ = tokio::fs::create_dir_all(&dir).await;
         let src = dir.join("src.bin");
@@ -6001,7 +6001,7 @@ mod tests {
 
     #[tokio::test]
     async fn dedup_filename_avoid_param_case_folds_and_renames() {
-        let dir = std::env::temp_dir().join("fluxdown_test_dedup_avoid_case_fold");
+        let dir = std::env::temp_dir().join("rinadown_test_dedup_avoid_case_fold");
         let _ = tokio::fs::remove_dir_all(&dir).await;
         let _ = tokio::fs::create_dir_all(&dir).await;
         // Empty directory, no reserved entries — only `avoid` forces a rename,

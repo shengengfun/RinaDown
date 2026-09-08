@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=RinaDown
+GenericName=Download Manager
+Comment=Free IDM-alternative download manager
+Exec=rina_down %U
+Icon=com.rinadown.app
+Type=Application
+Categories=Network;FileTransfer;
+MimeType=application/x-bittorrent;x-scheme-handler/magnet;x-scheme-handler/rinadown;x-scheme-handler/ed2k;
+Keywords=download;manager;idm;torrent;magnet;ed2k;
+StartupWMClass=rina_down
+StartupNotify=true

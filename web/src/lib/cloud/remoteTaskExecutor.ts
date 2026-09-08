@@ -94,7 +94,7 @@ function fingerprint(s: string): string {
 }
 
 function bindingsKey(): string {
-  return `fluxdown.cloud.taskBindings::${cloudUserId() || 'anon'}::${fingerprint(getBase() || 'local')}`
+  return `rinadown.cloud.taskBindings::${cloudUserId() || 'anon'}::${fingerprint(getBase() || 'local')}`
 }
 
 function loadBindings(key: string): Record<string, string> {

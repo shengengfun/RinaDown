@@ -5,9 +5,9 @@ import { GITHUB_REPO_URL } from "@/lib/utils";
 
 /** 与 AnnouncementModal 保持一致的官方域名列表；首项为主域名 */
 const OFFICIAL_SITES = [
-  "https://www.fluxdown.com",
-  "https://fluxdown.com",
-  "https://fluxdown.zerx.dev",
+  "https://www.rinadown.com",
+  "https://rinadown.com",
+  "https://rinadown.zerx.dev",
 ] as const;
 
 const ADVICE_KEYS: (keyof Messages)[] = [

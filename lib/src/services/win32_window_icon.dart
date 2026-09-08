@@ -7,7 +7,7 @@
 /// 16/32px。Windows 任务栏对 `WM_SETICON` 递进来的图标有一个随 UI 缩放
 /// 变化的最小尺寸阈值：低于阈值时只更新窗口标题栏装饰，任务栏按钮
 /// **静默不更新**（回落到窗口类图标，即 Runner.rc 编进 exe 的默认图标）。
-/// 高分屏（缩放 ≥125%）必踩中，而 FluxDown 是 TitleBarStyle.hidden 无
+/// 高分屏（缩放 ≥125%）必踩中，而 RinaDown 是 TitleBarStyle.hidden 无
 /// 标题栏——16/32px 的图标在任何可见位置都看不到效果。递 256px 图标则
 /// 标题栏与任务栏都正确生效（Windows 自行降采样），托盘图标之所以一直
 /// 正常，是因为 tray_manager 走 Shell_NotifyIcon 直递 HICON，不经此路径。
@@ -44,7 +44,7 @@ const _iconSide = 256;
 /// （`FindWindow(kFlutterWindowClass, kWindowTitle)`）保持一致：
 /// 快捷下载弹窗与主窗口共享窗口类，必须用标题区分。
 const _mainWindowClass = 'FLUTTER_RUNNER_WIN32_WINDOW';
-const _mainWindowTitle = 'FluxDown';
+const _mainWindowTitle = 'RinaDown';
 
 /// 把 [icoPath]（多尺寸 .ico）设为主窗口的运行时窗口/任务栏/Alt-Tab
 /// 图标。成功返回 true；找不到主窗口或图标加载失败返回 false（不改动

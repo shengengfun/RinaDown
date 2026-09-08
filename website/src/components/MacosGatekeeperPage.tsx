@@ -181,7 +181,7 @@ export default function MacosGatekeeperPage() {
             <p className="text-xs text-dark-text-secondary leading-relaxed mb-1">
               {t("macos.method2Desc")}
             </p>
-            <CodeBlock code="sudo xattr -rd com.apple.quarantine /Applications/FluxDown.app" />
+            <CodeBlock code="sudo xattr -rd com.apple.quarantine /Applications/RinaDown.app" />
             <p className="text-[10px] text-dark-text-muted leading-relaxed mt-2 pl-1 border-l-2 border-dark-border">
               {t("macos.method2Note")}
             </p>
@@ -219,7 +219,7 @@ export default function MacosGatekeeperPage() {
                     {t("macos.method3Step2")}
                   </p>
                 </div>
-                <CodeBlock code="sudo codesign --force --deep --sign - /Applications/FluxDown.app" />
+                <CodeBlock code="sudo codesign --force --deep --sign - /Applications/RinaDown.app" />
                 <p className="text-[10px] text-dark-text-muted leading-relaxed mt-1 pl-1 border-l-2 border-dark-border">
                   {t("macos.method3Note")}
                 </p>

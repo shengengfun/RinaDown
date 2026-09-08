@@ -1,5 +1,5 @@
 ---
-description: FluxDown 面向用户的文案必须走 i18n 查表，UI 代码里禁止硬编码中文字面量
+description: RinaDown 面向用户的文案必须走 i18n 查表，UI 代码里禁止硬编码中文字面量
 condition:
   - '(?m)^(?!\s*(//|///|\*|#|<!--)).*\b(Text|SelectableText)\(\s*(const\s+)?[''"][^''"\n]*[\u4e00-\u9fff]'
   - '(?m)^(?!\s*(//|///|\*|#|<!--)).*TextSpan\(\s*text:\s*(const\s+)?[''"][^''"\n]*[\u4e00-\u9fff]'
@@ -12,12 +12,12 @@ globs:
   - 'lib/**/*.dart'
   - 'web/src/**/*.tsx'
   - 'website/src/**/*.{tsx,astro}'
-  - 'fluxDown/**/*.{ts,tsx,html}'
+  - 'rinaDown/**/*.{ts,tsx,html}'
 repeatMode: after-gap
 repeatGap: 3
 ---
 
-你正在 FluxDown 的 UI 代码里写死中文文案。**所有面向用户的字段都必须走 i18n 查表**，否则该字段永远只有一种语言，社区也无从翻译。
+你正在 RinaDown 的 UI 代码里写死中文文案。**所有面向用户的字段都必须走 i18n 查表**，否则该字段永远只有一种语言，社区也无从翻译。
 
 按所在面替换：
 
@@ -26,7 +26,7 @@ repeatGap: 3
 | App（`lib/`） | `final s = S.of(locale);` → `Text(s.xxx)`；参数化 `s.xxx(name: v)` |
 | Web SPA（`web/`） | `const { t } = useI18n()` → `t('xxx')` |
 | 官网（`website/`） | `useI18n()` / `Messages` 键；Astro 侧取服务端 locale |
-| 扩展（`fluxDown/`） | `t('section.key')`，或 HTML 上挂 `data-i18n="section.key"` |
+| 扩展（`rinaDown/`） | `t('section.key')`，或 HTML 上挂 `data-i18n="section.key"` |
 
 Dart 侧文案承载点不止 `Text()`——本规则覆盖：`Text(` / `SelectableText(` / `TextSpan(text:` / `Tooltip(message:`，以及**字符串直传**的命名参数 `label:`（菜单项）、`tooltip:`（`ShadIconButton`/`ShadTooltip`）、`hintText:`（输入框）、`placeholder:` / `title:` / `description:`（shadcn 多数场景传的是 `Text(...)` widget，内层照样命中）、`semanticLabel:`，以及 `String get xxx => '…'` 形式的展示名 getter。
 

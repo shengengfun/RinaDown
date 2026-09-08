@@ -26,7 +26,7 @@
   </g>
 
   <!-- Wordmark + tagline -->
-  <text x="470" y="250" font-family="Arial" font-size="112" font-weight="700" fill="#F2F4F8">FluxDown</text>
+  <text x="470" y="250" font-family="Arial" font-size="112" font-weight="700" fill="#F2F4F8">RinaDown</text>
   <text x="472" y="330" font-family="Arial" font-size="42" font-weight="600" fill="#3B82F6">Free, open-source IDM alternative</text>
   <text x="472" y="392" font-family="Arial" font-size="34" font-weight="400" fill="#9aa4b2">Blazing-fast multi-protocol download manager</text>
   <text x="472" y="440" font-family="Arial" font-size="34" font-weight="400" fill="#9aa4b2">powered by a Rust engine.</text>

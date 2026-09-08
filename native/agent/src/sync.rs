@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
-use fluxdown_protocol::{AgentEvent, DaemonConfigPatch, RpcErrorData};
+use rinadown_protocol::{AgentEvent, DaemonConfigPatch, RpcErrorData};
 use futures_util::StreamExt;
 use serde::Deserialize;
 use serde_json::Value;
@@ -15,9 +15,9 @@ use crate::cloud::{CloudApi, CloudError};
 use crate::daemon_client::DaemonClient;
 use crate::event_hub::AgentEventHub;
 use crate::state::{AgentState, StateStore};
-use fluxdown_protocol::{SettingOwner, setting_spec, validate_value, value_to_daemon_config};
+use rinadown_protocol::{SettingOwner, setting_spec, validate_value, value_to_daemon_config};
 
-pub use fluxdown_protocol::SettingOwner as SyncOwner;
+pub use rinadown_protocol::SettingOwner as SyncOwner;
 
 #[must_use]
 pub fn owner_for_key(key: &str) -> SyncOwner {
@@ -94,7 +94,7 @@ impl SyncService {
     }
 
     #[must_use]
-    pub async fn status(&self) -> fluxdown_protocol::SyncStatusDto {
+    pub async fn status(&self) -> rinadown_protocol::SyncStatusDto {
         self.state.lock().await.sync.clone()
     }
 
@@ -245,7 +245,7 @@ impl SyncService {
             let revision = daemon_revision(&self.events);
             self.daemon
                 .call::<DaemonConfigPatch, Value>(
-                    fluxdown_protocol::method::DAEMON_CONFIG_PATCH,
+                    rinadown_protocol::method::DAEMON_CONFIG_PATCH,
                     Some(DaemonConfigPatch {
                         expected_revision: revision,
                         values: daemon_changes,
@@ -362,7 +362,7 @@ impl SyncService {
             let revision = daemon_revision(&self.events);
             self.daemon
                 .call::<DaemonConfigPatch, Value>(
-                    fluxdown_protocol::method::DAEMON_CONFIG_PATCH,
+                    rinadown_protocol::method::DAEMON_CONFIG_PATCH,
                     Some(DaemonConfigPatch {
                         expected_revision: revision,
                         values: BTreeMap::from([(
@@ -463,8 +463,8 @@ fn apply_pull_item(
 
 fn daemon_revision(events: &AgentEventHub) -> u64 {
     match events.snapshot().body {
-        fluxdown_protocol::SnapshotBody::Agent(agent) => agent.daemon.config.revision,
-        fluxdown_protocol::SnapshotBody::Daemon(_) => 0,
+        rinadown_protocol::SnapshotBody::Agent(agent) => agent.daemon.config.revision,
+        rinadown_protocol::SnapshotBody::Daemon(_) => 0,
     }
 }
 
@@ -599,7 +599,7 @@ mod tests {
         });
 
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_sync_worker_{}_{}",
+            "rinadown_sync_worker_{}_{}",
             std::process::id(),
             uuid::Uuid::new_v4()
         ));
@@ -610,7 +610,7 @@ mod tests {
         );
         let initial = AgentState {
             device_id: "device-1".to_owned(),
-            sync: fluxdown_protocol::SyncStatusDto {
+            sync: rinadown_protocol::SyncStatusDto {
                 enabled: true,
                 ..Default::default()
             },
@@ -631,7 +631,7 @@ mod tests {
         )
         .expect("sync cloud client");
         let events =
-            crate::event_hub::AgentEventHub::new(fluxdown_protocol::AgentSnapshot::default());
+            crate::event_hub::AgentEventHub::new(rinadown_protocol::AgentSnapshot::default());
         let service = Arc::new(SyncService::new(
             crate::cloud::CloudApi::new(cloud_client),
             Arc::new(crate::daemon_client::DaemonClient::disconnected()),

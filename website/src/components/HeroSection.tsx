@@ -9,7 +9,7 @@ import { useLocale } from "@/lib/i18n";
    - Click sidebar / tabs to filter tasks
    - Click a task row to open the detail panel on the right
    - Click the sun/moon icon in title bar to toggle light/dark theme
-   - Detail panel: 1:1 match with real FluxDown app
+   - Detail panel: 1:1 match with real RinaDown app
    ============================================================ */
 
 // ── Theme system (matches real app's app_colors.dart) ──
@@ -568,10 +568,10 @@ export default function HeroSection() {
   const selectPlatform = useCallback((key: string) => {
     setMoreOpen(false);
     // DownloadSection 为 client:visible 懒水合，事件可能无人监听——先存挂起值兜底
-    (window as { __fluxdownPendingPlatform?: string }).__fluxdownPendingPlatform =
+    (window as { __rinadownPendingPlatform?: string }).__rinadownPendingPlatform =
       key;
     window.dispatchEvent(
-      new CustomEvent("fluxdown:select-platform", { detail: key }),
+      new CustomEvent("rinadown:select-platform", { detail: key }),
     );
     document
       .getElementById("download")
@@ -1556,7 +1556,7 @@ export default function HeroSection() {
 }
 
 /* ================================================================
-   DetailPanel — 1:1 match with real FluxDown detail_panel.dart
+   DetailPanel — 1:1 match with real RinaDown detail_panel.dart
    ================================================================ */
 
 function DetailPanel({

@@ -5,33 +5,33 @@
 //! - URL 参数放行（yt-dlp 本职，区别于 ffmpeg 封网）——经真实二进制间接验证。
 //! - 真实 yt-dlp 可用时：`--version` 退出码 0、stdout 非空（牢笼由 bridge 自持）。
 //!
-//! 仅 `plugins` feature 下编译运行。真实执行经 `FLUXDOWN_TEST_YTDLP=<绝对路径>` 注入。
+//! 仅 `plugins` feature 下编译运行。真实执行经 `RINADOWN_TEST_YTDLP=<绝对路径>` 注入。
 #![cfg(feature = "plugins")]
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::path::{Path, PathBuf};
 
-use fluxdown_engine::db::Db;
-use fluxdown_engine::plugin::PluginBridge;
-use fluxdown_engine::plugin::bridge::EngineBridge;
-use fluxdown_engine::plugin::runtime::YtdlpSpec;
-use fluxdown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::db::Db;
+use rinadown_engine::plugin::PluginBridge;
+use rinadown_engine::plugin::bridge::EngineBridge;
+use rinadown_engine::plugin::runtime::YtdlpSpec;
+use rinadown_engine::proxy_config::ProxyConfig;
 
 fn unique_dir(tag: &str) -> PathBuf {
     static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let mut d = std::env::temp_dir();
-    d.push(format!("fluxdown_yt_{}_{}_{}", tag, std::process::id(), n));
+    d.push(format!("rinadown_yt_{}_{}_{}", tag, std::process::id(), n));
     std::fs::create_dir_all(&d).expect("mkdir temp");
     d
 }
 
 async fn make_bridge(data_dir: &Path) -> EngineBridge {
     let db = Db::open(data_dir).await.expect("open db");
-    // 测试用真实 yt-dlp：`FLUXDOWN_TEST_YTDLP=<绝对路径>` 时经 config 手动指定，
+    // 测试用真实 yt-dlp：`RINADOWN_TEST_YTDLP=<绝对路径>` 时经 config 手动指定，
     // 使 resolve_ytdlp 命中（CI/本机无系统 yt-dlp 时的确定性执行入口）。
-    if let Ok(p) = std::env::var("FLUXDOWN_TEST_YTDLP") {
-        db.set_config(fluxdown_engine::components::CONFIG_YTDLP_PATH, &p)
+    if let Ok(p) = std::env::var("RINADOWN_TEST_YTDLP") {
+        db.set_config(rinadown_engine::components::CONFIG_YTDLP_PATH, &p)
             .await
             .expect("seed yt-dlp path");
     }
@@ -170,7 +170,7 @@ async fn fs_rejects_unsafe_names() {
 }
 
 /// 端到端安装冒烟（需网络，默认忽略）：
-/// `cargo test -p fluxdown_engine --features plugins,components --test plugin_ytdlp -- --ignored ytdlp_install_smoke`
+/// `cargo test -p rinadown_engine --features plugins,components --test plugin_ytdlp -- --ignored ytdlp_install_smoke`
 /// 从 GitHub 下载当前平台官方 yt-dlp 二进制 → 校验托管状态 → 经 bridge 跑 `--version`。
 #[cfg(feature = "components")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -178,12 +178,12 @@ async fn fs_rejects_unsafe_names() {
 async fn ytdlp_install_smoke() {
     let data_dir = unique_dir("data_install_smoke");
     let db = Db::open(&data_dir).await.expect("open db");
-    let client = fluxdown_engine::downloader::build_client(&ProxyConfig::default(), "")
+    let client = rinadown_engine::downloader::build_client(&ProxyConfig::default(), "")
         .expect("build client");
     let progress = |d: u64, t: u64| eprintln!("[install] {d}/{t}");
 
     let status =
-        fluxdown_engine::components::install_ytdlp(&db, &data_dir, &client, None, &progress)
+        rinadown_engine::components::install_ytdlp(&db, &data_dir, &client, None, &progress)
             .await
             .expect("install yt-dlp");
     assert_eq!(status.source.as_str(), "managed");
@@ -196,7 +196,7 @@ async fn ytdlp_install_smoke() {
 
     // resolve_ytdlp 命中托管二进制；bridge 经它跑 `--version`。
     assert!(
-        fluxdown_engine::components::resolve_ytdlp(&db, &data_dir)
+        rinadown_engine::components::resolve_ytdlp(&db, &data_dir)
             .await
             .is_some(),
         "resolve_ytdlp must find managed binary"
@@ -217,14 +217,14 @@ async fn ytdlp_install_smoke() {
 }
 
 /// 快速网络冒烟（需网络，默认忽略）：拉取 yt-dlp Release 列表并解析版本 tag。
-/// `cargo test -p fluxdown_engine --features plugins,components --test plugin_ytdlp -- --ignored ytdlp_list_versions_smoke`
+/// `cargo test -p rinadown_engine --features plugins,components --test plugin_ytdlp -- --ignored ytdlp_list_versions_smoke`
 #[cfg(feature = "components")]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore]
 async fn ytdlp_list_versions_smoke() {
-    let client = fluxdown_engine::downloader::build_client(&ProxyConfig::default(), "")
+    let client = rinadown_engine::downloader::build_client(&ProxyConfig::default(), "")
         .expect("build client");
-    let v = fluxdown_engine::components::list_ytdlp_versions(&client)
+    let v = rinadown_engine::components::list_ytdlp_versions(&client)
         .await
         .expect("list yt-dlp versions");
     assert!(!v.versions.is_empty(), "at least one version tag");

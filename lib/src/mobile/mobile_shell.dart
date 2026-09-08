@@ -180,7 +180,7 @@ class _MobileShellState extends State<MobileShell> with WidgetsBindingObserver {
   }
 
   /// 收到系统分享 / URL scheme 唤起的链接：切到下载页，弹新建下载弹层
-  /// 并预填 URL（fluxdown:// 协议携带的建议文件名一并预填）。
+  /// 并预填 URL（rinadown:// 协议携带的建议文件名一并预填）。
   /// 新建下载弹层已打开时把 URL 追加进现有表单（批量协议唤起逐条到达）；
   /// 其他弹层（更新提示等）打开时忽略，避免叠层。
   Future<void> _onShared(SharedDownloadRequest request) async {

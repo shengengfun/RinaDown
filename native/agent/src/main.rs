@@ -1,4 +1,4 @@
-//! `fluxdown-agent` 官方客户端常驻后端。
+//! `rinadown-agent` 官方客户端常驻后端。
 
 use tokio_util::sync::CancellationToken;
 
@@ -10,7 +10,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         shutdown_signal().await;
         signal_cancel.cancel();
     });
-    fluxdown_agent::runtime::run(cancel).await
+    rinadown_agent::runtime::run(cancel).await
 }
 
 #[cfg(unix)]

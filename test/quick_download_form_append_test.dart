@@ -13,9 +13,9 @@
 import 'package:flutter/material.dart' show TextField;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/theme/app_theme.dart';
-import 'package:flux_down/src/theme/flux_theme_tokens.dart';
-import 'package:flux_down/src/widgets/quick_download_form.dart';
+import 'package:rina_down/src/theme/app_theme.dart';
+import 'package:rina_down/src/theme/flux_theme_tokens.dart';
+import 'package:rina_down/src/widgets/quick_download_form.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// 最小 QuickDownloadFormHost fake：队列空、默认线程数 0、无历史线程记忆、

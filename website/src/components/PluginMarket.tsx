@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocale } from "@/lib/i18n";
 
-// ── 数据类型（对应 fluxdown-plugin-index 仓库 index.json）──
+// ── 数据类型（对应 rinadown-plugin-index 仓库 index.json）──
 
-const INDEX_REPO = "zerx-lab/fluxdown-plugin-index";
+const INDEX_REPO = "zerx-lab/rinadown-plugin-index";
 const REPO_URL = `https://github.com/${INDEX_REPO}`;
 
 /** 索引条目：每插件每版本一条（append-only 分片 flatten 而来）。 */

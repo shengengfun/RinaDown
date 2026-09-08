@@ -1,8 +1,8 @@
 //! 关于：版本、软件更新、日志导出、浏览器扩展与捐赠链接。
 
-use fluxdown_protocol::method;
-use fluxdown_ui_components::{ButtonVariant, button};
-use fluxdown_ui_theme::active_theme;
+use rinadown_protocol::method;
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_theme::active_theme;
 use gpui::{App, IntoElement as _, ParentElement, SharedString, Styled, div};
 use gpui_component::{
     Icon, IconName, h_flex,
@@ -14,11 +14,11 @@ use serde_json::json;
 use super::SectionContext;
 
 pub(crate) const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
-const WEBSITE: &str = "https://fluxdown.zerx.dev";
-const CHROME_STORE: &str = "https://chromewebstore.google.com/search/FluxDown";
-const FIREFOX_STORE: &str = "https://addons.mozilla.org/firefox/addon/fluxdown/";
-const EDGE_STORE: &str = "https://microsoftedge.microsoft.com/addons/search/FluxDown";
-const DONATE: &str = "https://fluxdown.zerx.dev/sponsor";
+const WEBSITE: &str = "https://rinadown.zerx.dev";
+const CHROME_STORE: &str = "https://chromewebstore.google.com/search/RinaDown";
+const FIREFOX_STORE: &str = "https://addons.mozilla.org/firefox/addon/rinadown/";
+const EDGE_STORE: &str = "https://microsoftedge.microsoft.com/addons/search/RinaDown";
+const DONATE: &str = "https://rinadown.zerx.dev/sponsor";
 
 pub(crate) fn page(ctx: &SectionContext, _cx: &mut App) -> SettingPage {
     SettingPage::new(ctx.t("settingsCatAbout"))
@@ -34,7 +34,7 @@ pub(crate) fn page(ctx: &SectionContext, _cx: &mut App) -> SettingPage {
 fn version_group(ctx: &SectionContext) -> SettingGroup {
     let version = SharedString::from(format!("v{APP_VERSION}"));
     SettingGroup::new()
-        .title(SharedString::from("FluxDown"))
+        .title(SharedString::from("RinaDown"))
         .item(ctx.item(
             "currentVersion",
             None,
@@ -238,7 +238,7 @@ fn export_field(ctx: &SectionContext) -> SettingField<SharedString> {
                 .on_click(move |_, _, cx| {
                     let store = export_store.clone();
                     let receiver =
-                        cx.prompt_for_new_path(&std::env::temp_dir(), Some("fluxdown-logs.zip"));
+                        cx.prompt_for_new_path(&std::env::temp_dir(), Some("rinadown-logs.zip"));
                     cx.spawn(async move |cx| {
                         if let Ok(Ok(Some(path))) = receiver.await {
                             let target = path.display().to_string();

@@ -17,9 +17,9 @@
 import 'package:flutter/widgets.dart' show BorderRadius, Brightness, Color;
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flux_down/src/theme/app_theme.dart';
-import 'package:flux_down/src/theme/flux_metric_tokens.dart';
-import 'package:flux_down/src/theme/flux_theme_tokens.dart';
+import 'package:rina_down/src/theme/app_theme.dart';
+import 'package:rina_down/src/theme/flux_metric_tokens.dart';
+import 'package:rina_down/src/theme/flux_theme_tokens.dart';
 
 /// 一份"非默认"的自定义主题：全部 29 个颜色字段均使用与任何内置预设都不同的
 /// 精确 8 位 hex 字面量（而非 `withValues(alpha: 分数)` 派生色），确保

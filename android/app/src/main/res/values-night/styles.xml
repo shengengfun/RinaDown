@@ -2,7 +2,7 @@
 <resources>
     <!-- MainActivity 仅做无界面路由，不创建窗口或 FlutterEngine。 -->
     <style name="RouterTheme" parent="@android:style/Theme.NoDisplay" />
-    <!-- FluxdownMainActivity（主界面）暗色变体：黑底 splash，避免深色模式下冷启动白闪。 -->
+    <!-- RinadownMainActivity（主界面）暗色变体：黑底 splash，避免深色模式下冷启动白闪。 -->
     <style name="MainTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">@drawable/launch_background</item>
     </style>

@@ -1,13 +1,13 @@
 ---
 title: Command-Line Client
-description: The fluxdown CLI — an aria2c-style download client that drives the management API from your shell or scripts.
+description: The rinadown CLI — an aria2c-style download client that drives the management API from your shell or scripts.
 section: api
 order: 2
 ---
 
-FluxDown ships a command-line client, the `fluxdown` binary, modelled on `aria2c`. It works in two modes:
+RinaDown ships a command-line client, the `rinadown` binary, modelled on `aria2c`. It works in two modes:
 
-- **Remote mode (default)**: a thin, typed HTTP client over the [management API](/docs/en/api/overview/). Most commands talk to a running FluxDown desktop app or [headless server](/docs/en/headless-server/setup/) over `http://127.0.0.1:17800` (or wherever you point it), so it manages exactly the same tasks and queues you'd see in the app. In this role it's a scriptable remote control, the same part `aria2c`'s RPC client mode plays.
+- **Remote mode (default)**: a thin, typed HTTP client over the [management API](/docs/en/api/overview/). Most commands talk to a running RinaDown desktop app or [headless server](/docs/en/headless-server/setup/) over `http://127.0.0.1:17800` (or wherever you point it), so it manages exactly the same tasks and queues you'd see in the app. In this role it's a scriptable remote control, the same part `aria2c`'s RPC client mode plays.
 - **Standalone mode (`add --local`)**: fully independent of any running instance — it **embeds the download engine** inside the CLI process and downloads directly. This path never contacts a server and needs no token, ideal for headless environments or one-off scripted downloads. See [`add`](#add) and [Standalone mode](#standalone-mode---local) below.
 
 The [`config`](#config) subcommand is also purely local file I/O and never contacts a server.
@@ -17,14 +17,14 @@ The [`config`](#config) subcommand is also purely local file I/O and never conta
 The CLI is a workspace crate (`native/cli`). Build it from source:
 
 ```bash
-cargo build -p fluxdown_cli --release
-# binary at target/release/fluxdown (fluxdown.exe on Windows)
+cargo build -p rinadown_cli --release
+# binary at target/release/rinadown (rinadown.exe on Windows)
 ```
 
 Or run it straight through Cargo during development:
 
 ```bash
-cargo run -p fluxdown_cli -- ping
+cargo run -p rinadown_cli -- ping
 ```
 
 ## Configuration
@@ -33,8 +33,8 @@ Every command accepts these global options; the two that matter most also read e
 
 | Option | Environment variable | Default | Meaning |
 |---|---|---|---|
-| `--url <URL>` | `FLUXDOWN_URL` | `http://127.0.0.1:17800` | Base address of the FluxDown instance. |
-| `--token <TOKEN>` | `FLUXDOWN_TOKEN` | (none) | Management API token. Required for every command except `ping`. |
+| `--url <URL>` | `RINADOWN_URL` | `http://127.0.0.1:17800` | Base address of the RinaDown instance. |
+| `--token <TOKEN>` | `RINADOWN_TOKEN` | (none) | Management API token. Required for every command except `ping`. |
 | `--timeout <SECS>` | — | `30` | Per-request timeout, in seconds. |
 | `--json` | — | off | Emit machine-readable JSON instead of formatted text. |
 
@@ -44,13 +44,13 @@ The token comes from your running instance: on the desktop app it's under **Sett
 
 ```bash
 # Option A: export environment variables (per shell session)
-export FLUXDOWN_TOKEN="fxd_your_token_here"
-export FLUXDOWN_URL="http://127.0.0.1:17800"   # optional; this is the default
-fluxdown list
+export RINADOWN_TOKEN="fxd_your_token_here"
+export RINADOWN_URL="http://127.0.0.1:17800"   # optional; this is the default
+rinadown list
 
 # Option B: persist once, no exports needed afterwards
-fluxdown config set token fxd_your_token_here
-fluxdown list
+rinadown config set token fxd_your_token_here
+rinadown list
 ```
 
 The CLI always connects directly to the given address and never routes through a system proxy, so a local instance behind an `HTTP_PROXY` environment variable still works.
@@ -77,16 +77,16 @@ The CLI always connects directly to the given address and never routes through a
 
 ```bash
 # Single URL, auto everything
-fluxdown add https://example.com/file.zip
+rinadown add https://example.com/file.zip
 
 # Several URLs at once
-fluxdown add https://example.com/a.zip https://example.com/b.zip
+rinadown add https://example.com/a.zip https://example.com/b.zip
 
 # Read URLs from a file (one per line; blank lines and lines starting with # are ignored)
-fluxdown add -i urls.txt
+rinadown add -i urls.txt
 
 # Read URLs from stdin
-cat urls.txt | fluxdown add -i -
+cat urls.txt | rinadown add -i -
 ```
 
 `add` options:
@@ -112,8 +112,8 @@ On success it prints the new task id(s), one per line (`added <id>`), or a JSON 
 With `--local`, `add` no longer contacts any running instance. Instead it **embeds the download engine** (the same engine the desktop app/server use) inside the CLI process and downloads directly. This is the only way to run the CLI **fully offline** — no running app or server, and no token required.
 
 ```bash
-# Fully offline download, independent of any running FluxDown instance
-fluxdown add https://example.com/file.zip --local
+# Fully offline download, independent of any running RinaDown instance
+rinadown add https://example.com/file.zip --local
 ```
 
 Behavior:
@@ -128,9 +128,9 @@ Behavior:
 ### list
 
 ```bash
-fluxdown list
-fluxdown list --status downloading
-fluxdown --json list          # scriptable output
+rinadown list
+rinadown list --status downloading
+rinadown --json list          # scriptable output
 ```
 
 `--status` accepts a name or a numeric code: `pending`/`0`, `downloading`/`1`, `paused`/`2`, `completed`/`3`, `error`/`4`, `preparing`/`5`. The plain-text output is a table of id, status, progress, size, and name; `--json` emits the raw `TaskDto` array (camelCase fields — see the [API overview](/docs/en/api/overview/)).
@@ -138,22 +138,22 @@ fluxdown --json list          # scriptable output
 ### status, pause, resume, rm
 
 ```bash
-fluxdown status 42a14870-9276-4ea2-84ea-eb75ae497766
-fluxdown pause  42a14870-9276-4ea2-84ea-eb75ae497766
-fluxdown resume 42a14870-9276-4ea2-84ea-eb75ae497766
+rinadown status 42a14870-9276-4ea2-84ea-eb75ae497766
+rinadown pause  42a14870-9276-4ea2-84ea-eb75ae497766
+rinadown resume 42a14870-9276-4ea2-84ea-eb75ae497766
 
 # delete the task record only
-fluxdown rm 42a14870-9276-4ea2-84ea-eb75ae497766
+rinadown rm 42a14870-9276-4ea2-84ea-eb75ae497766
 # delete the record AND the file on disk
-fluxdown rm 42a14870-9276-4ea2-84ea-eb75ae497766 --delete-files
+rinadown rm 42a14870-9276-4ea2-84ea-eb75ae497766 --delete-files
 ```
 
 ### pause-all, resume-all, queue
 
 ```bash
-fluxdown pause-all
-fluxdown resume-all
-fluxdown queue           # list named queues
+rinadown pause-all
+rinadown resume-all
+rinadown queue           # list named queues
 ```
 
 ### watch
@@ -161,9 +161,9 @@ fluxdown queue           # list named queues
 `watch` polls the instance and redraws a progress table (clearing the screen each tick) until every watched task reaches a terminal state (completed / error), then exits.
 
 ```bash
-fluxdown watch                 # all active tasks
-fluxdown watch <ID>            # one task
-fluxdown watch --interval 2    # refresh every 2 seconds (default 1)
+rinadown watch                 # all active tasks
+rinadown watch <ID>            # one task
+rinadown watch --interval 2    # refresh every 2 seconds (default 1)
 ```
 
 ### config
@@ -171,18 +171,18 @@ fluxdown watch --interval 2    # refresh every 2 seconds (default 1)
 `config` reads and writes a small local config file so you don't have to export environment variables every time (think `go env -w`). It never contacts a server. Valid keys are `url`, `token`, and `timeout`.
 
 ```bash
-fluxdown config set token fxd_your_token_here   # persist the token
-fluxdown config set url http://192.168.1.10:17800
-fluxdown config set timeout 60
+rinadown config set token fxd_your_token_here   # persist the token
+rinadown config set url http://192.168.1.10:17800
+rinadown config set timeout 60
 
-fluxdown config get token        # print one value
-fluxdown config list             # show every key (unset keys shown as "(unset)")
-fluxdown --json config list      # machine-readable
-fluxdown config unset token      # clear one value
-fluxdown config path             # print the config file location
+rinadown config get token        # print one value
+rinadown config list             # show every key (unset keys shown as "(unset)")
+rinadown --json config list      # machine-readable
+rinadown config unset token      # clear one value
+rinadown config path             # print the config file location
 ```
 
-The file is `cli.toml` under the platform config directory (`%APPDATA%\zerx\fluxdown\config\` on Windows, `$XDG_CONFIG_HOME/fluxdown/` on Linux, `~/Library/Application Support/dev.zerx.fluxdown/` on macOS). The stored `token` is plain text; on Unix the file is created with `0600` permissions (owner-only). A value set here is overridden by an explicit `--flag` or the matching environment variable on any given invocation.
+The file is `cli.toml` under the platform config directory (`%APPDATA%\zerx\rinadown\config\` on Windows, `$XDG_CONFIG_HOME/rinadown/` on Linux, `~/Library/Application Support/dev.zerx.rinadown/` on macOS). The stored `token` is plain text; on Unix the file is created with `0600` permissions (owner-only). A value set here is overridden by an explicit `--flag` or the matching environment variable on any given invocation.
 
 ## Exit codes
 
@@ -194,7 +194,7 @@ The CLI mirrors `aria2c`'s exit-status convention, so scripts can branch on the 
 | `1` | Unknown error. |
 | `2` | Request timed out (or, from clap, no subcommand given). |
 | `3` | Not found (a 404 — e.g. the task id doesn't exist). |
-| `5` | Network error (couldn't connect — is FluxDown running?). |
+| `5` | Network error (couldn't connect — is RinaDown running?). |
 | `7` | Interrupted with downloads still unfinished (Ctrl-C in `--local` mode). |
 | `24` | Authentication failed (missing or invalid token). |
 | `32` | Bad request (a 400, or invalid input such as an unknown status filter). |
@@ -205,4 +205,4 @@ Wherever the CLI displays sizes it uses 1024-based units (`KiB`, `MiB`, `GiB`). 
 
 ## Relationship to aria2 and the API
 
-The CLI has two roles: remote mode drives the same management API, and standalone mode (`add --local`) embeds the engine to download offline. If you already have aria2-targeting tooling, the [aria2-compatible RPC endpoint](/docs/en/api/overview/#curl-examples) may be a better fit; for AI clients, use [MCP](/docs/en/api/overview/#mcp-model-context-protocol). Remote mode and those entry points operate on the same tasks and queues. Metalink, XML-RPC, and aria2's session save/restore are intentionally not implemented — FluxDown's SQLite store already persists everything across restarts.
+The CLI has two roles: remote mode drives the same management API, and standalone mode (`add --local`) embeds the engine to download offline. If you already have aria2-targeting tooling, the [aria2-compatible RPC endpoint](/docs/en/api/overview/#curl-examples) may be a better fit; for AI clients, use [MCP](/docs/en/api/overview/#mcp-model-context-protocol). Remote mode and those entry points operate on the same tasks and queues. Metalink, XML-RPC, and aria2's session save/restore are intentionally not implemented — RinaDown's SQLite store already persists everything across restarts.

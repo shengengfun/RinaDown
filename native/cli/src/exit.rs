@@ -6,7 +6,7 @@
 //! # Examples
 //!
 //! ```
-//! use fluxdown_cli::exit::ExitCode;
+//! use rinadown_cli::exit::ExitCode;
 //!
 //! assert_eq!(ExitCode::Success as i32, 0);
 //! assert_eq!(ExitCode::Unknown as i32, 1);

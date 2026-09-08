@@ -592,7 +592,7 @@ mod install {
         async fn zip_extract_pulls_ffmpeg_and_ffprobe() {
             use std::io::Write as _;
             let dir = std::env::temp_dir().join(format!(
-                "fluxdown_zipx_{}_{}",
+                "rinadown_zipx_{}_{}",
                 std::process::id(),
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)

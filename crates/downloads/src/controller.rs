@@ -5,7 +5,7 @@ use std::{
     sync::Arc,
 };
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     AgentEvent, AgentSnapshot, DaemonEvent, DaemonSnapshot, QueueDto, RemoteTaskDto, ServiceEvent,
     TaskDto, WsServerMsg,
 };
@@ -18,10 +18,10 @@ pub const LAST_SAVE_DIR_PREF: &str = "download.last_save_dir";
 pub const REMEMBER_LAST_SAVE_DIR_PREF: &str = "download.remember_last_save_dir";
 
 pub type PortFuture<T> =
-    Pin<Box<dyn Future<Output = Result<T, fluxdown_protocol::RpcErrorData>> + Send + 'static>>;
+    Pin<Box<dyn Future<Output = Result<T, rinadown_protocol::RpcErrorData>> + Send + 'static>>;
 
 pub enum DownloadsCommand {
-    Create(Box<fluxdown_protocol::DaemonCreateTaskParams>),
+    Create(Box<rinadown_protocol::DaemonCreateTaskParams>),
     Pause {
         task_id: String,
     },
@@ -46,7 +46,7 @@ pub enum DownloadsCommand {
         method: &'static str,
         params: serde_json::Value,
     },
-    ResolveSelection(fluxdown_protocol::SelectionResolutionDto),
+    ResolveSelection(rinadown_protocol::SelectionResolutionDto),
     RemoteDispatch(serde_json::Value),
     RemoteCommand(serde_json::Value),
     OpenTask {
@@ -80,7 +80,7 @@ pub struct DownloadsController {
     remote: Vec<RemoteTaskDto>,
     tasks: Vec<DownloadTaskView>,
     live_speeds: HashMap<String, i64>,
-    pending_selections: Vec<fluxdown_protocol::SelectionRequestDto>,
+    pending_selections: Vec<rinadown_protocol::SelectionRequestDto>,
     queues: Vec<QueueDto>,
     config: BTreeMap<String, String>,
     runtime_save_dir: String,
@@ -151,7 +151,7 @@ impl DownloadsController {
     }
 
     #[must_use]
-    pub(crate) fn pending_selection(&self) -> Option<&fluxdown_protocol::SelectionRequestDto> {
+    pub(crate) fn pending_selection(&self) -> Option<&rinadown_protocol::SelectionRequestDto> {
         self.pending_selections.first()
     }
     pub(crate) fn tasks(&self) -> &[DownloadTaskView] {
@@ -194,8 +194,8 @@ impl DownloadsController {
     pub fn execute(&self, command: DownloadsCommand) -> PortFuture<DownloadsResult> {
         if self.stale {
             return Box::pin(async {
-                Err(fluxdown_protocol::RpcErrorData::new(
-                    fluxdown_protocol::ApplicationErrorCode::Unavailable,
+                Err(rinadown_protocol::RpcErrorData::new(
+                    rinadown_protocol::ApplicationErrorCode::Unavailable,
                     true,
                 ))
             });
@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn metadata_probe_replaces_loading_row_name_and_size() {
-        let task = serde_json::from_value::<fluxdown_protocol::TaskDto>(json!({
+        let task = serde_json::from_value::<rinadown_protocol::TaskDto>(json!({
             "taskId":"task-1","url":"https://example.com/download","fileName":"",
             "saveDir":"/tmp","status":0,"downloadedBytes":0,"totalBytes":0,
             "errorMessage":"","createdAt":"1","proxyUrl":"","queueId":"main","checksum":""

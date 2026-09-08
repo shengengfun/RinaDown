@@ -5,7 +5,7 @@ section: plugins
 order: 2
 ---
 
-This walkthrough builds a resolver plugin from scratch: it intercepts links from a fictional file host, calls the host's API to get the real download link, and hands that link to FluxDown. When you're done you'll know the full edit–test loop.
+This walkthrough builds a resolver plugin from scratch: it intercepts links from a fictional file host, calls the host's API to get the real download link, and hands that link to RinaDown. When you're done you'll know the full edit–test loop.
 
 ## 1. Create the folder
 
@@ -51,7 +51,7 @@ Notes on the fields (full list in the [manifest reference](/docs/en/plugins/mani
 async function resolve(ctx) {
   // ctx.url is the original task URL, e.g. https://example-files.com/share/abc123
   const id = ctx.url.split("/share/")[1];
-  if (!id) return null; // null/undefined = pass through, FluxDown downloads ctx.url as-is
+  if (!id) return null; // null/undefined = pass through, RinaDown downloads ctx.url as-is
 
   // Call the host's API for the real link.
   const res = await flux.fetch({
@@ -80,8 +80,8 @@ What each part means:
 - `ctx` carries `taskId`, `url`, `cookies`, `referrer`, `userAgent` and `extraHeaders` — everything the task knows.
 - Returning `null` or `undefined` means "not mine, download the original URL".
 - Throwing an error puts the task into the error state (fail-closed). That is correct behavior for a resolver: better to fail visibly than to save an HTML page with a `.mp4` name.
-- `ephemeral: true` tells FluxDown the link is one-shot or anti-hotlinked, so it skips the extra HEAD probe that could burn the link. If your host's links are stable, leave it out — the probe gets you better resume integrity (ETag checks).
-- `rangeSupported: true` promises the host serves HTTP Range requests. Without a probe FluxDown would otherwise start conservatively with a single connection; with the promise it plans multi-segment right away. Only declare it when you know the host supports Range — a false promise can waste quota-limited links.
+- `ephemeral: true` tells RinaDown the link is one-shot or anti-hotlinked, so it skips the extra HEAD probe that could burn the link. If your host's links are stable, leave it out — the probe gets you better resume integrity (ETag checks).
+- `rangeSupported: true` promises the host serves HTTP Range requests. Without a probe RinaDown would otherwise start conservatively with a single connection; with the promise it plans multi-segment right away. Only declare it when you know the host supports Range — a false promise can waste quota-limited links.
 
 ## 4. Install in dev mode
 
@@ -90,7 +90,7 @@ In the desktop app: **Settings → Extensions → Plugins → install from direc
 Dev mode records your folder's path instead of copying it, and re-reads `resolver.js` **on every invocation**. Your loop becomes:
 
 1. Edit `resolver.js`, save.
-2. Add (or resume) a matching download in FluxDown.
+2. Add (or resume) a matching download in RinaDown.
 3. Read the result — no reinstall, no restart.
 
 Only `manifest.json` changes need a reload: toggle the plugin off and on in the settings page.
@@ -101,7 +101,7 @@ Add a download with a URL matching your pattern. Watch what happens:
 
 - **Success** — the task downloads from the resolved link. Task detail shows the resolved state.
 - **Your script threw / timed out** — the task shows an error message prefixed with the plugin marker. Right-click the failed task for the "ignore plugin retry" escape hatch, which re-downloads using the original URL without your plugin.
-- **Logs** — `flux.logger.*` and `console.log` both go to FluxDown's log file (`logs/fluxdown_YYYY-MM-DD.log` next to the app on Windows, `~/.local/share/fluxdown/logs/` on Linux). Log lines are truncated at 4 KB.
+- **Logs** — `flux.logger.*` and `console.log` both go to RinaDown's log file (`logs/rinadown_YYYY-MM-DD.log` next to the app on Windows, `~/.local/share/rinadown/logs/` on Linux). Log lines are truncated at 4 KB.
 
 Common first-run mistakes:
 

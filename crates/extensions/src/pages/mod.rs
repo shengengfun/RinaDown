@@ -1,6 +1,6 @@
 //! 扩展分类的两个子页：插件（已安装 / 安装 / 市场）与受管组件（ffmpeg / yt-dlp）。
 
-use fluxdown_ui_i18n::Translator;
+use rinadown_ui_i18n::Translator;
 use gpui_component::Theme;
 
 pub mod managed_components;

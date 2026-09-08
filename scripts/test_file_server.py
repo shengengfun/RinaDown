@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Simple HTTP file server for FluxDown download+delete integration tests.
+"""Simple HTTP file server for RinaDown download+delete integration tests.
 
 Serves N small binary files without touching the filesystem.
 Each file is a fixed block of bytes (repeating the file index mod 256).
@@ -130,7 +130,7 @@ def make_handler(count: int, size: int, port: int, speed: int = 0) -> type:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="FluxDown integration-test file server"
+        description="RinaDown integration-test file server"
     )
     parser.add_argument("--count", type=int, default=5000, metavar="N",
                         help="number of files to serve (default: 5000)")
@@ -154,7 +154,7 @@ def main() -> None:
     total_bytes = args.count * args.size
 
     print(
-        f"FluxDown test file server\n"
+        f"RinaDown test file server\n"
         f"  Files : {args.count:,} × {args.size:,} B "
         f"= {total_bytes / 1024 / 1024:.1f} MB total\n"
         f"  Base  : http://{args.host}:{args.port}/file-{{n}}.bin  (n=0..{args.count-1})\n"

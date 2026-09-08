@@ -24,7 +24,7 @@ import '../win32_toast/win32_bindings.dart';
 import 'floating_ball_renderer.dart';
 
 const _tag = 'Win32Ball';
-const _className = 'FluxDownBall_v1';
+const _className = 'RinaDownBall_v1';
 
 /// 输入轮询间隔（空闲态，光标不在球上）
 const _tickInterval = Duration(milliseconds: 150);

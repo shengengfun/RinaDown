@@ -1,16 +1,16 @@
 //! Application data directory resolution.
 //!
-//! Determines where FluxDown stores persistent data (database, logs, NMH manifests).
+//! Determines where RinaDown stores persistent data (database, logs, NMH manifests).
 //!
 //! ## Strategy
 //!
 //! | Platform        | Mode      | Directory                                      |
 //! |-----------------|-----------|-------------------------------------------------|
 //! | Windows         | 便携版     | `<exe_dir>/portable_data/`                      |
-//! | Windows         | 安装版     | `%LOCALAPPDATA%\FluxDown\`                      |
-//! | Linux           | —          | `$XDG_DATA_HOME/fluxdown/`                      |
-//! | macOS           | —          | `~/Library/Application Support/fluxdown/`        |
-//! | Android         | —          | `/data/data/<package>/files/fluxdown/`           |
+//! | Windows         | 安装版     | `%LOCALAPPDATA%\RinaDown\`                      |
+//! | Linux           | —          | `$XDG_DATA_HOME/rinadown/`                      |
+//! | macOS           | —          | `~/Library/Application Support/rinadown/`        |
+//! | Android         | —          | `/data/data/<package>/files/rinadown/`           |
 //!
 //! ### 便携模式检测（仅 Windows）
 //!
@@ -23,7 +23,7 @@
 //! 升级后首次启动时，旧文件自动迁移到 `portable_data/` 子目录：
 //!
 //! - 迁移幂等——目标已存在则跳过，进程内至多执行一次；
-//! - SQLite 三件套（`flux_down.db` / `-wal` / `-shm`）作为原子组迁移，
+//! - SQLite 三件套（`rina_down.db` / `-wal` / `-shm`）作为原子组迁移，
 //!   WAL 持有未 checkpoint 的事务，绝不与主库分离；
 //! - 失败的条目原地保留并记录到 `<portable_data>/migration_errors.log`
 //!   （GUI 进程无可见 stderr），下次启动自动重试。
@@ -60,7 +60,7 @@ pub enum DataDirError {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::data_dir::resolve_data_dir;
+/// use rinadown_engine::data_dir::resolve_data_dir;
 ///
 /// // Auto-detect the platform data directory.
 /// let dir = resolve_data_dir(None).expect("data dir should be creatable");
@@ -87,7 +87,7 @@ fn resolve_data_dir_inner() -> PathBuf {
                 let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
                 PathBuf::from(home).join(".local").join("share")
             });
-        base.join("fluxdown")
+        base.join("rinadown")
     }
 
     #[cfg(target_os = "macos")]
@@ -96,7 +96,7 @@ fn resolve_data_dir_inner() -> PathBuf {
         PathBuf::from(home)
             .join("Library")
             .join("Application Support")
-            .join("fluxdown")
+            .join("rinadown")
     }
 
     #[cfg(target_os = "windows")]
@@ -107,25 +107,25 @@ fn resolve_data_dir_inner() -> PathBuf {
             migrate_portable_data(&root, &new_dir);
             return new_dir;
         }
-        // Installed mode: use %LOCALAPPDATA%\FluxDown (always user-writable).
+        // Installed mode: use %LOCALAPPDATA%\RinaDown (always user-writable).
         if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-            return PathBuf::from(local).join("FluxDown");
+            return PathBuf::from(local).join("RinaDown");
         }
-        // Fallback: %APPDATA%\FluxDown
+        // Fallback: %APPDATA%\RinaDown
         if let Some(appdata) = std::env::var_os("APPDATA") {
-            return PathBuf::from(appdata).join("FluxDown");
+            return PathBuf::from(appdata).join("RinaDown");
         }
         // Last resort: exe directory (may fail on write, but better than ".").
         exe_dir()
     }
 
-    // Android: 应用内部存储 `/data/data/<package>/files/fluxdown`。
+    // Android: 应用内部存储 `/data/data/<package>/files/rinadown`。
     // 包名 = 进程名（`/proc/self/cmdline` 首个 NUL 之前的内容）。
     // 该目录无需任何存储权限即可读写，与 Dart 侧 `resolveDataDir()` 保持一致。
     #[cfg(target_os = "android")]
     {
         match android_package_name() {
-            Some(pkg) => PathBuf::from(format!("/data/data/{pkg}/files/fluxdown")),
+            Some(pkg) => PathBuf::from(format!("/data/data/{pkg}/files/rinadown")),
             None => exe_dir(),
         }
     }
@@ -152,7 +152,7 @@ fn resolve_data_dir_inner() -> PathBuf {
 ///
 /// ```ignore
 /// // 仅在 Android 目标上可用
-/// if let Some(pkg) = fluxdown_engine::data_dir::android_package_name() {
+/// if let Some(pkg) = rinadown_engine::data_dir::android_package_name() {
 ///     let dir = format!("/storage/emulated/0/Android/data/{pkg}/files/Download");
 /// }
 /// ```
@@ -186,11 +186,11 @@ fn is_portable() -> bool {
 
 /// SQLite 主库文件名；`-wal` / `-shm` 为其伴生文件（见 [`migrate_db_group`]）。
 #[cfg(any(target_os = "windows", test))]
-const DB_FILE: &str = "flux_down.db";
+const DB_FILE: &str = "rina_down.db";
 #[cfg(any(target_os = "windows", test))]
-const DB_WAL: &str = "flux_down.db-wal";
+const DB_WAL: &str = "rina_down.db-wal";
 #[cfg(any(target_os = "windows", test))]
-const DB_SHM: &str = "flux_down.db-shm";
+const DB_SHM: &str = "rina_down.db-shm";
 
 /// 独立迁移项（不含 DB 三件套——那组走 [`migrate_db_group`] 原子迁移）。
 // KEEP IN SYNC with lib/src/services/platform_utils.dart knownItems
@@ -361,7 +361,7 @@ mod tests {
 
     fn fresh_root(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_portable_migrate_{name}_{}",
+            "rinadown_portable_migrate_{name}_{}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&dir);
@@ -385,9 +385,9 @@ mod tests {
         write(&root.join(DB_SHM), "shm");
         write(&root.join("settings.json"), "{}");
         write(&root.join("icons").join("custom_icon.ico"), "ico");
-        write(&root.join("logs").join("fluxdown_2026-01-01.log"), "log");
+        write(&root.join("logs").join("rinadown_2026-01-01.log"), "log");
         // exe 根层的非数据文件（exe/DLL）不在清单内，必须原地保留。
-        write(&root.join("flux_down.exe"), "bin");
+        write(&root.join("rina_down.exe"), "bin");
 
         let failures = migrate_portable_layout(&root, &new_dir);
         assert!(failures.is_empty(), "{failures:?}");
@@ -398,12 +398,12 @@ mod tests {
         assert!(
             new_dir
                 .join("logs")
-                .join("fluxdown_2026-01-01.log")
+                .join("rinadown_2026-01-01.log")
                 .exists()
         );
         assert!(!root.join(DB_FILE).exists());
         assert!(!root.join("icons").exists());
-        assert!(root.join("flux_down.exe").exists());
+        assert!(root.join("rina_down.exe").exists());
         let _ = fs::remove_dir_all(&root);
     }
 

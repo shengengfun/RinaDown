@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     AgentEvent, CreateTaskRequest, DaemonCreateTaskParams, RemoteTaskDto, RemoteTaskStatus,
 };
 use futures_util::StreamExt;
@@ -319,7 +319,7 @@ impl RemoteTaskService {
             let result = self
                 .daemon
                 .call::<DaemonCreateTaskParams, Value>(
-                    fluxdown_protocol::method::DAEMON_TASK_CREATE,
+                    rinadown_protocol::method::DAEMON_TASK_CREATE,
                     Some(DaemonCreateTaskParams {
                         request,
                         torrent_blob_id: None,
@@ -402,7 +402,7 @@ impl RemoteTaskService {
         remote_id: &str,
         status: RemoteTaskStatus,
         error: Option<&str>,
-        task: Option<&fluxdown_protocol::TaskDto>,
+        task: Option<&rinadown_protocol::TaskDto>,
     ) -> Result<(), RemoteError> {
         if self.reported_statuses.lock().await.get(remote_id) == Some(&status) {
             return Ok(());
@@ -471,7 +471,7 @@ impl RemoteTaskService {
             let result = self
                 .daemon
                 .call::<DaemonCreateTaskParams, Value>(
-                    fluxdown_protocol::method::DAEMON_TASK_CREATE,
+                    rinadown_protocol::method::DAEMON_TASK_CREATE,
                     Some(DaemonCreateTaskParams {
                         request,
                         torrent_blob_id: None,
@@ -514,9 +514,9 @@ impl RemoteTaskService {
                 .cloned()
                 .unwrap_or_else(|| task.id.clone());
             let method = match action {
-                "pause" => fluxdown_protocol::method::DAEMON_TASK_PAUSE,
-                "resume" => fluxdown_protocol::method::DAEMON_TASK_RESUME,
-                "delete" | "cancel" => fluxdown_protocol::method::DAEMON_TASK_DELETE,
+                "pause" => rinadown_protocol::method::DAEMON_TASK_PAUSE,
+                "resume" => rinadown_protocol::method::DAEMON_TASK_RESUME,
+                "delete" | "cancel" => rinadown_protocol::method::DAEMON_TASK_DELETE,
                 _ => return Err(RemoteError::InvalidAction(action.to_owned())),
             };
             let _: Value = self
@@ -535,7 +535,7 @@ impl RemoteTaskService {
 
     /// URL 为主键，文件名与保存目录提供稳定加分。
     #[must_use]
-    pub fn rebind_score(remote: &RemoteTaskDto, local: &fluxdown_protocol::TaskDto) -> i32 {
+    pub fn rebind_score(remote: &RemoteTaskDto, local: &rinadown_protocol::TaskDto) -> i32 {
         if remote.url != local.url && remote.url != local.origin_url {
             return -1;
         }
@@ -579,10 +579,10 @@ impl RemoteTaskService {
     }
 }
 
-fn daemon_tasks(events: &AgentEventHub) -> Vec<fluxdown_protocol::TaskDto> {
+fn daemon_tasks(events: &AgentEventHub) -> Vec<rinadown_protocol::TaskDto> {
     match events.snapshot().body {
-        fluxdown_protocol::SnapshotBody::Agent(snapshot) => snapshot.daemon.tasks,
-        fluxdown_protocol::SnapshotBody::Daemon(_) => Vec::new(),
+        rinadown_protocol::SnapshotBody::Agent(snapshot) => snapshot.daemon.tasks,
+        rinadown_protocol::SnapshotBody::Daemon(_) => Vec::new(),
     }
 }
 
@@ -636,7 +636,7 @@ pub enum RemoteError {
     #[error(transparent)]
     Cloud(#[from] CloudError),
     #[error("daemon remote command failed: {0:?}")]
-    Daemon(fluxdown_protocol::RpcErrorData),
+    Daemon(rinadown_protocol::RpcErrorData),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]
@@ -657,7 +657,7 @@ mod tests {
     use axum::http::{HeaderMap, StatusCode, header};
     use axum::response::IntoResponse;
     use axum::routing::{get, post};
-    use fluxdown_protocol::{RemoteTaskDto, RemoteTaskStatus, TaskDto};
+    use rinadown_protocol::{RemoteTaskDto, RemoteTaskStatus, TaskDto};
     use serde_json::json;
     use tokio_util::sync::CancellationToken;
 
@@ -738,7 +738,7 @@ mod tests {
         });
 
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_remote_worker_{}_{}",
+            "rinadown_remote_worker_{}_{}",
             std::process::id(),
             uuid::Uuid::new_v4()
         ));
@@ -770,7 +770,7 @@ mod tests {
         let service = Arc::new(RemoteTaskService::new(
             cloud,
             Arc::new(crate::daemon_client::DaemonClient::disconnected()),
-            crate::event_hub::AgentEventHub::new(fluxdown_protocol::AgentSnapshot::default()),
+            crate::event_hub::AgentEventHub::new(rinadown_protocol::AgentSnapshot::default()),
             state,
             store.clone(),
         ));

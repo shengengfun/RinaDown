@@ -10,17 +10,17 @@
 //!      非零起点的 Range 请求。
 //!
 //! 用法（绑定本地端口，默认 ignore）：
-//!   cargo nextest run -p fluxdown_engine --test dash_track_pair_resume --run-ignored all
+//!   cargo nextest run -p rinadown_engine --test dash_track_pair_resume --run-ignored all
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, AtomicU8, Ordering};
 
-use fluxdown_engine::db::Db;
-use fluxdown_engine::downloader::{DownloadParams, ProgressUpdate, RequestSpec, build_client};
-use fluxdown_engine::events::{EngineEvent, EventSink};
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::speed_limiter::SpeedLimiter;
+use rinadown_engine::db::Db;
+use rinadown_engine::downloader::{DownloadParams, ProgressUpdate, RequestSpec, build_client};
+use rinadown_engine::events::{EngineEvent, EventSink};
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::speed_limiter::SpeedLimiter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
@@ -187,7 +187,7 @@ fn make_params(
         is_resume: false,
         range_verified: true,
         db: db.clone(),
-        client: build_client(&ProxyConfig::default(), "FluxDownRealTest/1.0").expect("client"),
+        client: build_client(&ProxyConfig::default(), "RinaDownRealTest/1.0").expect("client"),
         progress_tx: tx,
         cancel_token: cancel,
         sink: Arc::new(NoopTestSink),
@@ -200,7 +200,7 @@ fn make_params(
         },
         hint_file_size: 0,
         proxy_config: ProxyConfig::default(),
-        selector: Arc::new(fluxdown_engine::NoopSelection),
+        selector: Arc::new(rinadown_engine::NoopSelection),
         checksum: String::new(),
         extra_headers: std::collections::HashMap::new(),
         spec: RequestSpec::empty_get(),
@@ -209,7 +209,7 @@ fn make_params(
         use_server_time: false,
         allow_overwrite: false,
         ffmpeg_path: None,
-        cdn: fluxdown_engine::cdn::CdnTaskInput::default(),
+        cdn: rinadown_engine::cdn::CdnTaskInput::default(),
     }
 }
 
@@ -226,7 +226,7 @@ async fn track_pair_multi_segment_pause_resume_and_pair_coordinates() {
     });
     let base = start_range_server(video.clone(), audio.clone(), ledger.clone()).await;
 
-    let work_dir = std::env::temp_dir().join("fluxdown-rt-trackpair-resume");
+    let work_dir = std::env::temp_dir().join("rinadown-rt-trackpair-resume");
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
     tokio::fs::create_dir_all(&work_dir).await.unwrap();
     let db = Db::open(&work_dir).await.expect("db");
@@ -261,7 +261,7 @@ async fn track_pair_multi_segment_pause_resume_and_pair_coordinates() {
         }
     });
 
-    fluxdown_engine::dash_downloader::run_dash_download(make_params(
+    rinadown_engine::dash_downloader::run_dash_download(make_params(
         &base, &work_dir, &db, tx, cancel, 1,
     ))
     .await;
@@ -273,7 +273,7 @@ async fn track_pair_multi_segment_pause_resume_and_pair_coordinates() {
         !rows_after_pause.is_empty(),
         "pause must keep segment rows for resume"
     );
-    let temp_path = work_dir.join(format!("pair.mp4{}", fluxdown_engine::downloader::TEMP_EXT));
+    let temp_path = work_dir.join(format!("pair.mp4{}", rinadown_engine::downloader::TEMP_EXT));
     assert!(
         tokio::fs::try_exists(&temp_path).await.unwrap_or(false),
         "pause must keep the pre-allocated temp file"
@@ -295,7 +295,7 @@ async fn track_pair_multi_segment_pause_resume_and_pair_coordinates() {
         }
     });
 
-    fluxdown_engine::dash_downloader::run_dash_download(make_params(
+    rinadown_engine::dash_downloader::run_dash_download(make_params(
         &base,
         &work_dir,
         &db,

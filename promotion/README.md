@@ -1,4 +1,4 @@
-# FluxDown 推广渠道提交物料
+# RinaDown 推广渠道提交物料
 
 本目录是各推广/生态渠道的**可提交实物**，已按各平台官方规范核实生成。
 `lists/` 下是「被 GitHub 清单收录」的调研结果与逐条可粘贴物料，本文件是总索引与待办。
@@ -7,15 +7,15 @@
 
 | 项 | 结论 | 依据 |
 |---|---|---|
-| 仓库公开 | ✅ `zerx-lab/FluxDown`（public，1002★/51 fork） | GitHub API |
+| 仓库公开 | ✅ `zerx-lab/RinaDown`（public，1002★/51 fork） | GitHub API |
 | 开源协议 | ✅ AGPL-3.0（SPDX `AGPL-3.0`） | `LICENSE` |
 | 首个 tag | ✅ v0.0.1 @ 2026-02-10 | git tag |
 | 首个 GitHub **Release** | ⚠️ 2026-07-03（仅 24 天）——见「阻塞项 B」 | GitHub Releases API |
-| headless Web UI | ✅ `fluxdown_server`，端口 17800 | `docker/docker-compose.yml` |
-| 公共镜像 | ✅ `ghcr.io/zerx-lab/fluxdown-server`，**多架构 amd64 + arm64** | `release.yml:1678`；GHCR manifest list 实测 |
+| headless Web UI | ✅ `rinadown_server`，端口 17800 | `docker/docker-compose.yml` |
+| 公共镜像 | ✅ `ghcr.io/zerx-lab/rinadown-server`，**多架构 amd64 + arm64** | `release.yml:1678`；GHCR manifest list 实测 |
 | aria2 JSON-RPC | ✅ 覆盖官方 36 方法全集，27 个真实实现 | `native/api/src/aria2.rs:633-670`、`jsonrpc.rs:137-180` |
 | MCP 端点 | ✅ `POST /mcp`，12 个工具，默认仅 `127.0.0.1` + token | `native/api/src/mcp.rs` |
-| crates.io | ❌ 无 `fluxdown` crate（影响 awesome-rust 条目模板） | crates.io API |
+| crates.io | ❌ 无 `rinadown` crate（影响 awesome-rust 条目模板） | crates.io API |
 
 > **架构更正**：早期文档写「镜像仅 linux/amd64」是错的。commit `14a9fc6`(2026-07-10) 起
 > `platforms: linux/amd64,linux/arm64`，实测 `latest`/`0.1.59`/`0.2.0`/`0.2.2`/`0.2.3`/`0.2.5-rc.2`
@@ -54,7 +54,7 @@
 | ruanyf/weekly | [issue #10901](https://github.com/ruanyf/weekly/issues/10901) | open |
 | fmhy/edit | [issue #5890](https://github.com/fmhy/edit/issues/5890) | ✅ closed/completed（07-27） |
 
-同步落地的仓库改动：新增 `glama.json`；`native/api/src/mcp.rs` 12 个工具及参数描述改写为英文（`cargo check -p fluxdown_api` 通过）；README/README.zh-CN/`promotion/mcp/server.json` 的「9 个工具」订正为 12 并补全 rss_* 三工具。
+同步落地的仓库改动：新增 `glama.json`；`native/api/src/mcp.rs` 12 个工具及参数描述改写为英文（`cargo check -p rinadown_api` 通过）；README/README.zh-CN/`promotion/mcp/server.json` 的「9 个工具」订正为 12 并补全 rss_* 三工具。
 
 ### 合并后回挂（2026-07-28）
 
@@ -76,7 +76,7 @@
 | 渠道 | 原因 |
 |---|---|
 | awesome-selfhosted-data | 冷却至 2026-11-03（见阻塞项 B） |
-| IceWhaleTech/CasaOS-AppStore | 只收整个 store 源，FluxDown 尚无已发布 store（前置见阻塞项 C） |
+| IceWhaleTech/CasaOS-AppStore | 只收整个 store 源，RinaDown 尚无已发布 store（前置见阻塞项 C） |
 | FabioLolix/Awesome-Linux-Software | 与 DimitrisPa fork 内容重复，等 #1 有回音再定，避免像刷曝光 |
 | mcpservers.org / mcp.so / pulsemcp / Glama 用量 | 纯网页表单，gh 提交不了，需你本人操作 |
 | Cline marketplace / Smithery | 需 400×400 PNG + llms-install.md / stdio→HTTP 桥接 .mcpb |
@@ -87,11 +87,11 @@
 
 | # | 阻塞项 | 影响面 | 处理 |
 |---|---|---|---|
-| **A** | 仓库 Homepage 字段是 `https://www.fluxdown.com`，README 全用 `https://fluxdown.zerx.dev` | **全部清单**。维护者点 homepage 核对时视为可疑条目 | 二选一统一（改仓库 Settings 或改 README） |
+| **A** | 仓库 Homepage 字段是 `https://www.rinadown.com`，README 全用 `https://rinadown.zerx.dev` | **全部清单**。维护者点 homepage 核对时视为可疑条目 | 二选一统一（改仓库 Settings 或改 README） |
 | **B** | 最早 GitHub **Release** 2026-07-03 | `awesome-selfhosted`：PR #2675 已于 2026-07-05 被驳回（"Initial release 2 days ago"）。**补发 v0.0.1 Release 无效**——维护者看 Release 实际发布时间而非 tag 日期 | 冷却到 **2026-11-03** 后重提 |
 | **C** | CasaOS 源缺 `supported-languages.json`（v2 协议必需） | CasaOS/ZimaOS 自建源构建 | 补文件后再跑 `build_appstore.py` |
 
-已顺手修复：`casaos/Apps/FluxDown/docker-compose.yml` 的 `architectures` 补 `arm64`，镜像与 `version` 从 `0.1.54` 升到 `0.2.3`。
+已顺手修复：`casaos/Apps/RinaDown/docker-compose.yml` 的 `architectures` 补 `arm64`，镜像与 `version` 从 `0.1.54` 升到 `0.2.3`。
 
 ## 二、⚠️ 提示注入陷阱（务必人工提交）
 
@@ -127,7 +127,7 @@
 | `1c7/chinese-independent-developer` | 59.8k | `README.md` 主版面，按日期倒序新建小节 | `lists/p2p-and-china.md` |
 | `521xueweihan/HelloGitHub` | 167k | issue 模板 `submit-cn.yaml`，类别选 Rust | 同上 |
 | `ruanyf/weekly` | 98.1k | 空白 issue，标题前缀【开源自荐】 | 同上 |
-| `awesome-selfhosted-data` | 308k | `software/fluxdown.yml` | 已备；**卡阻塞项 B** |
+| `awesome-selfhosted-data` | 308k | `software/rinadown.yml` | 已备；**卡阻塞项 B** |
 
 ### P1 — 够格但有流程摩擦
 
@@ -150,13 +150,13 @@
 | CasaOS / ZimaOS | `casaos/` | 物料就绪（已升 0.2.3 + arm64） | 补 `supported-languages.json`；建自有源仓库 / 提官方 PR + 截图 |
 | Unraid CA | 独立仓库 `zerx-lab/unraid-templates` | ✅ 已推送并修完两处扫描错误 | 到 https://ca.unraid.net/submit 填仓库地址提交；建议 Icon 换 256×256 PNG |
 | MCP `punkpeye/awesome-mcp-servers` | PR #9304 | ✅ **已于 2026-07-13 合并**（README 第 3691 行） | 无 |
-| awesome-selfhosted | `awesome-selfhosted/fluxdown.yml` | 物料就绪（desc 222 字符，tag 与上游逐字匹配） | 先解阻塞项 B，再**本人手动**提 PR |
+| awesome-selfhosted | `awesome-selfhosted/rinadown.yml` | 物料就绪（desc 222 字符，tag 与上游逐字匹配） | 先解阻塞项 B，再**本人手动**提 PR |
 | MCP 官方 Registry | — | ❌ 不适用（拒 localhost remote，实测确认） | 无 |
 
 ### CasaOS 提交两种方式
 - **自建第三方商店（推荐，自己掌控）**：把 `casaos/` 放到公开仓库/分支，按 `store-config.json` 配好，
   用官方 `build_appstore.py` + Actions 构建到 gh-pages。用户「应用商店 → 添加来源」填 URL 即可一键装。
-- **进官方商店**：Fork `IceWhaleTech/CasaOS-AppStore`，拷入 `Apps/FluxDown/`，本地跑
+- **进官方商店**：Fork `IceWhaleTech/CasaOS-AppStore`，拷入 `Apps/RinaDown/`，本地跑
   `python3 scripts/build_appstore.py` 验证后提 PR（附安装成功 + WebUI 可达截图）。
 
 发新版时同步更新 `docker-compose.yml` 的 `image` 版本号与 `x-casaos.version`/`update_at`。

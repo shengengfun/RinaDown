@@ -14,7 +14,7 @@
 // Registered on the Dart-created ball HWND via RegisterDragDrop on the
 // platform thread (merged-thread model; process initialized with
 // OleInitialize in main.cpp). Forwards payloads to Dart through the
-// com.fluxdown/floating_ball MethodChannel:
+// com.rinadown/floating_ball MethodChannel:
 //   - onDragEnter / onDragLeave  → drag-target visual variant switching
 //   - onDropPayload {kind: "files"|"text", values: [...]}
 //

@@ -56,7 +56,7 @@ pub const MAX_FEED_BYTES: usize = 8 * 1024 * 1024;
 /// 「原始 feed 没有 guid」——据此才能在不猜测其内部哈希实现的前提下应用设计
 /// 文档 §2.2 的回退链（enclosure URL 优先于条目链接）。用 `\u{1}` 起头确保不
 /// 会与任何真实 guid 撞车。
-const GENERATED_ID_PREFIX: &str = "\u{1}fluxdown-noguid\u{1}";
+const GENERATED_ID_PREFIX: &str = "\u{1}rinadown-noguid\u{1}";
 
 /// 解析 feed 字节流。
 ///
@@ -77,7 +77,7 @@ const GENERATED_ID_PREFIX: &str = "\u{1}fluxdown-noguid\u{1}";
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::rss::parser::parse_feed;
+/// use rinadown_engine::rss::parser::parse_feed;
 ///
 /// let xml = r#"<?xml version="1.0" encoding="UTF-8"?>
 /// <rss version="2.0"><channel>

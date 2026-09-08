@@ -38,11 +38,11 @@ build_server() {
 	# ── data 载荷（各 arch 共用） ──
 	data="$work/data"
 	mkdir -p "$data/usr/bin" "$data/etc/init.d" "$data/etc/config"
-	cp "$BIN" "$data/usr/bin/fluxdown-server"
-	chmod 755 "$data/usr/bin/fluxdown-server"
-	cp "$SCRIPT_DIR/files/fluxdown.init" "$data/etc/init.d/fluxdown"
-	chmod 755 "$data/etc/init.d/fluxdown"
-	cp "$SCRIPT_DIR/files/fluxdown.config" "$data/etc/config/fluxdown"
+	cp "$BIN" "$data/usr/bin/rinadown-server"
+	chmod 755 "$data/usr/bin/rinadown-server"
+	cp "$SCRIPT_DIR/files/rinadown.init" "$data/etc/init.d/rinadown"
+	chmod 755 "$data/etc/init.d/rinadown"
+	cp "$SCRIPT_DIR/files/rinadown.config" "$data/etc/config/rinadown"
 
 	size=$(du -sk "$data" | cut -f1)
 
@@ -52,13 +52,13 @@ build_server() {
 		ln -s "$data" "$staging/data" 2>/dev/null || cp -r "$data" "$staging/data"
 
 		cat > "$staging/control/control" <<-EOF
-		Package: fluxdown-server
+		Package: rinadown-server
 		Version: $VERSION
 		Depends: libc
 		Section: net
 		Architecture: $arch
 		Installed-Size: ${size}k
-		Maintainer: FluxDown <https://fluxdown.zerx.dev>
+		Maintainer: RinaDown <https://rinadown.zerx.dev>
 		License: AGPL-3.0
 		Description: Blazing fast multi-protocol download manager (headless server).
 		 HTTP/HTTPS/FTP/BitTorrent/HLS downloads with intelligent segmentation,
@@ -66,14 +66,14 @@ build_server() {
 		EOF
 
 		cat > "$staging/control/conffiles" <<-EOF
-		/etc/config/fluxdown
+		/etc/config/rinadown
 		EOF
 
 		cat > "$staging/control/postinst" <<-'EOF'
 		#!/bin/sh
 		[ -n "$IPKG_INSTROOT" ] || {
-			/etc/init.d/fluxdown enable
-			/etc/init.d/fluxdown start
+			/etc/init.d/rinadown enable
+			/etc/init.d/rinadown start
 		}
 		exit 0
 		EOF
@@ -81,14 +81,14 @@ build_server() {
 		cat > "$staging/control/prerm" <<-'EOF'
 		#!/bin/sh
 		[ -n "$IPKG_INSTROOT" ] || {
-			/etc/init.d/fluxdown stop
-			/etc/init.d/fluxdown disable
+			/etc/init.d/rinadown stop
+			/etc/init.d/rinadown disable
 		}
 		exit 0
 		EOF
 		chmod 755 "$staging/control/postinst" "$staging/control/prerm"
 
-		make_ipk "$staging" "$OUTDIR/fluxdown-server_${VERSION}_${arch}.ipk"
+		make_ipk "$staging" "$OUTDIR/rinadown-server_${VERSION}_${arch}.ipk"
 	done
 }
 
@@ -106,16 +106,16 @@ build_luci() {
 	size=$(du -sk "$staging/data" | cut -f1)
 
 	cat > "$staging/control/control" <<-EOF
-	Package: luci-app-fluxdown
+	Package: luci-app-rinadown
 	Version: $VERSION
-	Depends: luci-base, fluxdown-server
+	Depends: luci-base, rinadown-server
 	Section: luci
 	Architecture: all
 	Installed-Size: ${size}k
-	Maintainer: FluxDown <https://fluxdown.zerx.dev>
+	Maintainer: RinaDown <https://rinadown.zerx.dev>
 	License: AGPL-3.0
-	Description: LuCI support for FluxDown download manager.
-	 Service configuration page and a shortcut to the FluxDown web interface.
+	Description: LuCI support for RinaDown download manager.
+	 Service configuration page and a shortcut to the RinaDown web interface.
 	EOF
 
 	cat > "$staging/control/postinst" <<-'EOF'
@@ -128,7 +128,7 @@ build_luci() {
 	EOF
 	chmod 755 "$staging/control/postinst"
 
-	make_ipk "$staging" "$OUTDIR/luci-app-fluxdown_${VERSION}_all.ipk"
+	make_ipk "$staging" "$OUTDIR/luci-app-rinadown_${VERSION}_all.ipk"
 }
 
 cmd=${1:-}

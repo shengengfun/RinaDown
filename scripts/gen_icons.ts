@@ -1,17 +1,17 @@
 #!/usr/bin/env bun
 /**
- * gen_icons.ts — 从 fluxdown_logo.svg 生成全平台图标
+ * gen_icons.ts — 从 rinadown_logo.svg 生成全平台图标
  *
  * 用法:
  *     bun scripts/gen_icons.ts
  *
  * 依赖: sharp (bun 全局已安装)
  *
- * 从 assets/logo/fluxdown_logo.svg 生成以下全部图标:
+ * 从 assets/logo/rinadown_logo.svg 生成以下全部图标:
  *
  *   assets/logo/
- *     fluxdown_logo.png (600×600)
- *     fluxdown_bolt.png (512×512, 内置备选应用图标「闪电」)
+ *     rinadown_logo.png (600×600)
+ *     rinadown_bolt.png (512×512, 内置备选应用图标「闪电」)
  *     logo.png (600×600)
  *     tray_iconTemplate.png (36×36, macOS 2x 菜单栏模板图标)
  *     tray_iconTemplate@1x.png (18×18, macOS 1x 菜单栏模板图标)
@@ -34,9 +34,9 @@
  *   android/app/src/main/res/
  *     mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}/ic_launcher.png
  *
- *   fluxDown/public/icon/
+ *   rinaDown/public/icon/
  *     {16,32,48,128}.png  {16,32,48,128}-disabled.png
- *     fluxdown_logo.png (128×128)  fluxdown_logo.svg (副本)
+ *     rinadown_logo.png (128×128)  rinadown_logo.svg (副本)
  *
  *   website/public/
  *     favicon.ico  favicon.svg  logo.png (1024×1024)  logo.svg (副本)
@@ -59,9 +59,9 @@ const REPO_ROOT = resolve(
 // scripts/ 的父目录即项目根
 const ROOT = resolve(REPO_ROOT, "..");
 
-const SVG_SRC = join(ROOT, "assets", "logo", "fluxdown_logo.svg");
+const SVG_SRC = join(ROOT, "assets", "logo", "rinadown_logo.svg");
 // 内置备选图标「闪电」源 SVG（可选 — 不存在时跳过生成）
-const BOLT_SVG_SRC = join(ROOT, "assets", "logo", "fluxdown_bolt.svg");
+const BOLT_SVG_SRC = join(ROOT, "assets", "logo", "rinadown_bolt.svg");
 
 if (!existsSync(SVG_SRC)) {
   console.error(`❌ 源文件不存在: ${SVG_SRC}`);
@@ -139,7 +139,7 @@ async function renderDisabledPng(size: number): Promise<Buffer> {
  *   - 仅黑色 + alpha，系统按菜单栏外观自动着色（深色变白、浅色变黑）
  *   - 用 fill-rule=evenodd 把箭头从圆角方块中"挖空"，保留 logo 整体识别度
  *
- * 路径坐标与 fluxdown_logo.svg 完全对齐:
+ * 路径坐标与 rinadown_logo.svg 完全对齐:
  *   外框: rect(56,56,400,400, rx=88) → 等价 8 段贝塞尔/直线
  *   箭头: 与 renderWindowsTrayArrow 同一条 path
  */
@@ -345,7 +345,7 @@ async function getCachedPng(size: number): Promise<Buffer> {
 // ─── 主流程 ────────────────────────────────────────────────────────
 
 async function main() {
-  console.log("🦅 FluxDown 全平台图标生成器");
+  console.log("🦅 RinaDown 全平台图标生成器");
   console.log(`   源文件: ${SVG_SRC}`);
   console.log("");
 
@@ -357,7 +357,7 @@ async function main() {
   console.log("📁 assets/logo/");
   {
     const logo600 = await getCachedPng(600);
-    await saveFile("assets/logo/fluxdown_logo.png", logo600);
+    await saveFile("assets/logo/rinadown_logo.png", logo600);
     await saveFile("assets/logo/logo.png", logo600);
 
     // macOS 菜单栏模板图标 — 黑色圆角方块 + 镂空箭头（保留 logo 识别度）
@@ -374,7 +374,7 @@ async function main() {
     // 内置备选应用图标「闪电」— 512px，运行时由 AppIconService 转 ICO
     if (existsSync(BOLT_SVG_SRC)) {
       const bolt = await renderPngFrom(BOLT_SVG_SRC, 512);
-      await saveFile("assets/logo/fluxdown_bolt.png", bolt);
+      await saveFile("assets/logo/rinadown_bolt.png", bolt);
       totalCount += 1;
     }
 
@@ -491,29 +491,29 @@ async function main() {
   // ──────────────────────────────────────────
   // 6. 浏览器扩展图标 — 正常 + disabled + logo
   // ──────────────────────────────────────────
-  console.log("\n📁 fluxDown/public/icon/");
+  console.log("\n📁 rinaDown/public/icon/");
   {
     const extSizes = [16, 32, 48, 128];
 
     // 正常图标
     for (const size of extSizes) {
       const buf = await getCachedPng(size);
-      await saveFile(`fluxDown/public/icon/${size}.png`, buf);
+      await saveFile(`rinaDown/public/icon/${size}.png`, buf);
     }
 
     // disabled（灰度）图标
     for (const size of extSizes) {
       const buf = await renderDisabledPng(size);
-      await saveFile(`fluxDown/public/icon/${size}-disabled.png`, buf);
+      await saveFile(`rinaDown/public/icon/${size}-disabled.png`, buf);
     }
 
     // 扩展 logo
     const extLogo = await getCachedPng(128);
-    await saveFile("fluxDown/public/icon/fluxdown_logo.png", extLogo);
+    await saveFile("rinaDown/public/icon/rinadown_logo.png", extLogo);
 
     // 复制 SVG 到扩展
     const svgContent = readFileSync(SVG_SRC);
-    await saveFile("fluxDown/public/icon/fluxdown_logo.svg", svgContent);
+    await saveFile("rinaDown/public/icon/rinadown_logo.svg", svgContent);
 
     totalCount += extSizes.length * 2 + 2;
   }

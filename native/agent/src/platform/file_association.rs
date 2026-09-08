@@ -1,19 +1,19 @@
 //! `.torrent` 文件关联。
 //!
-//! Windows 通过 HKCU 注册表指向同级 `fluxdown-desktop.exe`（与 Inno Setup
+//! Windows 通过 HKCU 注册表指向同级 `rinadown-desktop.exe`（与 Inno Setup
 //! 安装器写入的结构一致）：
 //! ```text
-//! HKCU\Software\Classes\.torrent                                → "FluxDown.TorrentFile"
-//! HKCU\Software\Classes\FluxDown.TorrentFile                    → "BitTorrent File"
-//! HKCU\Software\Classes\FluxDown.TorrentFile\DefaultIcon        → "<exe>,0"
-//! HKCU\Software\Classes\FluxDown.TorrentFile\shell\open\command → "\"<exe>\" \"%1\""
+//! HKCU\Software\Classes\.torrent                                → "RinaDown.TorrentFile"
+//! HKCU\Software\Classes\RinaDown.TorrentFile                    → "BitTorrent File"
+//! HKCU\Software\Classes\RinaDown.TorrentFile\DefaultIcon        → "<exe>,0"
+//! HKCU\Software\Classes\RinaDown.TorrentFile\shell\open\command → "\"<exe>\" \"%1\""
 //! ```
 //! 运行期直接写 winreg，不在安装器 [Registry] 跟踪范围内，因此
 //! `installer/windows/setup.iss` 卸载时显式执行 `RemoveTorrentAssociation`
 //! ——两处需保持同步。
 //!
 //! Linux 通过 `xdg-mime` 把 `application/x-bittorrent` 交给打包的
-//! `com.fluxdown.app.desktop`；macOS 通过 Launch Services 把
+//! `com.rinadown.app.desktop`；macOS 通过 Launch Services 把
 //! `org.bittorrent.torrent` UTI（`macos/Runner/Info.plist` 已声明）交给当前
 //! `.app` bundle。
 
@@ -26,7 +26,7 @@ mod inner {
 
     use crate::platform::{PlatformError, registry_executable};
 
-    const PROG_ID: &str = "FluxDown.TorrentFile";
+    const PROG_ID: &str = "RinaDown.TorrentFile";
     const PROG_DESC: &str = "BitTorrent File";
     const EXT: &str = ".torrent";
 
@@ -34,10 +34,10 @@ mod inner {
         desktop.is_some()
     }
 
-    /// `.torrent` 当前是否关联到 FluxDown。
+    /// `.torrent` 当前是否关联到 RinaDown。
     ///
     /// 只比较 `HKCU\Software\Classes\.torrent` 默认值是否为
-    /// `FluxDown.TorrentFile`，不比较命令中的 exe 路径：安装器与运行进程的路径
+    /// `RinaDown.TorrentFile`，不比较命令中的 exe 路径：安装器与运行进程的路径
     /// 表示可能不同（UNC 前缀、大小写、短名），ProgID 足以确认归属。
     pub fn is_associated() -> bool {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
@@ -77,14 +77,14 @@ mod inner {
         cmd_key.set_value("", &format!("\"{exe}\" \"%1\""))?;
 
         crate::platform::windows_shell::notify_association_changed();
-        tracing::info!(exe, "associated .torrent with FluxDown");
+        tracing::info!(exe, "associated .torrent with RinaDown");
         Ok(())
     }
 
-    /// 移除 FluxDown 的 `.torrent` 关联；其他程序的关联不受影响。
+    /// 移除 RinaDown 的 `.torrent` 关联；其他程序的关联不受影响。
     pub fn disassociate() -> Result<(), PlatformError> {
         if !is_associated() {
-            tracing::info!(".torrent not associated to FluxDown, skipping removal");
+            tracing::info!(".torrent not associated to RinaDown, skipping removal");
             return Ok(());
         }
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
@@ -102,7 +102,7 @@ mod inner {
     use std::path::Path;
 
     use crate::platform::PlatformError;
-    use crate::platform::xdg::{DESKTOP_ENTRY, query_default_is_fluxdown, remove_default};
+    use crate::platform::xdg::{DESKTOP_ENTRY, query_default_is_rinadown, remove_default};
 
     const MIME_TYPE: &str = "application/x-bittorrent";
 
@@ -110,14 +110,14 @@ mod inner {
         true
     }
 
-    /// `.torrent` 当前是否关联到 FluxDown。
+    /// `.torrent` 当前是否关联到 RinaDown。
     pub fn is_associated() -> bool {
-        query_default_is_fluxdown(MIME_TYPE)
+        query_default_is_rinadown(MIME_TYPE)
     }
 
-    /// 把 FluxDown 注册为 `.torrent` 默认处理程序。
+    /// 把 RinaDown 注册为 `.torrent` 默认处理程序。
     ///
-    /// 要求打包的 `com.fluxdown.app.desktop` 已安装到 XDG applications 目录。
+    /// 要求打包的 `com.rinadown.app.desktop` 已安装到 XDG applications 目录。
     pub fn associate(_desktop: Option<&Path>) -> Result<(), PlatformError> {
         let status = std::process::Command::new("xdg-mime")
             .args(["default", DESKTOP_ENTRY, MIME_TYPE])
@@ -127,7 +127,7 @@ mod inner {
                 "xdg-mime default exited with {status}"
             )));
         }
-        tracing::info!("associated .torrent with FluxDown");
+        tracing::info!("associated .torrent with RinaDown");
         Ok(())
     }
 
@@ -192,7 +192,7 @@ mod inner {
     /// 中声明的 UTI。
     pub fn associate(_desktop: Option<&Path>) -> Result<(), PlatformError> {
         let bundle_id = main_bundle_id().ok_or(PlatformError::Unsupported(
-            "fluxdown-agent is not running inside an app bundle",
+            "rinadown-agent is not running inside an app bundle",
         ))?;
         let uti = cf_string(TORRENT_UTI)?;
         let id = cf_string(&bundle_id)?;
@@ -204,14 +204,14 @@ mod inner {
                 "LSSetDefaultRoleHandlerForContentType failed (OSStatus={status})"
             )));
         }
-        tracing::info!(bundle_id, "associated .torrent with FluxDown");
+        tracing::info!(bundle_id, "associated .torrent with RinaDown");
         Ok(())
     }
 
     /// 把 `.torrent` 交还系统默认；仅在当前由本 bundle 持有时执行。
     pub fn disassociate() -> Result<(), PlatformError> {
         if !is_associated() {
-            tracing::info!(".torrent not associated to FluxDown, skipping removal");
+            tracing::info!(".torrent not associated to RinaDown, skipping removal");
             return Ok(());
         }
         let uti = cf_string(TORRENT_UTI)?;

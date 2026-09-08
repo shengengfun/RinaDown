@@ -27,7 +27,7 @@ export const POST: APIRoute = async ({ request }) => {
     subject =
       typeof body?.subject === "string" && body.subject.trim()
         ? body.subject.trim().slice(0, 120)
-        : "Support FluxDown";
+        : "Support RinaDown";
   } catch {
     return new Response(JSON.stringify({ error: "invalid body" }), {
       status: 400,

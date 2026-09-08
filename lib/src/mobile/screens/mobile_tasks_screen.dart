@@ -237,7 +237,7 @@ class MobileTasksScreenState extends State<MobileTasksScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'FluxDown',
+                      'RinaDown',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,

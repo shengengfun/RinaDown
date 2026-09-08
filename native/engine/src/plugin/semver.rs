@@ -12,7 +12,7 @@
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::plugin::semver::parse_semver;
+/// use rinadown_engine::plugin::semver::parse_semver;
 ///
 /// assert_eq!(parse_semver("1.2.3"), Some((1, 2, 3)));
 /// assert_eq!(parse_semver("v0.2.0"), Some((0, 2, 0)));
@@ -41,7 +41,7 @@ pub fn parse_semver(s: &str) -> Option<(u64, u64, u64)> {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::plugin::semver::satisfies_min;
+/// use rinadown_engine::plugin::semver::satisfies_min;
 ///
 /// assert!(satisfies_min("0.3.0", "0.2.0"));
 /// assert!(satisfies_min("1.0.0", "1.0.0"));

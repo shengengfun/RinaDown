@@ -1,14 +1,14 @@
-// FluxDown smoke tests — 仅测试纯 Dart 层，不依赖 libhub.so / native 插件。
+// RinaDown smoke tests — 仅测试纯 Dart 层，不依赖 libhub.so / native 插件。
 //
-// 背景：FluxDownApp 渲染时会构造 DownloadController 和 SettingsProvider，
+// 背景：RinaDownApp 渲染时会构造 DownloadController 和 SettingsProvider，
 // 二者在构造函数中立即调用 sendSignalToRust()，而测试环境没有构建 Rust 共享库，
 // 导致 DynamicLibrary.open('libhub.so') 抛出 ArgumentError。
 //
 // 正确做法：不修改正式代码来迁就测试，而是让 smoke test 只覆盖
 // 可以在测试环境中运行的纯 Dart 层逻辑。
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/i18n/locale_provider.dart';
-import 'package:flux_down/src/theme/theme_provider.dart';
+import 'package:rina_down/src/i18n/locale_provider.dart';
+import 'package:rina_down/src/theme/theme_provider.dart';
 
 void main() {
   // I18nStore 从资产加载翻译表（assets/i18n/*.json），需要测试绑定。

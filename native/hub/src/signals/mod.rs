@@ -546,7 +546,7 @@ pub struct SegmentSplitEvent {
 }
 
 /// 多 CDN 并发下载的节点级活动事件（Rust → Dart，详情面板「日志」Tab）。
-/// 语义与字段约定见 `fluxdown_engine::events::EngineEvent::TaskCdnEvent`。
+/// 语义与字段约定见 `rinadown_engine::events::EngineEvent::TaskCdnEvent`。
 #[derive(Serialize, RustSignal)]
 pub struct TaskCdnEvent {
     pub task_id: String,
@@ -784,7 +784,7 @@ pub struct FileAssociationStatus {
 
 /// Set or remove a URL scheme registration (Dart → Rust).
 ///
-/// `scheme` is a bare scheme token (`"fluxdown"` / `"ed2k"`) resolved against
+/// `scheme` is a bare scheme token (`"rinadown"` / `"ed2k"`) resolved against
 /// `protocol_registry::from_name`; unknown values are ignored.
 /// `enable = true` → register, `enable = false` → unregister.
 #[derive(Deserialize, DartSignal)]
@@ -1206,8 +1206,8 @@ pub struct PluginHookActivityEvent {
     pub running: bool,
 }
 
-/// Nested plugin info piece — mirrors `fluxdown_engine::plugin::PluginInfo`.
-/// Hub-local: not shared with `fluxdown_api`'s `PluginDto` (hub→api is a
+/// Nested plugin info piece — mirrors `rinadown_engine::plugin::PluginInfo`.
+/// Hub-local: not shared with `rinadown_api`'s `PluginDto` (hub→api is a
 /// one-way dependency).
 #[derive(Serialize, Deserialize, SignalPiece)]
 pub struct PluginInfoSignal {
@@ -1226,8 +1226,8 @@ pub struct PluginInfoSignal {
 }
 
 #[cfg(hub_plugins)]
-impl From<fluxdown_engine::plugin::PluginInfo> for PluginInfoSignal {
-    fn from(info: fluxdown_engine::plugin::PluginInfo) -> Self {
+impl From<rinadown_engine::plugin::PluginInfo> for PluginInfoSignal {
+    fn from(info: rinadown_engine::plugin::PluginInfo) -> Self {
         Self {
             identity: info.identity,
             name: info.name,
@@ -1249,7 +1249,7 @@ impl From<fluxdown_engine::plugin::PluginInfo> for PluginInfoSignal {
 }
 
 /// Nested plugin setting field piece — mirrors
-/// `fluxdown_engine::plugin::SettingField`. `min`/`max` use `f64` +
+/// `rinadown_engine::plugin::SettingField`. `min`/`max` use `f64` +
 /// `has_min`/`has_max` (rather than `f64::NAN`) to avoid NaN crossing the
 /// Dart FFI boundary undetected.
 #[derive(Serialize, Deserialize, SignalPiece)]
@@ -1274,9 +1274,9 @@ pub struct SettingFieldSignal {
 }
 
 #[cfg(hub_plugins)]
-impl From<fluxdown_engine::plugin::SettingField> for SettingFieldSignal {
-    fn from(field: fluxdown_engine::plugin::SettingField) -> Self {
-        use fluxdown_engine::plugin::{SettingType, SettingWidget};
+impl From<rinadown_engine::plugin::SettingField> for SettingFieldSignal {
+    fn from(field: rinadown_engine::plugin::SettingField) -> Self {
+        use rinadown_engine::plugin::{SettingType, SettingWidget};
 
         let setting_type = match field.ty {
             SettingType::String => "string",
@@ -1314,7 +1314,7 @@ impl From<fluxdown_engine::plugin::SettingField> for SettingFieldSignal {
     }
 }
 
-/// `select` widget option piece — mirrors `fluxdown_engine::plugin::SettingOption`.
+/// `select` widget option piece — mirrors `rinadown_engine::plugin::SettingOption`.
 #[derive(Serialize, Deserialize, SignalPiece)]
 pub struct SettingOptionSignal {
     pub value: String,
@@ -1322,8 +1322,8 @@ pub struct SettingOptionSignal {
 }
 
 #[cfg(hub_plugins)]
-impl From<fluxdown_engine::plugin::manifest::SettingOption> for SettingOptionSignal {
-    fn from(opt: fluxdown_engine::plugin::manifest::SettingOption) -> Self {
+impl From<rinadown_engine::plugin::manifest::SettingOption> for SettingOptionSignal {
+    fn from(opt: rinadown_engine::plugin::manifest::SettingOption) -> Self {
         Self {
             value: opt.value,
             label: opt.label,
@@ -1358,7 +1358,7 @@ pub struct MarketIndexLoaded {
     pub entries: Vec<MarketEntrySignal>,
 }
 
-/// Nested market entry piece — mirrors `fluxdown_engine::plugin::MarketEntry`.
+/// Nested market entry piece — mirrors `rinadown_engine::plugin::MarketEntry`.
 /// `sequence` uses `i64` (not `u64`) to avoid rinf's u64 FFI limitation.
 #[derive(Serialize, Deserialize, SignalPiece)]
 pub struct MarketEntrySignal {
@@ -1380,8 +1380,8 @@ pub struct MarketEntrySignal {
 }
 
 #[cfg(hub_plugins)]
-impl From<fluxdown_engine::plugin::MarketEntry> for MarketEntrySignal {
-    fn from(e: fluxdown_engine::plugin::MarketEntry) -> Self {
+impl From<rinadown_engine::plugin::MarketEntry> for MarketEntrySignal {
+    fn from(e: rinadown_engine::plugin::MarketEntry) -> Self {
         Self {
             plugin_id: e.plugin_id,
             version: e.version,
@@ -1432,7 +1432,7 @@ pub struct UninstallFfmpeg {}
 
 /// ffmpeg component status snapshot (Rust → Dart), sent after
 /// [`RequestFfmpegStatus`] and after every install/uninstall completes.
-/// `source` mirrors `fluxdown_engine::components::FfmpegSource::as_str()`
+/// `source` mirrors `rinadown_engine::components::FfmpegSource::as_str()`
 /// ("manual"/"managed"/"system"/"none").
 #[derive(Serialize, RustSignal)]
 pub struct FfmpegStatusReport {
@@ -1442,7 +1442,7 @@ pub struct FfmpegStatusReport {
     pub managed_version: String,
     pub system_path: String,
     /// Whether managed install is available on this platform (mirrors
-    /// `fluxdown_engine::components::FfmpegStatus::managed_supported`). `false`
+    /// `rinadown_engine::components::FfmpegStatus::managed_supported`). `false`
     /// on macOS etc. — the settings page hides the managed-install section and
     /// only guides system PATH / manual path, avoiding repeated failure prompts.
     pub managed_supported: bool,
@@ -1506,7 +1506,7 @@ pub struct UninstallYtdlp {}
 
 /// yt-dlp component status snapshot (Rust → Dart), sent after
 /// [`RequestYtdlpStatus`] and after every install/uninstall completes.
-/// `source` mirrors `fluxdown_engine::components::ComponentSource::as_str()`
+/// `source` mirrors `rinadown_engine::components::ComponentSource::as_str()`
 /// ("manual"/"managed"/"system"/"none").
 #[derive(Serialize, RustSignal)]
 pub struct YtdlpStatusReport {
@@ -1516,7 +1516,7 @@ pub struct YtdlpStatusReport {
     pub managed_version: String,
     pub system_path: String,
     /// Whether managed install is available on this platform (mirrors
-    /// `fluxdown_engine::components::YtdlpStatus::managed_supported`).
+    /// `rinadown_engine::components::YtdlpStatus::managed_supported`).
     /// yt-dlp ships official builds for all desktop/server platforms, so this
     /// is normally `true` (unlike ffmpeg on macOS).
     pub managed_supported: bool,

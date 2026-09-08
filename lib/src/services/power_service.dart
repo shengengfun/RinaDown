@@ -243,7 +243,7 @@ class PowerService {
     if (Platform.isLinux) {
       return _spawnInhibitor('/usr/bin/systemd-inhibit', [
         '--what=idle:sleep',
-        '--who=FluxDown',
+        '--who=RinaDown',
         '--why=Downloading files',
         '--mode=block',
         '--',

@@ -62,7 +62,7 @@ pub fn default_server_met_urls() -> String {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::server_subscription::parse_server_met;
+/// use rinadown_engine::ed2k::server_subscription::parse_server_met;
 /// // header(0x0E) + count(1) + [IP + port 4661 + tagCount 0]
 /// let mut bytes = vec![0x0E];
 /// bytes.extend_from_slice(&1u32.to_le_bytes());
@@ -311,7 +311,7 @@ pub async fn fetch_server_subscriptions(urls: &str) -> ServerFetchOutcome {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::server_subscription::normalize_subscription_url;
+/// use rinadown_engine::ed2k::server_subscription::normalize_subscription_url;
 /// assert_eq!(
 ///     normalize_subscription_url("ed2k://|serverlist|http://x.org/server.met|/"),
 ///     "http://x.org/server.met"

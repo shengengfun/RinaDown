@@ -16,10 +16,10 @@
 
 use std::sync::Arc;
 
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::download_manager::NewTaskSpec;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::download_manager::NewTaskSpec;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
 
 fn uniq() -> String {
     let n = std::time::SystemTime::now()
@@ -75,7 +75,7 @@ const FOREIGN_CONTENT: &[u8] = b"earlier completed download - must survive";
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_files_on_never_started_task_keeps_foreign_file() {
-    let work = std::env::temp_dir().join(format!("fluxdown-delguard-single-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-delguard-single-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let save_dir = work.to_string_lossy().into_owned();
     // 磁盘上已有早前任务留下的同名成品。
@@ -100,7 +100,7 @@ async fn delete_files_on_never_started_task_keeps_foreign_file() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_files_on_completed_task_removes_its_product() {
-    let work = std::env::temp_dir().join(format!("fluxdown-delguard-done-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-delguard-done-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let save_dir = work.to_string_lossy().into_owned();
     let product = work.join("c.bin");
@@ -128,7 +128,7 @@ async fn delete_files_on_completed_task_removes_its_product() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn batch_delete_files_on_never_started_tasks_keeps_foreign_files() {
-    let work = std::env::temp_dir().join(format!("fluxdown-delguard-batch-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-delguard-batch-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let save_dir = work.to_string_lossy().into_owned();
     let foreign = work.join("b.bin");
@@ -164,7 +164,7 @@ async fn batch_delete_files_on_never_started_tasks_keeps_foreign_files() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn restart_never_started_task_keeps_foreign_file() {
-    let work = std::env::temp_dir().join(format!("fluxdown-delguard-restart-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-delguard-restart-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let save_dir = work.to_string_lossy().into_owned();
     let existing = work.join("r.bin");

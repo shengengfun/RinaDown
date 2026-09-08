@@ -1,8 +1,8 @@
 // Repro for issue #111: DownloadTask must carry the referrer from TaskInfo
 // and periodic TaskProgress updates must not clobber it.
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/bindings/bindings.dart';
-import 'package:flux_down/src/models/download_task.dart';
+import 'package:rina_down/src/bindings/bindings.dart';
+import 'package:rina_down/src/models/download_task.dart';
 
 void main() {
   TaskInfo makeInfo() => const TaskInfo(

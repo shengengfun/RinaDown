@@ -26,7 +26,7 @@ import flutter_foreground_task
 
     if let controller = window?.rootViewController as? FlutterViewController {
       let channel = FlutterMethodChannel(
-        name: "com.fluxdown/share",
+        name: "com.rinadown/share",
         binaryMessenger: controller.binaryMessenger
       )
       channel.setMethodCallHandler { [weak self] call, result in
@@ -43,7 +43,7 @@ import flutter_foreground_task
     // 与 Android MainActivity 同名通道：移动端"打开文件"
     if let controller = window?.rootViewController as? FlutterViewController {
       let storageChannel = FlutterMethodChannel(
-        name: "com.fluxdown/storage",
+        name: "com.rinadown/storage",
         binaryMessenger: controller.binaryMessenger
       )
       storageChannel.setMethodCallHandler { [weak self] call, result in
@@ -63,7 +63,7 @@ import flutter_foreground_task
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  /// 应用运行中经 URL scheme（fluxdown:// / magnet:）唤起。
+  /// 应用运行中经 URL scheme（rinadown:// / magnet:）唤起。
   override func application(
     _ app: UIApplication,
     open url: URL,

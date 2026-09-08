@@ -159,7 +159,7 @@ impl RssDownloadPlan {
     /// # Examples
     ///
     /// ```
-    /// use fluxdown_engine::rss::RssDownloadPlan;
+    /// use rinadown_engine::rss::RssDownloadPlan;
     ///
     /// let plan = |url: &str| RssDownloadPlan { url: url.to_string(), ..Default::default() };
     ///
@@ -779,8 +779,8 @@ pub fn due_sources<'a>(
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::rss::effective_interval_secs;
-/// use fluxdown_engine::rss::model::RssSourceInfo;
+/// use rinadown_engine::rss::effective_interval_secs;
+/// use rinadown_engine::rss::model::RssSourceInfo;
 ///
 /// let healthy = RssSourceInfo { interval_minutes: 30, ..Default::default() };
 /// assert_eq!(effective_interval_secs(&healthy), 1800);

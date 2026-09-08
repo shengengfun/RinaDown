@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/models/custom_category.dart';
-import 'package:flux_down/src/models/download_task.dart';
+import 'package:rina_down/src/models/custom_category.dart';
+import 'package:rina_down/src/models/download_task.dart';
 
 void main() {
   group('FileCategory.fromExtension', () {
@@ -31,9 +31,9 @@ void main() {
       final archive = defaults.firstWhere((c) => c.builtinType == 'archive');
       expect(program.position, lessThan(archive.position));
       expect(program.isBuiltin, isTrue);
-      expect(program.matches('FluxDown-0.1.58-windows-x64-setup.exe'), isTrue);
-      expect(program.matches('FluxDown-0.1.58-macos-arm64.dmg'), isTrue);
-      expect(program.matches('fluxdown_0.1.58_amd64.deb'), isTrue);
+      expect(program.matches('RinaDown-0.1.58-windows-x64-setup.exe'), isTrue);
+      expect(program.matches('RinaDown-0.1.58-macos-arm64.dmg'), isTrue);
+      expect(program.matches('rinadown_0.1.58_amd64.deb'), isTrue);
       expect(program.matches('photo.png'), isFalse);
       expect(archive.extensions, isNot(contains('dmg')));
     });

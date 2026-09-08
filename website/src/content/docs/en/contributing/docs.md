@@ -5,7 +5,7 @@ section: contributing
 order: 1
 ---
 
-These docs live in the public [zerx-lab/fluxdown](https://github.com/zerx-lab/fluxdown) repository — every page has an **Edit this page** link.
+These docs live in the public [zerx-lab/rinadown](https://github.com/zerx-lab/rinadown) repository — every page has an **Edit this page** link.
 
 ## How it works
 

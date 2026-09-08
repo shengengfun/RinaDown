@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use fluxdown_engine::model::{BtFileEntry, HlsQualityOption, ResolveVariantOption};
-use fluxdown_engine::selection::{HostSelection, SelectionOutcome};
+use rinadown_engine::model::{BtFileEntry, HlsQualityOption, ResolveVariantOption};
+use rinadown_engine::selection::{HostSelection, SelectionOutcome};
 use rinf::RustSignal;
 use tokio::sync::oneshot;
 

@@ -128,8 +128,8 @@ function decode(raw: string | null): ViewPrefs | null {
   return null
 }
 
-const GLOBAL_KEY = 'fluxdown.viewPrefs'
-const tabKey = (tab: string) => `fluxdown.viewPrefs.${tab}`
+const GLOBAL_KEY = 'rinadown.viewPrefs'
+const tabKey = (tab: string) => `rinadown.viewPrefs.${tab}`
 
 /** 已知的状态页签 key 集合，构造时预加载覆盖层用。 */
 const KNOWN_TABS = ['all', 'downloading', 'completed', 'paused', 'error']

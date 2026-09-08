@@ -6,7 +6,7 @@
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use fluxdown_protocol::{LogExportResult, LogPathsDto};
+use rinadown_protocol::{LogExportResult, LogPathsDto};
 
 /// 单个日志文件上限；超过时只保留末尾，避免失控日志撑爆内存与导出包。
 const MAX_LOG_FILE_BYTES: u64 = 32 * 1024 * 1024;
@@ -25,7 +25,7 @@ pub fn resolve_target(target_path: &str) -> PathBuf {
         let stem = path
             .file_name()
             .and_then(|name| name.to_str())
-            .unwrap_or("fluxdown-logs")
+            .unwrap_or("rinadown-logs")
             .to_owned();
         path.set_file_name(format!("{stem}.zip"));
     }
@@ -48,7 +48,7 @@ pub fn nmh_relay_log_path() -> Option<PathBuf> {
     {
         std::env::var_os("TEMP")
             .or_else(|| std::env::var_os("TMP"))
-            .map(|tmp| PathBuf::from(tmp).join("fluxdown_nmh.log"))
+            .map(|tmp| PathBuf::from(tmp).join("rinadown_nmh.log"))
     }
     #[cfg(not(windows))]
     {
@@ -57,11 +57,11 @@ pub fn nmh_relay_log_path() -> Option<PathBuf> {
             Some(home) if cfg!(target_os = "macos") => home
                 .join("Library")
                 .join("Application Support")
-                .join("fluxdown"),
-            Some(home) => home.join(".local").join("share").join("fluxdown"),
+                .join("rinadown"),
+            Some(home) => home.join(".local").join("share").join("rinadown"),
             None => PathBuf::from("/tmp"),
         };
-        Some(dir.join("fluxdown_nmh.log"))
+        Some(dir.join("rinadown_nmh.log"))
     }
 }
 

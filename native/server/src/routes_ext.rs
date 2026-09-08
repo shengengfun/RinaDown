@@ -3,14 +3,14 @@
 //!
 //! 鉴权模型：
 //! - 常规扩展端点 → `route_layer` 统一套用管理 token 门禁
-//!   （复用 [`fluxdown_api::auth::check_management_auth`]）。
+//!   （复用 [`rinadown_api::auth::check_management_auth`]）。
 //! - `GET /api/v1/ws`、`GET /api/v1/tasks/{id}/file` → 浏览器无法设自定义
 //!   header，改用 `?token=` 查询参数在 handler 内常量时间比较。
 //! - `openapi.json` / `docs` → 无鉴权（纯接口描述，不含数据）。
 //! - `setup/status`、`setup` → **无鉴权**，且仅在服务器尚未设置访问密钥时可写。
 //!   这不是缺口：无密钥时管理 API 本就全线 403，服务器对任何人都不可用；
 //!   首次设置是「谁先到谁落定」的一次性窗口（与所有 NAS 应用的初装向导同构），
-//!   落定后 `setup` 立刻转为 409。部署方若在意抢注，用 `FLUXDOWN_TOKEN` 预置。
+//!   落定后 `setup` 立刻转为 409。部署方若在意抢注，用 `RINADOWN_TOKEN` 预置。
 
 use std::collections::HashMap;
 use std::path::{Path as FsPath, PathBuf};
@@ -25,17 +25,17 @@ use axum::http::{StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post, put};
-use fluxdown_api::auth::{TokenCell, check_management_auth, constant_time_eq};
-use fluxdown_api::service::ApiError;
-use fluxdown_engine::components::{
+use rinadown_api::auth::{TokenCell, check_management_auth, constant_time_eq};
+use rinadown_api::service::ApiError;
+use rinadown_engine::components::{
     ffmpeg_status, install_ffmpeg, install_ytdlp, list_versions, list_ytdlp_versions,
     uninstall_ffmpeg, uninstall_ytdlp, ytdlp_status,
 };
-use fluxdown_engine::db::Db;
-use fluxdown_engine::downloader::build_client;
-use fluxdown_engine::log_info;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::selection::HostSelection;
+use rinadown_engine::db::Db;
+use rinadown_engine::downloader::build_client;
+use rinadown_engine::log_info;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::selection::HostSelection;
 use serde::Deserialize;
 use tokio::sync::mpsc;
 use tokio_util::io::ReaderStream;
@@ -44,7 +44,7 @@ use utoipa::OpenApi;
 use crate::actor::ActorCmd;
 use crate::config::{ACCESS_KEY_MIN_LEN, default_save_dir, validate_access_key};
 use crate::ws_hub::WsHub;
-use fluxdown_protocol::daemon::{
+use rinadown_protocol::daemon::{
     ComponentFfmpegStatus, ComponentVersions, ComponentYtdlpStatus, CreateQueueRequest,
     Ed2kServerSubRefreshResponse, FsEntry, FsListResponse, InstallFfmpegRequest, LogFileDto,
     LogsResponse, MoveQueueRequest, ProxyTestRequest, ProxyTestResponse, QueueScheduleRequest,
@@ -61,10 +61,10 @@ pub struct ServerState {
     pub hub: Arc<WsHub>,
     pub selector: Arc<dyn HostSelection>,
     /// 管理访问密钥。热更新（首次运行向导 / 重新生成 / 设置页改写）后立即生效，
-    /// 与 `fluxdown_api` 核心路由共享同一个 cell。
+    /// 与 `rinadown_api` 核心路由共享同一个 cell。
     pub token: TokenCell,
     pub version: String,
-    /// 演示模式：`Some(url)` 时仅允许下载该 URL（`FLUXDOWN_DEMO_URL`）。
+    /// 演示模式：`Some(url)` 时仅允许下载该 URL（`RINADOWN_DEMO_URL`）。
     pub demo_url: Option<String>,
     /// 解析后的数据目录（与 `engine.data_dir` 一致），供组件 API
     /// （ffmpeg 探测/安装）直接调用，无需经 actor。
@@ -106,7 +106,7 @@ impl ServerState {
     }
 }
 
-/// 组装全部扩展路由（含鉴权中间件），与 `fluxdown_api::server::api_router`
+/// 组装全部扩展路由（含鉴权中间件），与 `rinadown_api::server::api_router`
 /// `merge` 后使用（两侧路径不重叠、同路径不同方法自动合并）。
 pub fn extra_router(state: ServerState) -> Router {
     let protected = Router::new()
@@ -215,7 +215,7 @@ pub mod paths {
     pub const SETUP: &str = "/api/v1/setup";
 }
 
-/// 统一 JSON 错误体（与 `fluxdown_api` 的 `ResultMessage` 形态一致）。
+/// 统一 JSON 错误体（与 `rinadown_api` 的 `ResultMessage` 形态一致）。
 fn error_response(status: StatusCode, message: &str) -> Response {
     (
         status,
@@ -281,7 +281,7 @@ async fn handle_socket(mut socket: WebSocket, state: ServerState, authorized: bo
         let msg = WsServerMsg::TasksSnapshot {
             tasks: tasks
                 .into_iter()
-                .map(fluxdown_engine_protocol::task_info_to_dto)
+                .map(rinadown_engine_protocol::task_info_to_dto)
                 .collect(),
         };
         if send_msg(&mut socket, &msg).await.is_err() {
@@ -292,7 +292,7 @@ async fn handle_socket(mut socket: WebSocket, state: ServerState, authorized: bo
         let msg = WsServerMsg::QueuesChanged {
             queues: queues
                 .into_iter()
-                .map(fluxdown_engine_protocol::queue_info_to_dto)
+                .map(rinadown_engine_protocol::queue_info_to_dto)
                 .collect(),
         };
         if send_msg(&mut socket, &msg).await.is_err() {
@@ -818,15 +818,15 @@ fn percent_encode_rfc5987(s: &str) -> String {
     security(("bearer_token" = []), ("api_key" = []))
 )]
 async fn logs_info() -> Result<Response, ApiError> {
-    let dir = fluxdown_engine::logger::log_dir().display().to_string();
-    let files = fluxdown_engine::logger::list_log_files()
+    let dir = rinadown_engine::logger::log_dir().display().to_string();
+    let files = rinadown_engine::logger::list_log_files()
         .into_iter()
         .map(|m| LogFileDto {
             name: m.name,
             size: m.size as i64,
         })
         .collect();
-    let health = fluxdown_engine::logger::health();
+    let health = rinadown_engine::logger::health();
     Ok(axum::Json(LogsResponse {
         dir,
         files,
@@ -843,7 +843,7 @@ async fn logs_info() -> Result<Response, ApiError> {
 #[utoipa::path(get, path = "/api/v1/logs/export", tag = "server",
     params(("token" = String, Query, description = "管理 token")),
     responses(
-        (status = 200, description = "日志压缩包（attachment: fluxdown_logs.zip）"),
+        (status = 200, description = "日志压缩包（attachment: rinadown_logs.zip）"),
         (status = 401, description = "token 无效或缺失")
     )
 )]
@@ -852,7 +852,7 @@ async fn logs_export(State(state): State<ServerState>, Query(q): Query<TokenQuer
     if token.is_empty() || !constant_time_eq(&q.token, &token) {
         return error_response(StatusCode::UNAUTHORIZED, "invalid or missing token");
     }
-    let bytes = match fluxdown_engine::logger::export_logs_zip() {
+    let bytes = match rinadown_engine::logger::export_logs_zip() {
         Ok(b) => b,
         Err(e) => return error_response(StatusCode::INTERNAL_SERVER_ERROR, &e),
     };
@@ -862,7 +862,7 @@ async fn logs_export(State(state): State<ServerState>, Query(q): Query<TokenQuer
         header::CONTENT_TYPE,
         header::HeaderValue::from_static("application/zip"),
     );
-    if let Ok(v) = header::HeaderValue::from_str(&content_disposition("fluxdown_logs.zip")) {
+    if let Ok(v) = header::HeaderValue::from_str(&content_disposition("rinadown_logs.zip")) {
         headers.insert(header::CONTENT_DISPOSITION, v);
     }
     response
@@ -978,13 +978,13 @@ async fn webhook_deliveries(State(state): State<ServerState>) -> Result<Response
     Ok(axum::Json(WebhookDeliveriesResponse {
         deliveries: deliveries
             .into_iter()
-            .map(fluxdown_engine_protocol::webhook_delivery_to_dto)
+            .map(rinadown_engine_protocol::webhook_delivery_to_dto)
             .collect(),
-        presets: fluxdown_engine::webhook::preset_catalog()
+        presets: rinadown_engine::webhook::preset_catalog()
             .into_iter()
-            .map(fluxdown_engine_protocol::webhook_preset_to_dto)
+            .map(rinadown_engine_protocol::webhook_preset_to_dto)
             .collect(),
-        variables: fluxdown_engine::webhook::TEMPLATE_VARIABLES
+        variables: rinadown_engine::webhook::TEMPLATE_VARIABLES
             .iter()
             .map(|v| (*v).to_string())
             .collect(),
@@ -1144,7 +1144,7 @@ async fn stats(State(state): State<ServerState>) -> Result<Response, ApiError> {
 )]
 async fn component_ffmpeg_status(State(state): State<ServerState>) -> Result<Response, ApiError> {
     let status = ffmpeg_status(&state.db, &state.data_dir).await;
-    Ok(axum::Json(fluxdown_engine_protocol::ffmpeg_status_to_dto(status)).into_response())
+    Ok(axum::Json(rinadown_engine_protocol::ffmpeg_status_to_dto(status)).into_response())
 }
 
 /// 列出当前平台可安装的 ffmpeg 稳定版本（降序；数据来自 BtbN/FFmpeg-Builds latest Release）。
@@ -1163,7 +1163,7 @@ async fn component_ffmpeg_versions(
     let versions = list_versions(&client)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(axum::Json(fluxdown_engine_protocol::ffmpeg_versions_to_dto(versions)).into_response())
+    Ok(axum::Json(rinadown_engine_protocol::ffmpeg_versions_to_dto(versions)).into_response())
 }
 
 /// 安装/更新托管 ffmpeg：立即返回 202，实际下载在后台执行——进度经 WS
@@ -1256,7 +1256,7 @@ async fn component_ffmpeg_uninstall(
 )]
 async fn component_ytdlp_status(State(state): State<ServerState>) -> Result<Response, ApiError> {
     let status = ytdlp_status(&state.db, &state.data_dir).await;
-    Ok(axum::Json(fluxdown_engine_protocol::ytdlp_status_to_dto(status)).into_response())
+    Ok(axum::Json(rinadown_engine_protocol::ytdlp_status_to_dto(status)).into_response())
 }
 
 /// 列出当前平台可安装的 yt-dlp 稳定版本（降序；数据来自 yt-dlp/yt-dlp latest Release）。
@@ -1273,7 +1273,7 @@ async fn component_ytdlp_versions(State(_state): State<ServerState>) -> Result<R
     let versions = list_ytdlp_versions(&client)
         .await
         .map_err(|e| ApiError::Internal(e.to_string()))?;
-    Ok(axum::Json(fluxdown_engine_protocol::ytdlp_versions_to_dto(versions)).into_response())
+    Ok(axum::Json(rinadown_engine_protocol::ytdlp_versions_to_dto(versions)).into_response())
 }
 
 /// 安装/更新托管 yt-dlp：立即返回 202，实际下载在后台执行——进度经 WS
@@ -1357,12 +1357,12 @@ async fn component_ytdlp_uninstall(State(state): State<ServerState>) -> Result<R
 // OpenAPI（核心 + 扩展合并）与 Scalar 文档
 // ---------------------------------------------------------------------------
 
-/// 本 crate 扩展端点的 OpenAPI 文档（与 `fluxdown_api::openapi::ApiDoc` 合并）。
+/// 本 crate 扩展端点的 OpenAPI 文档（与 `rinadown_api::openapi::ApiDoc` 合并）。
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "FluxDown Server API",
-        description = "FluxDown headless 服务器 HTTP API：核心任务管理（复用桌面 API 契约）\
+        title = "RinaDown Server API",
+        description = "RinaDown headless 服务器 HTTP API：核心任务管理（复用桌面 API 契约）\
             + 服务器扩展（WebSocket 实时推送 / 配置 / 队列 CRUD / 文件取回 / 目录列举 / 代理测试）。",
         version = crate::SERVER_VERSION,
     ),
@@ -1405,40 +1405,40 @@ async fn component_ytdlp_uninstall(State(state): State<ServerState>) -> Result<R
         webhook_test,
     ),
     components(schemas(
-        fluxdown_protocol::daemon::WsServerMsg,
-        fluxdown_protocol::daemon::WsClientMsg,
-        fluxdown_protocol::daemon::SegmentDetailDto,
-        fluxdown_protocol::daemon::QueuePositionDto,
-        fluxdown_protocol::daemon::FileMissingUpdateDto,
-        fluxdown_protocol::daemon::HlsQualityOptionDto,
-        fluxdown_protocol::daemon::ResolveVariantOptionDto,
-        fluxdown_protocol::daemon::BtFileDto,
-        fluxdown_protocol::daemon::CreateQueueRequest,
-        fluxdown_protocol::daemon::MoveQueueRequest,
-        fluxdown_protocol::daemon::QueueScheduleRequest,
-        fluxdown_protocol::daemon::ReorderQueueRequest,
-        fluxdown_protocol::daemon::ProxyTestRequest,
-        fluxdown_protocol::daemon::ProxyTestResponse,
-        fluxdown_protocol::daemon::SetupStatusResponse,
-        fluxdown_protocol::daemon::SetupRequest,
-        fluxdown_protocol::daemon::FsEntry,
-        fluxdown_protocol::daemon::FsListResponse,
-        fluxdown_protocol::daemon::StatsResponse,
-        fluxdown_protocol::daemon::LogsResponse,
-        fluxdown_protocol::daemon::LogFileDto,
-        fluxdown_protocol::daemon::TokenResponse,
-        fluxdown_protocol::daemon::ComponentFfmpegStatus,
-        fluxdown_protocol::daemon::ComponentYtdlpStatus,
-        fluxdown_protocol::daemon::ComponentVersions,
-        fluxdown_protocol::daemon::InstallFfmpegRequest,
-        fluxdown_protocol::daemon::TrackerSubRefreshResponse,
-        fluxdown_protocol::daemon::Ed2kServerSubRefreshResponse,
-        fluxdown_protocol::daemon::WebhookDeliveryDto,
-        fluxdown_protocol::daemon::WebhookPresetDto,
-        fluxdown_protocol::daemon::WebhookDeliveriesResponse,
-        fluxdown_protocol::daemon::WebhookTestRequest,
-        fluxdown_protocol::daemon::WebhookTestResponse,
-        fluxdown_protocol::daemon::WebhookSimulateResponse,
+        rinadown_protocol::daemon::WsServerMsg,
+        rinadown_protocol::daemon::WsClientMsg,
+        rinadown_protocol::daemon::SegmentDetailDto,
+        rinadown_protocol::daemon::QueuePositionDto,
+        rinadown_protocol::daemon::FileMissingUpdateDto,
+        rinadown_protocol::daemon::HlsQualityOptionDto,
+        rinadown_protocol::daemon::ResolveVariantOptionDto,
+        rinadown_protocol::daemon::BtFileDto,
+        rinadown_protocol::daemon::CreateQueueRequest,
+        rinadown_protocol::daemon::MoveQueueRequest,
+        rinadown_protocol::daemon::QueueScheduleRequest,
+        rinadown_protocol::daemon::ReorderQueueRequest,
+        rinadown_protocol::daemon::ProxyTestRequest,
+        rinadown_protocol::daemon::ProxyTestResponse,
+        rinadown_protocol::daemon::SetupStatusResponse,
+        rinadown_protocol::daemon::SetupRequest,
+        rinadown_protocol::daemon::FsEntry,
+        rinadown_protocol::daemon::FsListResponse,
+        rinadown_protocol::daemon::StatsResponse,
+        rinadown_protocol::daemon::LogsResponse,
+        rinadown_protocol::daemon::LogFileDto,
+        rinadown_protocol::daemon::TokenResponse,
+        rinadown_protocol::daemon::ComponentFfmpegStatus,
+        rinadown_protocol::daemon::ComponentYtdlpStatus,
+        rinadown_protocol::daemon::ComponentVersions,
+        rinadown_protocol::daemon::InstallFfmpegRequest,
+        rinadown_protocol::daemon::TrackerSubRefreshResponse,
+        rinadown_protocol::daemon::Ed2kServerSubRefreshResponse,
+        rinadown_protocol::daemon::WebhookDeliveryDto,
+        rinadown_protocol::daemon::WebhookPresetDto,
+        rinadown_protocol::daemon::WebhookDeliveriesResponse,
+        rinadown_protocol::daemon::WebhookTestRequest,
+        rinadown_protocol::daemon::WebhookTestResponse,
+        rinadown_protocol::daemon::WebhookSimulateResponse,
     )),
     tags((name = "server", description = "headless 服务器扩展端点"))
 )]
@@ -1448,7 +1448,7 @@ struct ServerApiDoc;
 fn merged_openapi_json() -> &'static str {
     static SPEC: OnceLock<String> = OnceLock::new();
     SPEC.get_or_init(|| {
-        let merged = ServerApiDoc::openapi().merge_from(fluxdown_api::openapi::ApiDoc::openapi());
+        let merged = ServerApiDoc::openapi().merge_from(rinadown_api::openapi::ApiDoc::openapi());
         merged
             .to_pretty_json()
             .unwrap_or_else(|e| format!("{{\"error\":\"openapi serialize failed: {e}\"}}"))
@@ -1475,7 +1475,7 @@ const SCALAR_HTML: &str = r#"<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>FluxDown Server API Docs</title>
+    <title>RinaDown Server API Docs</title>
     <style>html, body, #app { height: 100%; margin: 0; }</style>
   </head>
   <body>

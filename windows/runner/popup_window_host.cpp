@@ -29,9 +29,9 @@ constexpr UINT_PTR kRevealFallbackTimerId = 0x464C5250;  // 'FLRP'
 constexpr UINT kRevealFallbackTimeoutMs = 3000;
 
 // 窗口标题 — 仅用于调试识别（无边框窗口不显示标题栏）。
-// 注意不得等于 L"FluxDown"：main.cpp 单实例逻辑用
-// FindWindow(class, L"FluxDown") 定位主窗口，两者共享窗口类。
-constexpr const wchar_t kPopupTitle[] = L"FluxDown Quick Download";
+// 注意不得等于 L"RinaDown"：main.cpp 单实例逻辑用
+// FindWindow(class, L"RinaDown") 定位主窗口，两者共享窗口类。
+constexpr const wchar_t kPopupTitle[] = L"RinaDown Quick Download";
 
 std::wstring Utf8ToWide(const std::string& utf8) {
   if (utf8.empty()) {
@@ -99,7 +99,7 @@ void ForceActivate(HWND hwnd) {
 PopupWindowHost::PopupWindowHost(flutter::BinaryMessenger* host_messenger) {
   host_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
-          host_messenger, "fluxdown/popup_host",
+          host_messenger, "rinadown/popup_host",
           &flutter::StandardMethodCodec::GetInstance());
   host_channel_->SetMethodCallHandler(
       [this](const flutter::MethodCall<flutter::EncodableValue>& call,
@@ -236,7 +236,7 @@ bool PopupWindowHost::OnCreate() {
 
   child_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
-          flutter_controller_->engine()->messenger(), "fluxdown/popup_child",
+          flutter_controller_->engine()->messenger(), "rinadown/popup_child",
           &flutter::StandardMethodCodec::GetInstance());
   child_channel_->SetMethodCallHandler(
       [this](const flutter::MethodCall<flutter::EncodableValue>& call,

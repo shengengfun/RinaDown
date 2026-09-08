@@ -8,9 +8,9 @@ use std::sync::Arc;
 #[cfg(feature = "components")]
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use fluxdown_engine::download_manager::{CreateGroupSpec, GroupItemSpec};
-use fluxdown_protocol::method;
-use fluxdown_protocol::{
+use rinadown_engine::download_manager::{CreateGroupSpec, GroupItemSpec};
+use rinadown_protocol::method;
+use rinadown_protocol::{
     ApplicationErrorCode, CdnConfigApplyParams, CdnReportAckParams, CreateGroupRequest,
     CreateQueueRequest, DaemonConfigPatch, DaemonCreateTaskParams, MigrationAckParams,
     RpcErrorData, RpcErrorObject, RpcRequest, RpcResponse, SelectionResolutionDto, ServiceHello,
@@ -30,11 +30,11 @@ pub struct DaemonService {
     hello: ServiceHello,
     events: DaemonEventHub,
     selections: DaemonSelection,
-    db: fluxdown_engine::db::Db,
+    db: rinadown_engine::db::Db,
     #[cfg(any(feature = "plugins", feature = "components"))]
     data_dir: PathBuf,
     #[cfg(feature = "plugins")]
-    plugin_manager: Option<Arc<fluxdown_engine::plugin::PluginManager>>,
+    plugin_manager: Option<Arc<rinadown_engine::plugin::PluginManager>>,
     blobs: Arc<BlobStore>,
     #[cfg(feature = "components")]
     ffmpeg_installing: AtomicBool,
@@ -55,10 +55,10 @@ impl DaemonService {
         selections: DaemonSelection,
         blobs: Arc<BlobStore>,
         actor: DaemonActorHandle,
-        db: fluxdown_engine::db::Db,
+        db: rinadown_engine::db::Db,
         #[cfg(any(feature = "plugins", feature = "components"))] data_dir: PathBuf,
         #[cfg(feature = "plugins")] plugin_manager: Option<
-            Arc<fluxdown_engine::plugin::PluginManager>,
+            Arc<rinadown_engine::plugin::PluginManager>,
         >,
     ) -> Self {
         Self {
@@ -107,13 +107,13 @@ impl DaemonService {
         self.publish_component_statuses().await;
         let stats = self.runtime_stats().await;
         self.events
-            .publish(fluxdown_protocol::DaemonEvent::RuntimeStatsChanged(stats));
+            .publish(rinadown_protocol::DaemonEvent::RuntimeStatsChanged(stats));
         Ok(())
     }
 
     /// 从线性化投影读取任务，用于二进制文件端点。
     #[must_use]
-    pub fn task(&self, task_id: &str) -> Option<fluxdown_protocol::TaskDto> {
+    pub fn task(&self, task_id: &str) -> Option<rinadown_protocol::TaskDto> {
         self.daemon_snapshot()
             .tasks
             .into_iter()
@@ -272,7 +272,7 @@ impl DaemonService {
             }
             method::DAEMON_GROUP_LIST => to_value(self.daemon_snapshot().groups),
             method::DAEMON_GROUP_RESOLVE_PREVIEW => {
-                let request = parse_params::<fluxdown_protocol::ResolvePreviewRequest>(params)?;
+                let request = parse_params::<rinadown_protocol::ResolvePreviewRequest>(params)?;
                 #[cfg(feature = "plugins")]
                 {
                     let source_url = request.url.clone();
@@ -288,7 +288,7 @@ impl DaemonService {
                         .await
                     {
                         Ok(ActorResult::ResolvePreview(outcome)) => {
-                            to_value(fluxdown_protocol::ResolvePreviewResponse {
+                            to_value(rinadown_protocol::ResolvePreviewResponse {
                                 name: outcome.name,
                                 source_url,
                                 error: outcome.error,
@@ -381,8 +381,8 @@ impl DaemonService {
                     .await
                     .map_err(|error| internal_error(format!("{error:#}")))?
                     .unwrap_or_default();
-                let count = fluxdown_engine::segment_coordinator::count_domain_conn_policies(&raw);
-                to_value(fluxdown_protocol::ConnPolicySummaryDto {
+                let count = rinadown_engine::segment_coordinator::count_domain_conn_policies(&raw);
+                to_value(rinadown_protocol::ConnPolicySummaryDto {
                     domain_count: u64::try_from(count).unwrap_or(u64::MAX),
                 })
             }
@@ -396,12 +396,12 @@ impl DaemonService {
             method::DAEMON_SITE_AUTH_LIST => {
                 let json = self
                     .db
-                    .get_config(fluxdown_engine::site_auth::SITE_AUTH_CONFIG_KEY)
+                    .get_config(rinadown_engine::site_auth::SITE_AUTH_CONFIG_KEY)
                     .await
                     .map_err(|error| internal_error(format!("{error:#}")))?
                     .unwrap_or_default();
                 to_value(crate::actor::site_auth_entries(
-                    &fluxdown_engine::site_auth::parse_store(&json),
+                    &rinadown_engine::site_auth::parse_store(&json),
                 ))
             }
             method::DAEMON_SITE_AUTH_DELETE => {
@@ -423,7 +423,7 @@ impl DaemonService {
                     .await
                     .map_err(|error| internal_error(format!("{error:#}")))?
                     .into_iter()
-                    .map(fluxdown_engine_protocol::rss_source_info_to_dto)
+                    .map(rinadown_engine_protocol::rss_source_info_to_dto)
                     .collect::<Vec<_>>();
                 to_value(sources)
             }
@@ -433,21 +433,21 @@ impl DaemonService {
                     .db
                     .load_rss_items(
                         &params.source_id,
-                        fluxdown_engine::rss::MAX_ITEMS_PER_SOURCE,
+                        rinadown_engine::rss::MAX_ITEMS_PER_SOURCE,
                     )
                     .await
                     .map_err(|error| internal_error(format!("{error:#}")))?
                     .into_iter()
-                    .map(fluxdown_engine_protocol::rss_item_info_to_dto)
+                    .map(rinadown_engine_protocol::rss_item_info_to_dto)
                     .collect::<Vec<_>>();
                 to_value(items)
             }
             method::DAEMON_RSS_CREATE_SOURCE => {
-                let source = parse_params::<fluxdown_protocol::RssSourceDto>(params)?;
+                let source = parse_params::<rinadown_protocol::RssSourceDto>(params)?;
                 match self
                     .actor
                     .execute(ActorOperation::RssCreate {
-                        source: Box::new(fluxdown_engine_protocol::rss_source_dto_to_engine(
+                        source: Box::new(rinadown_engine_protocol::rss_source_dto_to_engine(
                             source,
                         )),
                     })
@@ -461,7 +461,7 @@ impl DaemonService {
                 }
             }
             method::DAEMON_RSS_UPDATE_SOURCE => {
-                let source = parse_params::<fluxdown_protocol::RssSourceDto>(params)?;
+                let source = parse_params::<rinadown_protocol::RssSourceDto>(params)?;
                 let source_id = source.source_id.clone();
                 if source_id.trim().is_empty() {
                     return Err(invalid_argument("sourceId", "sourceId is required"));
@@ -469,7 +469,7 @@ impl DaemonService {
                 match self
                     .actor
                     .execute(ActorOperation::RssUpdate {
-                        source: Box::new(fluxdown_engine_protocol::rss_source_dto_to_engine(
+                        source: Box::new(rinadown_engine_protocol::rss_source_dto_to_engine(
                             source,
                         )),
                     })
@@ -505,7 +505,7 @@ impl DaemonService {
                 .await
             }
             method::DAEMON_RSS_VALIDATE => {
-                let request = parse_params::<fluxdown_protocol::RssValidateRequest>(params)?;
+                let request = parse_params::<rinadown_protocol::RssValidateRequest>(params)?;
                 match self
                     .actor
                     .execute(ActorOperation::RssValidate {
@@ -517,13 +517,13 @@ impl DaemonService {
                     .await
                 {
                     Ok(ActorResult::RssValidation(outcome)) => {
-                        to_value(fluxdown_protocol::RssValidateResponse {
+                        to_value(rinadown_protocol::RssValidateResponse {
                             url: outcome.url,
                             feed_title: outcome.feed_title,
                             items: outcome
                                 .items
                                 .into_iter()
-                                .map(fluxdown_engine_protocol::rss_item_info_to_dto)
+                                .map(rinadown_engine_protocol::rss_item_info_to_dto)
                                 .collect(),
                             error: outcome.error,
                         })
@@ -580,14 +580,14 @@ impl DaemonService {
                     .map_err(|error| internal_error(format!("{error:#}")))?;
                 let missing_components = self.plugin_missing_components(&identity).await;
                 self.publish_plugins().await?;
-                to_value(fluxdown_protocol::InstalledPlugin {
+                to_value(rinadown_protocol::InstalledPlugin {
                     identity,
                     missing_components,
                 })
             }
             #[cfg(feature = "plugins")]
             method::DAEMON_PLUGIN_INSTALL_DEV => {
-                let request = parse_params::<fluxdown_protocol::InstallPluginDevRequest>(params)?;
+                let request = parse_params::<rinadown_protocol::InstallPluginDevRequest>(params)?;
                 let identity = self
                     .plugin_manager()?
                     .install_dev(std::path::Path::new(&request.dir_path))
@@ -595,7 +595,7 @@ impl DaemonService {
                     .map_err(|error| invalid_argument("dirPath", &error.to_string()))?;
                 let missing_components = self.plugin_missing_components(&identity).await;
                 self.publish_plugins().await?;
-                to_value(fluxdown_protocol::InstalledPlugin {
+                to_value(rinadown_protocol::InstalledPlugin {
                     identity,
                     missing_components,
                 })
@@ -622,13 +622,13 @@ impl DaemonService {
                     index
                         .entries
                         .into_iter()
-                        .map(fluxdown_engine_protocol::market_entry_to_dto)
+                        .map(rinadown_engine_protocol::market_entry_to_dto)
                         .collect::<Vec<_>>(),
                 )
             }
             #[cfg(feature = "plugins")]
             method::DAEMON_PLUGIN_MARKET_INSTALL => {
-                let request = parse_params::<fluxdown_protocol::MarketInstallRequest>(params)?;
+                let request = parse_params::<rinadown_protocol::MarketInstallRequest>(params)?;
                 let identity = self
                     .market_client()
                     .await?
@@ -637,7 +637,7 @@ impl DaemonService {
                     .map_err(|error| invalid_argument("pluginId", &error.to_string()))?;
                 let missing_components = self.plugin_missing_components(&identity).await;
                 self.publish_plugins().await?;
-                to_value(fluxdown_protocol::InstalledPlugin {
+                to_value(rinadown_protocol::InstalledPlugin {
                     identity,
                     missing_components,
                 })
@@ -670,23 +670,23 @@ impl DaemonService {
             }
             #[cfg(feature = "components")]
             method::DAEMON_COMPONENT_GET => {
-                let params = parse_params::<fluxdown_protocol::ComponentParams>(params)?;
+                let params = parse_params::<rinadown_protocol::ComponentParams>(params)?;
                 to_value(self.component_status(params.component).await)
             }
             #[cfg(feature = "components")]
             method::DAEMON_COMPONENT_LIST_VERSIONS => {
-                let params = parse_params::<fluxdown_protocol::ComponentParams>(params)?;
+                let params = parse_params::<rinadown_protocol::ComponentParams>(params)?;
                 to_value(self.component_versions(params.component).await?)
             }
             #[cfg(feature = "components")]
             method::DAEMON_COMPONENT_INSTALL => {
-                let params = parse_params::<fluxdown_protocol::ComponentInstallParams>(params)?;
+                let params = parse_params::<rinadown_protocol::ComponentInstallParams>(params)?;
                 self.install_component(params.component, params.version)
                     .await
             }
             #[cfg(feature = "components")]
             method::DAEMON_COMPONENT_UNINSTALL => {
-                let params = parse_params::<fluxdown_protocol::ComponentParams>(params)?;
+                let params = parse_params::<rinadown_protocol::ComponentParams>(params)?;
                 self.uninstall_component(params.component).await
             }
             #[cfg(not(feature = "components"))]
@@ -699,16 +699,16 @@ impl DaemonService {
             method::DAEMON_WEBHOOK_GET => {
                 match self.actor.execute(ActorOperation::WebhookDeliveries).await {
                     Ok(ActorResult::WebhookDeliveries(deliveries)) => {
-                        to_value(fluxdown_protocol::WebhookDeliveriesResponse {
+                        to_value(rinadown_protocol::WebhookDeliveriesResponse {
                             deliveries: deliveries
                                 .into_iter()
-                                .map(fluxdown_engine_protocol::webhook_delivery_to_dto)
+                                .map(rinadown_engine_protocol::webhook_delivery_to_dto)
                                 .collect(),
-                            presets: fluxdown_engine::webhook::preset_catalog()
+                            presets: rinadown_engine::webhook::preset_catalog()
                                 .into_iter()
-                                .map(fluxdown_engine_protocol::webhook_preset_to_dto)
+                                .map(rinadown_engine_protocol::webhook_preset_to_dto)
                                 .collect(),
-                            variables: fluxdown_engine::webhook::TEMPLATE_VARIABLES
+                            variables: rinadown_engine::webhook::TEMPLATE_VARIABLES
                                 .iter()
                                 .map(|variable| (*variable).to_owned())
                                 .collect(),
@@ -724,7 +724,7 @@ impl DaemonService {
             method::DAEMON_WEBHOOK_SIMULATE => {
                 match self.actor.execute(ActorOperation::WebhookSimulate).await {
                     Ok(ActorResult::WebhookSimulation(dispatched)) => {
-                        to_value(fluxdown_protocol::WebhookSimulateResponse {
+                        to_value(rinadown_protocol::WebhookSimulateResponse {
                             dispatched: i32::try_from(dispatched).unwrap_or(i32::MAX),
                         })
                     }
@@ -733,7 +733,7 @@ impl DaemonService {
                 }
             }
             method::DAEMON_WEBHOOK_TEST => {
-                let request = parse_params::<fluxdown_protocol::WebhookTestRequest>(params)?;
+                let request = parse_params::<rinadown_protocol::WebhookTestRequest>(params)?;
                 match self
                     .actor
                     .execute(ActorOperation::WebhookTest {
@@ -742,7 +742,7 @@ impl DaemonService {
                     .await
                 {
                     Ok(ActorResult::WebhookTest(delivery)) => {
-                        to_value(fluxdown_protocol::WebhookTestResponse {
+                        to_value(rinadown_protocol::WebhookTestResponse {
                             success: delivery.success,
                             status_code: delivery.status_code,
                             latency_ms: delivery.latency_ms,
@@ -815,7 +815,7 @@ impl DaemonService {
                     "queues": snapshot.queues.len(),
                     "groups": snapshot.groups.len(),
                     "configRevision": snapshot.config.revision,
-                    "logDir": fluxdown_engine::logger::log_dir().display().to_string(),
+                    "logDir": rinadown_engine::logger::log_dir().display().to_string(),
                     "components": snapshot.components,
                 }))
             }
@@ -1007,7 +1007,7 @@ impl DaemonService {
         self.execute_unit(operation).await
     }
 
-    fn daemon_snapshot(&self) -> fluxdown_protocol::DaemonSnapshot {
+    fn daemon_snapshot(&self) -> rinadown_protocol::DaemonSnapshot {
         match self.events.snapshot().body {
             SnapshotBody::Daemon(snapshot) => *snapshot,
             SnapshotBody::Agent(_) => unreachable!("daemon event hub returned agent snapshot"),
@@ -1022,7 +1022,7 @@ impl DaemonService {
                 .get("default_save_dir")
                 .filter(|value| !value.trim().is_empty())
                 .cloned()
-                .unwrap_or_else(fluxdown_engine::user_dirs::download_dir_or_cwd)
+                .unwrap_or_else(rinadown_engine::user_dirs::download_dir_or_cwd)
         } else {
             request.save_dir
         };
@@ -1071,37 +1071,37 @@ impl DaemonService {
 impl DaemonService {
     fn plugin_manager(
         &self,
-    ) -> Result<&Arc<fluxdown_engine::plugin::PluginManager>, RpcErrorObject> {
+    ) -> Result<&Arc<rinadown_engine::plugin::PluginManager>, RpcErrorObject> {
         self.plugin_manager
             .as_ref()
             .ok_or_else(|| unsupported_error("plugin manager is unavailable"))
     }
 
-    async fn list_plugins(&self) -> Result<Vec<fluxdown_protocol::PluginDto>, RpcErrorObject> {
+    async fn list_plugins(&self) -> Result<Vec<rinadown_protocol::PluginDto>, RpcErrorObject> {
         Ok(self
             .plugin_manager()?
             .list()
             .await
             .into_iter()
-            .map(fluxdown_engine_protocol::plugin_info_to_dto)
+            .map(rinadown_engine_protocol::plugin_info_to_dto)
             .collect())
     }
 
     async fn publish_plugins(&self) -> Result<(), RpcErrorObject> {
         let plugins = self.list_plugins().await?;
         self.events
-            .publish(fluxdown_protocol::DaemonEvent::PluginsChanged(plugins));
+            .publish(rinadown_protocol::DaemonEvent::PluginsChanged(plugins));
         Ok(())
     }
 
-    async fn market_client(&self) -> Result<fluxdown_engine::plugin::MarketClient, RpcErrorObject> {
+    async fn market_client(&self) -> Result<rinadown_engine::plugin::MarketClient, RpcErrorObject> {
         let config = self
             .db
             .get_all_config()
             .await
             .map_err(|error| internal_error(format!("{error:#}")))?;
-        let sources = fluxdown_engine::plugin::MarketClient::source_config(&config);
-        Ok(fluxdown_engine::plugin::MarketClient::new(
+        let sources = rinadown_engine::plugin::MarketClient::source_config(&config);
+        Ok(rinadown_engine::plugin::MarketClient::new(
             self.plugin_manager()?.clone(),
             self.db.clone(),
             sources,
@@ -1113,7 +1113,7 @@ impl DaemonService {
             return Vec::new();
         };
         let permissions = manager.permissions_of(identity).await;
-        fluxdown_engine::plugin::dependencies::missing_components(
+        rinadown_engine::plugin::dependencies::missing_components(
             &self.db,
             &self.data_dir,
             &permissions,
@@ -1126,20 +1126,20 @@ impl DaemonService {
 impl DaemonService {
     async fn component_status(
         &self,
-        component: fluxdown_protocol::ComponentKind,
-    ) -> fluxdown_protocol::ComponentStatusDto {
+        component: rinadown_protocol::ComponentKind,
+    ) -> rinadown_protocol::ComponentStatusDto {
         match component {
-            fluxdown_protocol::ComponentKind::Ffmpeg => {
-                fluxdown_protocol::ComponentStatusDto::Ffmpeg(
-                    fluxdown_engine_protocol::ffmpeg_status_to_dto(
-                        fluxdown_engine::components::ffmpeg_status(&self.db, &self.data_dir).await,
+            rinadown_protocol::ComponentKind::Ffmpeg => {
+                rinadown_protocol::ComponentStatusDto::Ffmpeg(
+                    rinadown_engine_protocol::ffmpeg_status_to_dto(
+                        rinadown_engine::components::ffmpeg_status(&self.db, &self.data_dir).await,
                     ),
                 )
             }
-            fluxdown_protocol::ComponentKind::Ytdlp => {
-                fluxdown_protocol::ComponentStatusDto::Ytdlp(
-                    fluxdown_engine_protocol::ytdlp_status_to_dto(
-                        fluxdown_engine::components::ytdlp_status(&self.db, &self.data_dir).await,
+            rinadown_protocol::ComponentKind::Ytdlp => {
+                rinadown_protocol::ComponentStatusDto::Ytdlp(
+                    rinadown_engine_protocol::ytdlp_status_to_dto(
+                        rinadown_engine::components::ytdlp_status(&self.db, &self.data_dir).await,
                     ),
                 )
             }
@@ -1148,31 +1148,31 @@ impl DaemonService {
 
     async fn component_versions(
         &self,
-        component: fluxdown_protocol::ComponentKind,
-    ) -> Result<fluxdown_protocol::ComponentVersions, RpcErrorObject> {
+        component: rinadown_protocol::ComponentKind,
+    ) -> Result<rinadown_protocol::ComponentVersions, RpcErrorObject> {
         let config = self
             .db
             .get_all_config()
             .await
             .map_err(|error| internal_error(format!("{error:#}")))?;
-        let proxy = fluxdown_engine::proxy_config::ProxyConfig::from_config_map(&config);
+        let proxy = rinadown_engine::proxy_config::ProxyConfig::from_config_map(&config);
         let user_agent = config
             .get("global_user_agent")
             .map(String::as_str)
             .unwrap_or_default();
-        let client = fluxdown_engine::downloader::build_client(&proxy, user_agent)
+        let client = rinadown_engine::downloader::build_client(&proxy, user_agent)
             .map_err(|error| internal_error(format!("{error:#}")))?;
         match component {
-            fluxdown_protocol::ComponentKind::Ffmpeg => {
-                fluxdown_engine::components::list_versions(&client)
+            rinadown_protocol::ComponentKind::Ffmpeg => {
+                rinadown_engine::components::list_versions(&client)
                     .await
-                    .map(fluxdown_engine_protocol::ffmpeg_versions_to_dto)
+                    .map(rinadown_engine_protocol::ffmpeg_versions_to_dto)
                     .map_err(|error| internal_error(error.to_string()))
             }
-            fluxdown_protocol::ComponentKind::Ytdlp => {
-                fluxdown_engine::components::list_ytdlp_versions(&client)
+            rinadown_protocol::ComponentKind::Ytdlp => {
+                rinadown_engine::components::list_ytdlp_versions(&client)
                     .await
-                    .map(fluxdown_engine_protocol::ytdlp_versions_to_dto)
+                    .map(rinadown_engine_protocol::ytdlp_versions_to_dto)
                     .map_err(|error| internal_error(error.to_string()))
             }
         }
@@ -1180,7 +1180,7 @@ impl DaemonService {
 
     async fn install_component(
         &self,
-        component: fluxdown_protocol::ComponentKind,
+        component: rinadown_protocol::ComponentKind,
         version: Option<String>,
     ) -> Result<Value, RpcErrorObject> {
         let flag = self.component_install_flag(component);
@@ -1193,18 +1193,18 @@ impl DaemonService {
             .get_all_config()
             .await
             .map_err(|error| internal_error(format!("{error:#}")))?;
-        let proxy = fluxdown_engine::proxy_config::ProxyConfig::from_config_map(&config);
+        let proxy = rinadown_engine::proxy_config::ProxyConfig::from_config_map(&config);
         let user_agent = config
             .get("global_user_agent")
             .map(String::as_str)
             .unwrap_or_default();
-        let client = fluxdown_engine::downloader::build_client(&proxy, user_agent)
+        let client = rinadown_engine::downloader::build_client(&proxy, user_agent)
             .map_err(|error| internal_error(format!("{error:#}")))?;
         let component_name = component_name(component);
         let progress_events = self.events.clone();
         let progress = move |downloaded: u64, total: u64| {
-            progress_events.publish(fluxdown_protocol::DaemonEvent::Engine(
-                fluxdown_protocol::WsServerMsg::ComponentProgress {
+            progress_events.publish(rinadown_protocol::DaemonEvent::Engine(
+                rinadown_protocol::WsServerMsg::ComponentProgress {
                     component: component_name.to_owned(),
                     downloaded_bytes: i64::try_from(downloaded).unwrap_or(i64::MAX),
                     total_bytes: i64::try_from(total).unwrap_or(i64::MAX),
@@ -1212,8 +1212,8 @@ impl DaemonService {
             ));
         };
         let outcome = match component {
-            fluxdown_protocol::ComponentKind::Ffmpeg => {
-                fluxdown_engine::components::install_ffmpeg(
+            rinadown_protocol::ComponentKind::Ffmpeg => {
+                rinadown_engine::components::install_ffmpeg(
                     &self.db,
                     &self.data_dir,
                     &client,
@@ -1223,7 +1223,7 @@ impl DaemonService {
                 .await
                 .map(|_| ())
             }
-            fluxdown_protocol::ComponentKind::Ytdlp => fluxdown_engine::components::install_ytdlp(
+            rinadown_protocol::ComponentKind::Ytdlp => rinadown_engine::components::install_ytdlp(
                 &self.db,
                 &self.data_dir,
                 &client,
@@ -1235,8 +1235,8 @@ impl DaemonService {
         };
         match outcome {
             Ok(()) => {
-                self.events.publish(fluxdown_protocol::DaemonEvent::Engine(
-                    fluxdown_protocol::WsServerMsg::ComponentResult {
+                self.events.publish(rinadown_protocol::DaemonEvent::Engine(
+                    rinadown_protocol::WsServerMsg::ComponentResult {
                         component: component_name.to_owned(),
                         ok: true,
                         message: "installed".to_owned(),
@@ -1246,8 +1246,8 @@ impl DaemonService {
                 Ok(json!({ "ok": true }))
             }
             Err(error) => {
-                self.events.publish(fluxdown_protocol::DaemonEvent::Engine(
-                    fluxdown_protocol::WsServerMsg::ComponentResult {
+                self.events.publish(rinadown_protocol::DaemonEvent::Engine(
+                    rinadown_protocol::WsServerMsg::ComponentResult {
                         component: component_name.to_owned(),
                         ok: false,
                         message: error.to_string(),
@@ -1261,7 +1261,7 @@ impl DaemonService {
 
     async fn uninstall_component(
         &self,
-        component: fluxdown_protocol::ComponentKind,
+        component: rinadown_protocol::ComponentKind,
     ) -> Result<Value, RpcErrorObject> {
         if self
             .component_install_flag(component)
@@ -1270,11 +1270,11 @@ impl DaemonService {
             return Err(conflict_error("component install is in progress"));
         }
         match component {
-            fluxdown_protocol::ComponentKind::Ffmpeg => {
-                fluxdown_engine::components::uninstall_ffmpeg(&self.db, &self.data_dir).await
+            rinadown_protocol::ComponentKind::Ffmpeg => {
+                rinadown_engine::components::uninstall_ffmpeg(&self.db, &self.data_dir).await
             }
-            fluxdown_protocol::ComponentKind::Ytdlp => {
-                fluxdown_engine::components::uninstall_ytdlp(&self.db, &self.data_dir).await
+            rinadown_protocol::ComponentKind::Ytdlp => {
+                rinadown_engine::components::uninstall_ytdlp(&self.db, &self.data_dir).await
             }
         }
         .map_err(|error| internal_error(error.to_string()))?;
@@ -1282,22 +1282,22 @@ impl DaemonService {
         Ok(json!({ "ok": true }))
     }
 
-    fn component_install_flag(&self, component: fluxdown_protocol::ComponentKind) -> &AtomicBool {
+    fn component_install_flag(&self, component: rinadown_protocol::ComponentKind) -> &AtomicBool {
         match component {
-            fluxdown_protocol::ComponentKind::Ffmpeg => &self.ffmpeg_installing,
-            fluxdown_protocol::ComponentKind::Ytdlp => &self.ytdlp_installing,
+            rinadown_protocol::ComponentKind::Ffmpeg => &self.ffmpeg_installing,
+            rinadown_protocol::ComponentKind::Ytdlp => &self.ytdlp_installing,
         }
     }
 
     async fn publish_component_statuses(&self) {
         let statuses = vec![
-            self.component_status(fluxdown_protocol::ComponentKind::Ffmpeg)
+            self.component_status(rinadown_protocol::ComponentKind::Ffmpeg)
                 .await,
-            self.component_status(fluxdown_protocol::ComponentKind::Ytdlp)
+            self.component_status(rinadown_protocol::ComponentKind::Ytdlp)
                 .await,
         ];
         self.events
-            .publish(fluxdown_protocol::DaemonEvent::ComponentsChanged(statuses));
+            .publish(rinadown_protocol::DaemonEvent::ComponentsChanged(statuses));
     }
 }
 
@@ -1312,15 +1312,15 @@ impl Drop for ComponentInstallGuard<'_> {
 }
 
 #[cfg(feature = "components")]
-fn component_name(component: fluxdown_protocol::ComponentKind) -> &'static str {
+fn component_name(component: rinadown_protocol::ComponentKind) -> &'static str {
     match component {
-        fluxdown_protocol::ComponentKind::Ffmpeg => "ffmpeg",
-        fluxdown_protocol::ComponentKind::Ytdlp => "ytdlp",
+        rinadown_protocol::ComponentKind::Ffmpeg => "ffmpeg",
+        rinadown_protocol::ComponentKind::Ytdlp => "ytdlp",
     }
 }
 
 impl DaemonService {
-    async fn runtime_stats(&self) -> fluxdown_protocol::DaemonRuntimeStatsDto {
+    async fn runtime_stats(&self) -> rinadown_protocol::DaemonRuntimeStatsDto {
         let snapshot = self.daemon_snapshot();
         let save_dir = snapshot
             .config
@@ -1328,8 +1328,8 @@ impl DaemonService {
             .get("default_save_dir")
             .cloned()
             .filter(|path| !path.trim().is_empty())
-            .unwrap_or_else(fluxdown_engine::user_dirs::download_dir_or_cwd);
-        fluxdown_protocol::DaemonRuntimeStatsDto {
+            .unwrap_or_else(rinadown_engine::user_dirs::download_dir_or_cwd);
+        rinadown_protocol::DaemonRuntimeStatsDto {
             active_tasks: u32::try_from(
                 snapshot
                     .tasks
@@ -1348,7 +1348,7 @@ impl DaemonService {
             .unwrap_or(u32::MAX),
             total_download_bps: snapshot.runtime_stats.total_download_bps,
             total_upload_bps: snapshot.runtime_stats.total_upload_bps,
-            disk_free_bytes: fluxdown_engine::disk_space::available_space_checked(
+            disk_free_bytes: rinadown_engine::disk_space::available_space_checked(
                 std::path::PathBuf::from(&save_dir),
             )
             .await,
@@ -1359,7 +1359,7 @@ impl DaemonService {
     async fn list_directories(
         &self,
         requested_path: String,
-    ) -> Result<fluxdown_protocol::FsListResponse, RpcErrorObject> {
+    ) -> Result<rinadown_protocol::FsListResponse, RpcErrorObject> {
         let snapshot = self.daemon_snapshot();
         let base = if requested_path.trim().is_empty() {
             let configured = snapshot
@@ -1394,14 +1394,14 @@ impl DaemonService {
                 if name.starts_with('.') {
                     continue;
                 }
-                dirs.push(fluxdown_protocol::FsEntry {
+                dirs.push(rinadown_protocol::FsEntry {
                     name,
                     path: entry.path().to_string_lossy().into_owned(),
                 });
             }
         }
         dirs.sort_by_key(|entry| entry.name.to_lowercase());
-        Ok(fluxdown_protocol::FsListResponse {
+        Ok(rinadown_protocol::FsListResponse {
             path: base,
             parent,
             dirs,
@@ -1411,9 +1411,9 @@ impl DaemonService {
 
 #[cfg(feature = "plugins")]
 fn manifest_item_to_preview_dto(
-    item: fluxdown_engine::model::ManifestItemInfo,
-) -> fluxdown_protocol::PreviewItemDto {
-    fluxdown_protocol::PreviewItemDto {
+    item: rinadown_engine::model::ManifestItemInfo,
+) -> rinadown_protocol::PreviewItemDto {
+    rinadown_protocol::PreviewItemDto {
         id: item.id,
         name: item.name,
         path: item.path,
@@ -1421,7 +1421,7 @@ fn manifest_item_to_preview_dto(
         variants: item
             .variants
             .into_iter()
-            .map(|variant| fluxdown_protocol::PreviewVariantDto {
+            .map(|variant| rinadown_protocol::PreviewVariantDto {
                 id: variant.id,
                 label: variant.label,
                 size: variant.size,
@@ -1677,28 +1677,28 @@ fn unsupported_error(message: &str) -> RpcErrorObject {
 
 #[cfg(test)]
 mod tests {
-    use fluxdown_protocol::{ApplicationErrorCode, RpcErrorData};
+    use rinadown_protocol::{ApplicationErrorCode, RpcErrorData};
 
     use super::DaemonService;
 
     #[tokio::test]
     async fn every_canonical_daemon_method_reaches_a_real_dispatch_branch() {
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_daemon_dispatch_{}_{}",
+            "rinadown_daemon_dispatch_{}_{}",
             std::process::id(),
             uuid::Uuid::new_v4()
         ));
         tokio::fs::create_dir_all(&dir)
             .await
             .expect("create daemon dispatch dir");
-        let db = fluxdown_engine::db::Db::open(&dir)
+        let db = rinadown_engine::db::Db::open(&dir)
             .await
             .expect("open daemon dispatch db");
         db.init_default_config("/tmp")
             .await
             .expect("seed daemon dispatch config");
         let events =
-            crate::event_hub::DaemonEventHub::new(fluxdown_protocol::DaemonSnapshot::default(), 32);
+            crate::event_hub::DaemonEventHub::new(rinadown_protocol::DaemonSnapshot::default(), 32);
         let selections = crate::selection::DaemonSelection::new(events.clone());
         let blobs = std::sync::Arc::new(
             crate::blob_store::BlobStore::open(dir.join("blobs"))
@@ -1718,7 +1718,7 @@ mod tests {
             None,
         );
 
-        for method_name in fluxdown_protocol::method::ALL_METHODS
+        for method_name in rinadown_protocol::method::ALL_METHODS
             .iter()
             .copied()
             .filter(|name| name.starts_with("daemon."))
@@ -1749,7 +1749,7 @@ mod tests {
     }
 
     fn optional_feature_method(method_name: &str) -> bool {
-        method_name == fluxdown_protocol::method::DAEMON_GROUP_RESOLVE_PREVIEW
+        method_name == rinadown_protocol::method::DAEMON_GROUP_RESOLVE_PREVIEW
             || method_name.starts_with("daemon.plugin.")
             || method_name.starts_with("daemon.component.")
     }

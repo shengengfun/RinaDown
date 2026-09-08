@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use base64::Engine as _;
 use ed25519_dalek::SigningKey;
-use fluxdown_protocol::{
+use rinadown_protocol::{
     AgentEvent, GatewayMigrationExport, LinkDeviceInfo, LinkMigrationExport, MigrationAckParams,
 };
 use serde_json::{Value, json};
@@ -35,13 +35,13 @@ async fn migrate_link(
     }
     let export = daemon
         .call::<Value, LinkMigrationExport>(
-            fluxdown_protocol::method::DAEMON_MIGRATION_LINK_EXPORT,
+            rinadown_protocol::method::DAEMON_MIGRATION_LINK_EXPORT,
             None,
         )
         .await;
     let export = match export {
         Ok(export) => export,
-        Err(error) if error.code == fluxdown_protocol::ApplicationErrorCode::NotFound => {
+        Err(error) if error.code == rinadown_protocol::ApplicationErrorCode::NotFound => {
             ensure_identity(state, store).await?;
             return Ok(());
         }
@@ -61,7 +61,7 @@ async fn migrate_link(
     }
     let _: Value = daemon
         .call(
-            fluxdown_protocol::method::DAEMON_MIGRATION_LINK_ACK,
+            rinadown_protocol::method::DAEMON_MIGRATION_LINK_ACK,
             Some(MigrationAckParams {
                 revision: export.revision,
             }),
@@ -82,13 +82,13 @@ async fn migrate_gateway(
     }
     let export = daemon
         .call::<Value, GatewayMigrationExport>(
-            fluxdown_protocol::method::DAEMON_MIGRATION_GATEWAY_EXPORT,
+            rinadown_protocol::method::DAEMON_MIGRATION_GATEWAY_EXPORT,
             None,
         )
         .await;
     let export = match export {
         Ok(export) => export,
-        Err(error) if error.code == fluxdown_protocol::ApplicationErrorCode::NotFound => {
+        Err(error) if error.code == rinadown_protocol::ApplicationErrorCode::NotFound => {
             return Ok(());
         }
         Err(error) => return Err(LinkMigrationError::Daemon(error)),
@@ -108,7 +108,7 @@ async fn migrate_gateway(
     }
     let _: Value = daemon
         .call(
-            fluxdown_protocol::method::DAEMON_MIGRATION_GATEWAY_ACK,
+            rinadown_protocol::method::DAEMON_MIGRATION_GATEWAY_ACK,
             Some(MigrationAckParams {
                 revision: export.revision,
             }),
@@ -167,7 +167,7 @@ pub fn public_devices(state: &AgentState) -> Vec<LinkDeviceInfo> {
 #[derive(Debug, thiserror::Error)]
 pub enum LinkMigrationError {
     #[error("daemon migration RPC failed: {0:?}")]
-    Daemon(fluxdown_protocol::RpcErrorData),
+    Daemon(rinadown_protocol::RpcErrorData),
     #[error(transparent)]
     State(#[from] crate::state::StateError),
 }

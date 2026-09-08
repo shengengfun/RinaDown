@@ -7,7 +7,7 @@
 //! 场景矩阵：显式段数 / auto(0) / 浏览器扩展 hint 模式，各含多轮暂停恢复。
 //!
 //! 运行：
-//!   cargo test -p fluxdown_engine --test pause_resume_repro -- --ignored --nocapture
+//!   cargo test -p rinadown_engine --test pause_resume_repro -- --ignored --nocapture
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -15,9 +15,9 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Duration;
 
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -229,7 +229,7 @@ async fn run_scenario(
     method: Option<String>,
 ) -> ScenarioResult {
     let work_dir =
-        std::env::temp_dir().join(format!("fluxdown_pr_{}_{}", name, std::process::id()));
+        std::env::temp_dir().join(format!("rinadown_pr_{}_{}", name, std::process::id()));
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
     tokio::fs::create_dir_all(&work_dir).await.unwrap();
 
@@ -283,7 +283,7 @@ async fn run_scenario(
     let hint = if use_hint { size as i64 } else { 0 };
     let task_id = engine
         .manager
-        .create_task(fluxdown_engine::download_manager::NewTaskSpec {
+        .create_task(rinadown_engine::download_manager::NewTaskSpec {
             url: url.clone(),
             save_dir: work_dir.to_string_lossy().to_string(),
             file_name: "file.bin".to_string(),
@@ -475,7 +475,7 @@ async fn run_change_segments(
     pause_first: bool,
 ) -> CsResult {
     let work_dir =
-        std::env::temp_dir().join(format!("fluxdown_cs_{}_{}", name, std::process::id()));
+        std::env::temp_dir().join(format!("rinadown_cs_{}_{}", name, std::process::id()));
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
     tokio::fs::create_dir_all(&work_dir).await.unwrap();
 
@@ -525,7 +525,7 @@ async fn run_change_segments(
 
     let task_id = engine
         .manager
-        .create_task(fluxdown_engine::download_manager::NewTaskSpec {
+        .create_task(rinadown_engine::download_manager::NewTaskSpec {
             url: url.clone(),
             save_dir: work_dir.to_string_lossy().to_string(),
             file_name: "file.bin".to_string(),

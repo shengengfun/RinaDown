@@ -238,7 +238,7 @@ class MobileSettingsScreen extends StatelessWidget {
                         _Row(
                           label: s.mobilePrivacyPolicy,
                           onTap: () => launchUrl(
-                            Uri.parse('https://fluxdown.zerx.dev/privacy'),
+                            Uri.parse('https://rinadown.zerx.dev/privacy'),
                           ),
                         ),
                         _Row(

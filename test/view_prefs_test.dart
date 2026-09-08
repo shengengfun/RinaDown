@@ -8,8 +8,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/models/view_prefs.dart';
-import 'package:flux_down/src/services/kv_store.dart';
+import 'package:rina_down/src/models/view_prefs.dart';
+import 'package:rina_down/src/services/kv_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -1,0 +1,14 @@
+{
+	"luci-app-rinadown": {
+		"description": "Grant access to RinaDown configuration",
+		"read": {
+			"uci": [ "rinadown" ],
+			"ubus": {
+				"service": [ "list" ]
+			}
+		},
+		"write": {
+			"uci": [ "rinadown" ]
+		}
+	}
+}

@@ -1,11 +1,11 @@
 ---
-title: Translating FluxDown
+title: Translating RinaDown
 description: Help translate the app, the web UI, and this website by contributing on GitHub.
 section: contributing
 order: 2
 ---
 
-FluxDown translations are maintained in the public [zerx-lab/FluxDown](https://github.com/zerx-lab/FluxDown) repository. Community members contribute language updates through GitHub pull requests.
+RinaDown translations are maintained in the public [zerx-lab/RinaDown](https://github.com/zerx-lab/RinaDown) repository. Community members contribute language updates through GitHub pull requests.
 
 ## What can be translated
 
@@ -14,13 +14,13 @@ FluxDown translations are maintained in the public [zerx-lab/FluxDown](https://g
 | --- | --- |
 | **Desktop & Mobile App** | Every string in the Windows/macOS/Linux app and the mobile app |
 | **Web App** | The web UI served by the headless server |
-| **Website** | fluxdown.zerx.dev — landing page, FAQ, changelog |
+| **Website** | rinadown.zerx.dev — landing page, FAQ, changelog |
 
 English is the source language; Simplified Chinese is maintained by the core team. Everything else is yours to build.
 
 ## Quick start
 
-1. Fork [zerx-lab/FluxDown](https://github.com/zerx-lab/FluxDown) and create a branch from `main`.
+1. Fork [zerx-lab/RinaDown](https://github.com/zerx-lab/RinaDown) and create a branch from `main`.
 2. Add or update the relevant translation file:
    - **Desktop & Mobile App**: `assets/i18n/`
    - **Web App**: `web/src/lib/locales/`

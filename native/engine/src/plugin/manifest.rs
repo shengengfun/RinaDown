@@ -503,7 +503,7 @@ pub fn is_safe_relative_path(p: &str) -> bool {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::plugin::manifest::url_glob_match;
+/// use rinadown_engine::plugin::manifest::url_glob_match;
 ///
 /// assert!(url_glob_match("*://www.youtube.com/watch*", "https://www.youtube.com/watch?v=abc"));
 /// assert!(url_glob_match("*", "anything"));

@@ -8,8 +8,8 @@
 // 时单靠它也能选出主，只是接主有最多一个续租周期的延迟）；BroadcastChannel 只是锦上
 // 添花——leader 主动释放时广播一声，让等位标签页不必空等到 TTL 到期才能接主。
 
-const LEASE_KEY = 'fluxdown.cloud.executorLease'
-const CHANNEL_NAME = 'fluxdown.cloud.executor'
+const LEASE_KEY = 'rinadown.cloud.executorLease'
+const CHANNEL_NAME = 'rinadown.cloud.executor'
 /** 续租间隔：必须明显小于 TTL，否则一次 setInterval 抖动/标签页节流就可能让租约
  *  在续期前过期，被其它标签页抢走导致来回易主。 */
 const RENEW_INTERVAL_MS = 2_000

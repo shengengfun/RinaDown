@@ -18,7 +18,7 @@ pub const LATER_QUEUE_ID: &str = "later";
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::model::{is_builtin_queue, MAIN_QUEUE_ID};
+/// use rinadown_engine::model::{is_builtin_queue, MAIN_QUEUE_ID};
 /// assert!(is_builtin_queue(MAIN_QUEUE_ID));
 /// assert!(!is_builtin_queue("some-uuid"));
 /// ```

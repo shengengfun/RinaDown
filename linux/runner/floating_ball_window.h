@@ -7,7 +7,7 @@ G_BEGIN_DECLS
 
 // Opaque native controller for the floating ball on Linux (plan A6/S3.4).
 //
-// Registers the com.fluxdown/floating_ball MethodChannel and answers it with
+// Registers the com.rinadown/floating_ball MethodChannel and answers it with
 // a "dumb" GTK window: it only blits whatever bitmap Dart pushes and forwards
 // pointer/drag input back over the channel. No business logic lives here.
 //

@@ -1,4 +1,4 @@
-//! 持久化 CLI 配置 —— `fluxdown config set/unset/get/list` 写入的本地配置文件，
+//! 持久化 CLI 配置 —— `rinadown config set/unset/get/list` 写入的本地配置文件，
 //! 效果类似 `go env -w`：一次设置长期生效，无需每次导出环境变量。
 //!
 //! ## 优先级
@@ -6,7 +6,7 @@
 //! 每个配置项的生效值按「显式 > 环境 > 持久化配置 > 内置默认」解析：
 //!
 //! 1. 命令行 flag（`--token X`）
-//! 2. 环境变量（`FLUXDOWN_TOKEN` —— 由 clap 的 `env=` 合并进 flag）
+//! 2. 环境变量（`RINADOWN_TOKEN` —— 由 clap 的 `env=` 合并进 flag）
 //! 3. 本文件的持久化配置（`config set` 写入）
 //! 4. 内置默认（仅 `url`，默认 `http://127.0.0.1:17800`）
 //!
@@ -18,9 +18,9 @@
 //!
 //! | 平台 | 路径 |
 //! |---|---|
-//! | Windows | `%APPDATA%\zerx\fluxdown\config\cli.toml` |
-//! | Linux | `$XDG_CONFIG_HOME/fluxdown/cli.toml`（默认 `~/.config/fluxdown/`） |
-//! | macOS | `~/Library/Application Support/dev.zerx.fluxdown/cli.toml` |
+//! | Windows | `%APPDATA%\zerx\rinadown\config\cli.toml` |
+//! | Linux | `$XDG_CONFIG_HOME/rinadown/cli.toml`（默认 `~/.config/rinadown/`） |
+//! | macOS | `~/Library/Application Support/dev.zerx.rinadown/cli.toml` |
 //!
 //! ## 安全
 //!
@@ -125,10 +125,10 @@ impl ConfigError {
 /// 持久化的 CLI 配置。所有字段可选：未设置的项回退到环境变量/默认值。
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CliConfig {
-    /// 服务基址（对应 `--url` / `FLUXDOWN_URL`）。
+    /// 服务基址（对应 `--url` / `RINADOWN_URL`）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
-    /// 管理 API token（对应 `--token` / `FLUXDOWN_TOKEN`）。
+    /// 管理 API token（对应 `--token` / `RINADOWN_TOKEN`）。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
     /// 单请求超时秒数（对应 `--timeout`）。
@@ -141,13 +141,13 @@ pub struct CliConfig {
 /// # Examples
 ///
 /// ```no_run
-/// use fluxdown_cli::config::config_path;
+/// use rinadown_cli::config::config_path;
 ///
 /// let p = config_path().expect("a config dir should exist");
 /// assert!(p.ends_with("cli.toml"));
 /// ```
 pub fn config_path() -> Result<PathBuf, ConfigError> {
-    let dirs = ProjectDirs::from("dev", "zerx", "fluxdown").ok_or(ConfigError::NoConfigDir)?;
+    let dirs = ProjectDirs::from("dev", "zerx", "rinadown").ok_or(ConfigError::NoConfigDir)?;
     Ok(dirs.config_dir().join(CONFIG_FILE))
 }
 

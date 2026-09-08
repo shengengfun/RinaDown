@@ -1,16 +1,16 @@
-//! FluxDown CLI 入口 —— aria2c 风格命令行下载客户端。
+//! RinaDown CLI 入口 —— aria2c 风格命令行下载客户端。
 
 use std::process::ExitCode as ProcExitCode;
 use std::time::Duration;
 
 use clap::{Args, Parser, Subcommand};
-use fluxdown_cli::client::{ApiClient, ClientError};
-use fluxdown_cli::config::{CliConfig, ConfigError};
-use fluxdown_cli::exit::ExitCode;
-use fluxdown_cli::format::{
+use rinadown_cli::client::{ApiClient, ClientError};
+use rinadown_cli::config::{CliConfig, ConfigError};
+use rinadown_cli::exit::ExitCode;
+use rinadown_cli::format::{
     human_bytes, human_time, percent, rss_item_status_name, status_name, truncate,
 };
-use fluxdown_protocol::daemon::{CreateTaskRequest, RssSourceDto};
+use rinadown_protocol::daemon::{CreateTaskRequest, RssSourceDto};
 
 mod local;
 
@@ -20,16 +20,16 @@ const DEFAULT_URL: &str = "http://127.0.0.1:17800";
 /// 默认请求超时（秒），当命令行/环境/持久化配置都未指定时使用。
 const DEFAULT_TIMEOUT_SECS: u64 = 30;
 
-/// FluxDown 命令行下载客户端。
+/// RinaDown 命令行下载客户端。
 #[derive(Debug, Parser)]
-#[command(name = "fluxdown", version, about, long_about = None)]
+#[command(name = "rinadown", version, about, long_about = None)]
 struct Cli {
     /// 服务基址（默认 http://127.0.0.1:17800）。
-    #[arg(long, global = true, env = "FLUXDOWN_URL")]
+    #[arg(long, global = true, env = "RINADOWN_URL")]
     url: Option<String>,
 
     /// 管理 API token。
-    #[arg(long, global = true, env = "FLUXDOWN_TOKEN")]
+    #[arg(long, global = true, env = "RINADOWN_TOKEN")]
     token: Option<String>,
 
     /// 请求超时（秒，默认 30；可用 `config set timeout` 持久化）。
@@ -250,10 +250,10 @@ enum ConfigCmd {
 }
 
 fn main() -> ProcExitCode {
-    if let Err(error) = fluxdown_engine::logger::init() {
+    if let Err(error) = rinadown_engine::logger::init() {
         eprintln!(
-            "fluxdown: failed to initialize logger: {}",
-            fluxdown_engine::logger::format_error_chain(&error)
+            "rinadown: failed to initialize logger: {}",
+            rinadown_engine::logger::format_error_chain(&error)
         );
         return ProcExitCode::from(ExitCode::Unknown.code() as u8);
     }
@@ -262,10 +262,10 @@ fn main() -> ProcExitCode {
         Err(error) => {
             let exit_code = error.exit_code();
             if error.use_stderr() {
-                fluxdown_engine::logger::report_error("cli", "parse arguments", &error);
+                rinadown_engine::logger::report_error("cli", "parse arguments", &error);
             }
             if let Err(print_error) = error.print() {
-                fluxdown_engine::logger::report_error("cli", "print argument error", &print_error);
+                rinadown_engine::logger::report_error("cli", "print argument error", &print_error);
             }
             return ProcExitCode::from(u8::try_from(exit_code).unwrap_or(1));
         }
@@ -276,8 +276,8 @@ fn main() -> ProcExitCode {
     {
         Ok(rt) => rt,
         Err(e) => {
-            fluxdown_engine::logger::report_error("cli", "start runtime", &e);
-            eprintln!("fluxdown: failed to start runtime: {e}");
+            rinadown_engine::logger::report_error("cli", "start runtime", &e);
+            eprintln!("rinadown: failed to start runtime: {e}");
             return ProcExitCode::from(ExitCode::Unknown.code() as u8);
         }
     };
@@ -326,8 +326,8 @@ async fn run(cli: Cli) -> i32 {
         return match cmd_config(args.action, json) {
             Ok(()) => ExitCode::Success.code(),
             Err(e) => {
-                fluxdown_engine::logger::report_error("cli", "config command", &e);
-                eprintln!("fluxdown: {e}");
+                rinadown_engine::logger::report_error("cli", "config command", &e);
+                eprintln!("rinadown: {e}");
                 e.exit().code()
             }
         };
@@ -341,8 +341,8 @@ async fn run(cli: Cli) -> i32 {
         return match local::run_add_local(*a, json).await {
             Ok(()) => ExitCode::Success.code(),
             Err(e) => {
-                fluxdown_engine::logger::report_error("cli", "local add", &e);
-                eprintln!("fluxdown: {e}");
+                rinadown_engine::logger::report_error("cli", "local add", &e);
+                eprintln!("rinadown: {e}");
                 e.exit.code()
             }
         };
@@ -351,8 +351,8 @@ async fn run(cli: Cli) -> i32 {
     // 加载持久化配置作为 flag/env 未指定时的兜底（优先级：flag/env > 配置文件 > 默认）。
     // 读取失败不致命：仅告警并退回空配置，仍可用 flag/env/默认驱动。
     let cfg = CliConfig::load().unwrap_or_else(|e| {
-        fluxdown_engine::logger::report_warning("cli", "load config", &e);
-        eprintln!("fluxdown: warning: {e}");
+        rinadown_engine::logger::report_warning("cli", "load config", &e);
+        eprintln!("rinadown: warning: {e}");
         CliConfig::default()
     });
 
@@ -367,8 +367,8 @@ async fn run(cli: Cli) -> i32 {
     let client = match ApiClient::new(&base, &token, timeout) {
         Ok(c) => c,
         Err(e) => {
-            fluxdown_engine::logger::report_error("cli", "initialize client", &e);
-            eprintln!("fluxdown: {e}");
+            rinadown_engine::logger::report_error("cli", "initialize client", &e);
+            eprintln!("rinadown: {e}");
             return e.exit.code();
         }
     };
@@ -399,8 +399,8 @@ async fn run(cli: Cli) -> i32 {
     match result {
         Ok(()) => ExitCode::Success.code(),
         Err(e) => {
-            fluxdown_engine::logger::report_error("cli", "command", &e);
-            eprintln!("fluxdown: {e}");
+            rinadown_engine::logger::report_error("cli", "command", &e);
+            eprintln!("rinadown: {e}");
             e.exit.code()
         }
     }
@@ -443,7 +443,7 @@ fn cmd_config(action: ConfigCmd, json: bool) -> Result<(), ConfigError> {
             print_config_list(&cfg, json)
         }
         ConfigCmd::Path => {
-            println!("{}", fluxdown_cli::config::config_path()?.display());
+            println!("{}", rinadown_cli::config::config_path()?.display());
             Ok(())
         }
     }
@@ -479,7 +479,7 @@ async fn cmd_ping(client: &ApiClient, json: bool) -> Result<(), ClientError> {
     if json {
         println!("{}", serde_json::to_string_pretty(&v).unwrap_or_default());
     } else {
-        let app = v.get("app").and_then(|x| x.as_str()).unwrap_or("FluxDown");
+        let app = v.get("app").and_then(|x| x.as_str()).unwrap_or("RinaDown");
         let ver = v.get("version").and_then(|x| x.as_str()).unwrap_or("?");
         println!("pong — {app} {ver}");
     }
@@ -553,7 +553,7 @@ async fn cmd_add(client: &ApiClient, a: AddArgs, json: bool) -> Result<(), Clien
         match client.create_task(&req).await {
             Ok(res) => created.push(res.task_id),
             Err(e) => {
-                eprintln!("fluxdown: failed to add {url}: {e}");
+                eprintln!("rinadown: failed to add {url}: {e}");
                 if first_err.is_none() {
                     first_err = Some(e);
                 }
@@ -751,7 +751,7 @@ async fn cmd_rss_list(client: &ApiClient, json: bool) -> Result<(), ClientError>
         let minutes = if s.interval_minutes > 0 {
             s.interval_minutes
         } else {
-            fluxdown_engine::rss::model::DEFAULT_INTERVAL_MINUTES
+            rinadown_engine::rss::model::DEFAULT_INTERVAL_MINUTES
         };
         println!(
             "{:<16}  {:<32}  {:>6}  {:>6}  {}",

@@ -1,4 +1,4 @@
-// FluxDown 本地设备互联（局域网配对）客户端服务 —— 单例 + ChangeNotifier
+// RinaDown 本地设备互联（局域网配对）客户端服务 —— 单例 + ChangeNotifier
 // （同 CloudAuthService/RemoteTaskService 的单例风格）。
 //
 // 与 FluxCloud 账户体系无关：不登录账号，双方在同一局域网内即可直接配对，
@@ -149,7 +149,7 @@ class LocalPairingService extends ChangeNotifier {
     _send(action: 'stopDiscovery');
   }
 
-  /// 探测指定地址是否为可配对的 FluxDown 设备（手动输入地址场景）。
+  /// 探测指定地址是否为可配对的 RinaDown 设备（手动输入地址场景）。
   void probe({required String host, required int port}) {
     if (!supported) return;
     _send(action: 'probe', host: host, port: port);

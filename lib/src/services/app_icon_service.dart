@@ -22,7 +22,7 @@ enum AppIconChoice {
   /// 默认图标（exe 资源 / app_icon.ico，Linux 为打包的 hicolor PNG）。
   defaultIcon,
 
-  /// 内置备选图标「闪电」（assets/logo/fluxdown_bolt.png）。
+  /// 内置备选图标「闪电」（assets/logo/rinadown_bolt.png）。
   bolt,
 
   /// 用户导入的自定义图标。
@@ -33,7 +33,7 @@ enum AppIconChoice {
 /// 同名同通道（macos/Runner/MainFlutterWindow.swift 里只注册一次
 /// handler，两个 Dart 文件各自持有一份 MethodChannel 实例是安全的，
 /// 二者只是同一个平台通道名的独立句柄）。这里只用得到 `setAppIcon`。
-const _macWindowChannel = MethodChannel('com.fluxdown/window');
+const _macWindowChannel = MethodChannel('com.rinadown/window');
 
 /// 动态应用图标服务（Windows/Linux/macOS 均生效，实现方式因平台而异）。
 ///
@@ -41,7 +41,7 @@ const _macWindowChannel = MethodChannel('com.fluxdown/window');
 /// 「自定义」之间的切换：
 /// - 默认图标来自打包资源（Windows：exe 资源 + CMake install 的
 ///   `app_icon.ico`；Linux：CMake install 的
-///   `data/icons/hicolor/256x256/apps/com.fluxdown.app.png`；macOS：
+///   `data/icons/hicolor/256x256/apps/com.rinadown.app.png`；macOS：
 ///   `Assets.xcassets/AppIcon`，运行时不持有可读路径，靠原生 `nil` 复位）；
 /// - 内置「闪电」图标由打包资源 [builtinBoltAsset] 在应用时渲染，缓存在
 ///   数据目录 `icons/bolt_icon.<ext>`；
@@ -54,7 +54,7 @@ const _macWindowChannel = MethodChannel('com.fluxdown/window');
 ///   （256px `WM_SETICON`；window_manager.setIcon 硬编码 16/32px，DPI
 ///   缩放下任务栏静默不更新），Linux 用 `window_manager.setIcon`
 ///   （`gtk_window_set_icon_from_file`），macOS 没有等价的 window_manager
-///   实现，经 `com.fluxdown/window` 原生通道调用
+///   实现，经 `com.rinadown/window` 原生通道调用
 ///   `NSApp.applicationIconImage`；
 /// - **持久化的「快捷方式」图标**（桌面 / 开始菜单 / 任务栏固定 /
 ///   Finder / Dock）——运行时替换窗口图标不会触碰这些静态引用，三个平台
@@ -63,9 +63,9 @@ const _macWindowChannel = MethodChannel('com.fluxdown/window');
 ///     (`native/hub/src/shortcut_icon.rs`)，用 COM 重写 `.lnk` 的
 ///     `IconLocation` 并 `SHChangeNotify`；
 ///   - Linux：覆盖用户级 XDG 图标主题路径
-///     `$XDG_DATA_HOME/icons/hicolor/256x256/apps/com.fluxdown.app.png`
+///     `$XDG_DATA_HOME/icons/hicolor/256x256/apps/com.rinadown.app.png`
 ///     ——查找优先级高于系统安装的同名图标，`.desktop` 的
-///     `Icon=com.fluxdown.app` 因此在应用菜单/Dash固定/任务栏等处生效，
+///     `Icon=com.rinadown.app` 因此在应用菜单/Dash固定/任务栏等处生效，
 ///     无需 root；
 ///   - macOS：经原生通道调用 `NSWorkspace.setIcon(forFile:)` 给 `.app`
 ///     bundle 设置 Finder 自定义图标覆盖（不修改已签名 bundle 的实际
@@ -84,7 +84,7 @@ class AppIconService extends ChangeNotifier {
   static const _kChoiceKey = 'app_icon_choice';
 
   /// 内置备选图标「闪电」的打包资源路径（UI 预览也直接引用）。
-  static const builtinBoltAsset = 'assets/logo/fluxdown_bolt.png';
+  static const builtinBoltAsset = 'assets/logo/rinadown_bolt.png';
 
   /// Windows ICO 容器渲染的正方形尺寸集合。
   static const _icoSizes = [16, 24, 32, 48, 64, 128, 256];
@@ -137,7 +137,7 @@ class AppIconService extends ChangeNotifier {
     // Linux bundle 布局（linux/CMakeLists.txt 的 install 规则；portable
     // tar.gz / AppImage / deb / arch 打包都直接复用同一份 flutter build
     // bundle 输出，因此这个相对路径在所有分发形式下一致）：
-    //   <exeDir>/data/icons/hicolor/256x256/apps/com.fluxdown.app.png
+    //   <exeDir>/data/icons/hicolor/256x256/apps/com.rinadown.app.png
     return p.join(
       exeDir,
       'data',
@@ -145,15 +145,15 @@ class AppIconService extends ChangeNotifier {
       'hicolor',
       '256x256',
       'apps',
-      'com.fluxdown.app.png',
+      'com.rinadown.app.png',
     );
   }
 
   /// Linux 用户级 XDG 图标主题覆盖路径。
   ///
   /// 写入此文件会让桌面环境（GNOME/KDE 等）的图标主题查找优先命中它，
-  /// 覆盖系统安装的 `/usr/share/icons/hicolor/256x256/apps/com.fluxdown.app.png`
-  /// ——`.desktop` 的 `Icon=com.fluxdown.app` 因此在应用菜单、Dash/任务栏
+  /// 覆盖系统安装的 `/usr/share/icons/hicolor/256x256/apps/com.rinadown.app.png`
+  /// ——`.desktop` 的 `Icon=com.rinadown.app` 因此在应用菜单、Dash/任务栏
   /// 固定图标、窗口切换器等"快捷方式"位置生效，且无需 root 权限。这是
   /// Linux 侧对应 Windows 改写 `.lnk` 的角色。
   static String get _linuxIconOverridePath {
@@ -167,7 +167,7 @@ class AppIconService extends ChangeNotifier {
       'hicolor',
       '256x256',
       'apps',
-      'com.fluxdown.app.png',
+      'com.rinadown.app.png',
     );
   }
 

@@ -2,11 +2,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
-import 'package:flux_down/src/i18n/locale_provider.dart';
-import 'package:flux_down/src/theme/app_theme.dart';
-import 'package:flux_down/src/theme/flux_theme_tokens.dart';
-import 'package:flux_down/src/widgets/quick_download_form.dart';
-import 'package:flux_down/src/widgets/flux_sonner.dart';
+import 'package:rina_down/src/i18n/locale_provider.dart';
+import 'package:rina_down/src/theme/app_theme.dart';
+import 'package:rina_down/src/theme/flux_theme_tokens.dart';
+import 'package:rina_down/src/widgets/quick_download_form.dart';
+import 'package:rina_down/src/widgets/flux_sonner.dart';
 
 class _FakeHost implements QuickDownloadFormHost {
   @override

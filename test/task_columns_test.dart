@@ -6,10 +6,10 @@
 // Source: lib/src/widgets/task_columns.dart
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/i18n/i18n_store.dart';
-import 'package:flux_down/src/i18n/translations.dart';
-import 'package:flux_down/src/models/view_prefs.dart';
-import 'package:flux_down/src/widgets/task_columns.dart';
+import 'package:rina_down/src/i18n/i18n_store.dart';
+import 'package:rina_down/src/i18n/translations.dart';
+import 'package:rina_down/src/models/view_prefs.dart';
+import 'package:rina_down/src/widgets/task_columns.dart';
 
 void main() {
   // 列切换拒绝提示需要读 i18n 表；en.json 作为源语言表恒可用。

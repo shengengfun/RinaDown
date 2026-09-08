@@ -3,7 +3,7 @@
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     AgentPreferencesDto, AgentSessionDto, GatewayStatusDto, RemoteTaskDto, SyncStatusDto,
 };
 use fs2::FileExt;
@@ -223,7 +223,7 @@ mod tests {
     #[tokio::test]
     async fn state_is_atomic_private_and_exclusively_locked() {
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_agent_state_{}_{}",
+            "rinadown_agent_state_{}_{}",
             std::process::id(),
             uuid::Uuid::new_v4()
         ));

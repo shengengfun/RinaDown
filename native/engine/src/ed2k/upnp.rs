@@ -29,7 +29,7 @@ const LEASE_SECS: u32 = 3600;
 const RENEW_INTERVAL: Duration = Duration::from_secs(3000);
 
 /// 映射描述（网关管理页可见）。
-const MAPPING_DESC: &str = "FluxDown eD2K";
+const MAPPING_DESC: &str = "RinaDown eD2K";
 
 /// 一组已建立的 UPnP 映射的句柄。drop 时后台任务被 abort 并尽力移除映射。
 pub struct UpnpMapping {

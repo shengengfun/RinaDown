@@ -8,12 +8,12 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use fluxdown_protocol::{ReleaseNoteDto, UpdateCheckResultDto};
+use rinadown_protocol::{ReleaseNoteDto, UpdateCheckResultDto};
 use serde::Deserialize;
 use serde_json::Value;
 
-const UPDATE_API_BASE: &str = "https://fluxdown.zerx.dev";
-const RELEASE_PAGE_URL: &str = "https://fluxdown.zerx.dev/changelog";
+const UPDATE_API_BASE: &str = "https://rinadown.zerx.dev";
+const RELEASE_PAGE_URL: &str = "https://rinadown.zerx.dev/changelog";
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 const CHANGELOG_PER_PAGE: u32 = 50;
 
@@ -65,7 +65,7 @@ impl UpdateService {
         let http = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(10))
             .timeout(REQUEST_TIMEOUT)
-            .user_agent(format!("fluxdown-agent/{current_version}"))
+            .user_agent(format!("rinadown-agent/{current_version}"))
             .build()?;
         Ok(Self {
             current_version: current_version.to_owned(),
@@ -190,7 +190,7 @@ fn asset_keys() -> &'static [&'static str] {
         .as_deref()
         .and_then(std::path::Path::to_str)
         .unwrap_or("");
-    if exe_str.starts_with("/opt/fluxdown") {
+    if exe_str.starts_with("/opt/rinadown") {
         if package_owns(&["dpkg", "-S"], exe_str) {
             return &["linux_deb"];
         }
@@ -358,7 +358,7 @@ mod tests {
         );
         assert_eq!(
             select_download_url(&assets).as_deref(),
-            Some("https://fluxdown.zerx.dev/api/download/x")
+            Some("https://rinadown.zerx.dev/api/download/x")
         );
         assets.insert(
             keys[0].to_owned(),
@@ -430,8 +430,8 @@ mod tests {
         assert_eq!(notes[0].version, "1.3.0");
         assert_eq!(notes[0].body, "new");
         assert_eq!(
-            absolute_download_url("/api/download/FluxDown.dmg"),
-            "https://fluxdown.zerx.dev/api/download/FluxDown.dmg"
+            absolute_download_url("/api/download/RinaDown.dmg"),
+            "https://rinadown.zerx.dev/api/download/RinaDown.dmg"
         );
         assert_eq!(
             absolute_download_url("https://cdn.example/a.dmg"),

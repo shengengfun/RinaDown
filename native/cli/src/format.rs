@@ -8,7 +8,7 @@
 /// # Examples
 ///
 /// ```
-/// use fluxdown_cli::format::status_name;
+/// use rinadown_cli::format::status_name;
 ///
 /// assert_eq!(status_name(1), "downloading");
 /// assert_eq!(status_name(3), "completed");
@@ -35,7 +35,7 @@ pub fn status_name(status: i32) -> &'static str {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_cli::format::rss_item_status_name;
+/// use rinadown_cli::format::rss_item_status_name;
 ///
 /// assert_eq!(rss_item_status_name(0), "new");
 /// assert_eq!(rss_item_status_name(4), "dup");
@@ -59,7 +59,7 @@ pub fn rss_item_status_name(status: i32) -> &'static str {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_cli::format::human_bytes;
+/// use rinadown_cli::format::human_bytes;
 ///
 /// assert_eq!(human_bytes(0), "0 B");
 /// assert_eq!(human_bytes(1024), "1.00 KiB");
@@ -91,7 +91,7 @@ pub fn human_bytes(bytes: i64) -> String {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_cli::format::percent;
+/// use rinadown_cli::format::percent;
 ///
 /// assert_eq!(percent(50, 100), "50.0%");
 /// assert_eq!(percent(0, 0), "--");
@@ -112,7 +112,7 @@ pub fn percent(downloaded: i64, total: i64) -> String {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_cli::format::parse_size;
+/// use rinadown_cli::format::parse_size;
 ///
 /// assert_eq!(parse_size("1024").unwrap(), 1024);
 /// assert_eq!(parse_size("1K").unwrap(), 1024);
@@ -148,7 +148,7 @@ pub fn parse_size(s: &str) -> Result<i64, String> {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_cli::format::truncate;
+/// use rinadown_cli::format::truncate;
 ///
 /// assert_eq!(truncate("hello", 10), "hello");
 /// assert_eq!(truncate("hello world", 8), "hello w…");
@@ -173,7 +173,7 @@ pub fn truncate(s: &str, max: usize) -> String {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_cli::format::human_time;
+/// use rinadown_cli::format::human_time;
 ///
 /// assert_eq!(human_time(0), "-");
 /// assert_eq!(human_time(86_399), "1970-01-01 23:59");

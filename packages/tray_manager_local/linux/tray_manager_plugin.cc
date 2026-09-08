@@ -46,7 +46,7 @@ G_DEFINE_TYPE(TrayManagerPlugin, tray_manager_plugin, g_object_get_type())
 
 // Stable application identifier exposed as StatusNotifierItem.Id. It must not
 // change at runtime: hosts derive their per-item identity from it.
-#define SNI_APP_ID        "FluxDown"
+#define SNI_APP_ID        "RinaDown"
 
 // ─── Menu entry ───────────────────────────────────────────────────────────────
 
@@ -71,7 +71,7 @@ static guint               s_watcher_id = 0;
 static bool                s_name_acquired  = false;
 static bool                s_watcher_present = false;
 static std::string         s_icon_path;
-static std::string         s_title     = "FluxDown";
+static std::string         s_title     = "RinaDown";
 static std::vector<MenuEntry> s_menu_items;
 static guint32             s_menu_rev  = 1;
 

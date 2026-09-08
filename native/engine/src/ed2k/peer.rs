@@ -308,7 +308,7 @@ async fn handshake(
     user_hash[5] = 14;
     user_hash[14] = 111;
     // 能力 tag：名称 + eDonkey 版本 + eMule 版本（aMule 软件 id 3）。
-    let name_tag = encode_peer_string_tag(0x01, "FluxDown");
+    let name_tag = encode_peer_string_tag(0x01, "RinaDown");
     let ver_tag = encode_peer_u32_tag(0x11, 0x3C);
     let mule_ver: u32 = (3 << 24) | (1 << 7);
     let mule_tag = encode_peer_u32_tag(0xFB, mule_ver);

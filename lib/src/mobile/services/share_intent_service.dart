@@ -9,7 +9,7 @@ import '../../services/log_service.dart';
 const _tag = 'ShareIntent';
 
 /// 系统分享 / URL scheme 接入桥（对应 Android [ExternalDownloadActivity] 的
-/// `com.fluxdown/share` channel 与 iOS [AppDelegate] 的同名 channel）。
+/// `com.rinadown/share` channel 与 iOS [AppDelegate] 的同名 channel）。
 ///
 /// 两端约定：
 /// - 原生侧 invoke `onShare`（热启动，应用已在前台/后台收到新分享 intent）；
@@ -17,7 +17,7 @@ const _tag = 'ShareIntent';
 ///   取走即清空，避免重复触发）。
 ///
 /// 载荷双形态兼容：Android 传 `{url, filename}` Map（filename 仅
-/// fluxdown:// 协议携带，其余为空串）；iOS 仍传纯 String（无协议模式）。
+/// rinadown:// 协议携带，其余为空串）；iOS 仍传纯 String（无协议模式）。
 ///
 /// 分享内容可能夹带描述文字（如“看看这个 https://x/f.zip”），[extractUrl]
 /// 从中提取首个可下载的 URL / magnet。
@@ -42,7 +42,7 @@ class SharedDownloadRequest {
 class ShareIntentService {
   ShareIntentService._();
 
-  static const _channel = MethodChannel('com.fluxdown/share');
+  static const _channel = MethodChannel('com.rinadown/share');
 
   /// 外部载荷截断上限，防止超大输入卡死 UI
   static const int _maxUrlLen = 8192;

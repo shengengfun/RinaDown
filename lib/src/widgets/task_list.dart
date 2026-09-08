@@ -2077,7 +2077,7 @@ class _ViewOptionsHeaderButtonState extends State<_ViewOptionsHeaderButton> {
         final prefs = widget.viewPrefsStore.resolve(tab);
         return ShadPopover(
           controller: _popoverController,
-          // FluxDown 弹出层无进出场动画(rule: shad-overlay-no-animation)。
+          // RinaDown 弹出层无进出场动画(rule: shad-overlay-no-animation)。
           effects: const [],
           // 固定向下展开（overlay topRight 贴按钮 bottomRight——portal.dart
           // 中 childAlignment 实际作用于 overlay、overlayAlignment 作用于

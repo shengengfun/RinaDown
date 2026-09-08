@@ -101,7 +101,7 @@ impl CloudClient {
     pub(crate) async fn persist_auth(
         &self,
         auth: AuthResponse,
-    ) -> Result<fluxdown_protocol::AgentSessionDto, CloudError> {
+    ) -> Result<rinadown_protocol::AgentSessionDto, CloudError> {
         let session = auth.session();
         let mut state = self.state.lock().await;
         state.credentials = Some(CloudCredentials {
@@ -120,8 +120,8 @@ impl CloudClient {
     /// 资料修改成功后更新无令牌会话并原子持久化。
     pub(crate) async fn persist_profile(
         &self,
-        profile: fluxdown_protocol::CloudProfile,
-    ) -> Result<fluxdown_protocol::AgentSessionDto, CloudError> {
+        profile: rinadown_protocol::CloudProfile,
+    ) -> Result<rinadown_protocol::AgentSessionDto, CloudError> {
         let mut state = self.state.lock().await;
         let session = state
             .credentials
@@ -247,10 +247,10 @@ impl CloudClient {
             .get(format!("{}{}", self.base_url, path))
             .bearer_auth(bearer)
             .header("Accept", "text/event-stream")
-            .header("X-FluxDown-Device-Id", device_id)
-            .header("X-FluxDown-Device-Name", device_name)
-            .header("X-FluxDown-Platform", platform)
-            .header("X-FluxDown-Version", env!("CARGO_PKG_VERSION"))
+            .header("X-RinaDown-Device-Id", device_id)
+            .header("X-RinaDown-Device-Name", device_name)
+            .header("X-RinaDown-Platform", platform)
+            .header("X-RinaDown-Version", env!("CARGO_PKG_VERSION"))
             .send()
             .await
             .map_err(|error| CloudError::transport(format!("{error:#}")))
@@ -274,10 +274,10 @@ impl CloudClient {
         let mut request = self
             .http
             .request(method, format!("{}{}", self.base_url, path))
-            .header("X-FluxDown-Device-Id", device_id)
-            .header("X-FluxDown-Device-Name", device_name)
-            .header("X-FluxDown-Platform", platform)
-            .header("X-FluxDown-Version", env!("CARGO_PKG_VERSION"));
+            .header("X-RinaDown-Device-Id", device_id)
+            .header("X-RinaDown-Device-Name", device_name)
+            .header("X-RinaDown-Platform", platform)
+            .header("X-RinaDown-Version", env!("CARGO_PKG_VERSION"));
         if let Some(token) = bearer {
             request = request.bearer_auth(token);
         }
@@ -467,7 +467,7 @@ mod tests {
         });
 
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_cloud_test_{}_{}",
+            "rinadown_cloud_test_{}_{}",
             std::process::id(),
             uuid::Uuid::new_v4()
         ));
@@ -515,7 +515,7 @@ mod tests {
         });
 
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_cloud_revoked_test_{}_{}",
+            "rinadown_cloud_revoked_test_{}_{}",
             std::process::id(),
             uuid::Uuid::new_v4()
         ));

@@ -239,7 +239,7 @@ impl CompiledRule {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::rss::filter::parse_size;
+/// use rinadown_engine::rss::filter::parse_size;
 ///
 /// assert_eq!(parse_size("200M"), Some(200 * 1024 * 1024));
 /// assert_eq!(parse_size("1.5 GB"), Some(1_610_612_736));
@@ -277,7 +277,7 @@ pub fn parse_size(input: &str) -> Option<i64> {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::rss::filter::{format_size, parse_size};
+/// use rinadown_engine::rss::filter::{format_size, parse_size};
 ///
 /// assert_eq!(format_size(0), "");
 /// assert_eq!(format_size(200 * 1024 * 1024), "200M");
@@ -314,7 +314,7 @@ pub fn format_size(bytes: i64) -> String {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::rss::filter::episode_key;
+/// use rinadown_engine::rss::filter::episode_key;
 ///
 /// // 同一集的不同字幕组版本归一到同一个键
 /// let a = episode_key("[ANi] 幼女战记 2 - 02 [1080P][Baha][WEB-DL]");

@@ -7,7 +7,7 @@
 # commit 流水账。这里把 cliff 输出降级为素材之一，允许合并/删减/重述条目。
 #
 # 输出格式必须保持官网 ChangelogSection.tsx 的解析契约：
-#   <!-- fluxdown:lang:zh --> / <!-- fluxdown:lang:en --> 两个区块，
+#   <!-- rinadown:lang:zh --> / <!-- rinadown:lang:en --> 两个区块，
 #   区块内只用 "## 标题" / "### 分组" / "- 条目" 三级结构。
 name: Generate release notes
 description: git-cliff 采集素材 + Claude 改写为面向用户的中英双语发布说明
@@ -119,7 +119,7 @@ runs:
         fi
 
         PROMPT=$(cat <<'EOF'
-        你是 FluxDown（多协议下载器）的发布说明作者。本次发布的组件是：__COMPONENT__
+        你是 RinaDown（多协议下载器）的发布说明作者。本次发布的组件是：__COMPONENT__
 
         输入素材（都在当前目录，只读）：
         - RELEASE_NOTES.md：git-cliff 按 Conventional Commits 聚合的原始条目（流水账，仅作线索）
@@ -138,7 +138,7 @@ runs:
 
         输出文件格式（严格遵守；无代码块围栏、无任何额外说明文字）：
 
-        <!-- fluxdown:lang:zh -->
+        <!-- rinadown:lang:zh -->
         ## <版本标题> - <YYYY-MM-DD>
 
         ### 🚀 新功能
@@ -147,7 +147,7 @@ runs:
         ### 🐛 问题修复
         - ...
 
-        <!-- fluxdown:lang:en -->
+        <!-- rinadown:lang:en -->
         ## <version title> - <YYYY-MM-DD>
 
         ### 🚀 Features
@@ -175,8 +175,8 @@ runs:
       if: steps.finalize.outputs.has_notes == 'true'
       shell: bash
       run: |
-        if grep -q '<!-- fluxdown:lang:zh -->' RELEASE_NOTES.md \
-          && grep -q '<!-- fluxdown:lang:en -->' RELEASE_NOTES.md; then
+        if grep -q '<!-- rinadown:lang:zh -->' RELEASE_NOTES.md \
+          && grep -q '<!-- rinadown:lang:en -->' RELEASE_NOTES.md; then
           echo "AI-authored bilingual notes OK"
         else
           echo "::warning::Rewritten notes missing language markers — falling back to git-cliff output"

@@ -32,7 +32,7 @@ pub const COMPONENT_YTDLP: &str = "ytdlp";
 /// 返回顺序稳定：按 `[ffmpeg, ytdlp]` 固定序，方便 UI 与测试断言。
 ///
 /// ```
-/// use fluxdown_engine::plugin::dependencies::required_components;
+/// use rinadown_engine::plugin::dependencies::required_components;
 /// let perms = vec!["ytdlp".to_string()];
 /// assert_eq!(required_components(&perms), vec!["ytdlp", "ffmpeg"]);
 /// ```

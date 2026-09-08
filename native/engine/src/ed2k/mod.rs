@@ -68,7 +68,7 @@ pub const MAX_ED2K_CONCURRENCY: usize = 8;
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::{ed2k_concurrency, DEFAULT_ED2K_CONCURRENCY, MAX_ED2K_CONCURRENCY};
+/// use rinadown_engine::ed2k::{ed2k_concurrency, DEFAULT_ED2K_CONCURRENCY, MAX_ED2K_CONCURRENCY};
 /// assert_eq!(ed2k_concurrency(0, 100), DEFAULT_ED2K_CONCURRENCY);
 /// assert_eq!(ed2k_concurrency(999, 100), MAX_ED2K_CONCURRENCY);
 /// assert_eq!(ed2k_concurrency(16, 3), 3); // capped by remaining

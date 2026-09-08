@@ -1,4 +1,4 @@
-use fluxdown_ui_i18n::{Translator, keys};
+use rinadown_ui_i18n::{Translator, keys};
 use gpui::SharedString;
 
 #[derive(Clone)]
@@ -272,8 +272,8 @@ impl NewDownloadStrings {
     /// 队列显示名：内置队列本地化，自定义队列用用户命名。
     pub(crate) fn queue_name(&self, queue_id: &str, name: &str) -> SharedString {
         match queue_id {
-            fluxdown_protocol::MAIN_QUEUE_ID => self.main_queue.clone(),
-            fluxdown_protocol::LATER_QUEUE_ID => self.later_queue.clone(),
+            rinadown_protocol::MAIN_QUEUE_ID => self.main_queue.clone(),
+            rinadown_protocol::LATER_QUEUE_ID => self.later_queue.clone(),
             _ => shared(name),
         }
     }

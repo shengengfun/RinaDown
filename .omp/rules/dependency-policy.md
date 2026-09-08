@@ -8,7 +8,7 @@ interruptMode: never
 scope: tool:edit,tool:write
 ---
 
-你正在改动依赖清单文件。FluxDown 依赖政策：
+你正在改动依赖清单文件。RinaDown 依赖政策：
 
 - 禁止未经用户确认新增 dependency——先说明理由并等确认。
 - 版本管理走工具命令（`cargo add/update`、`flutter pub add`、`bun add`/`npm i`），禁止直接手编版本号。

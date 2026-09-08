@@ -1099,7 +1099,7 @@ class _ProxyModeTrigger extends StatelessWidget {
   Widget build(BuildContext context) {
     return ShadPopover(
       controller: popoverController,
-      // FluxDown 弹出层无进出场动画(rule: shad-overlay-no-animation)。
+      // RinaDown 弹出层无进出场动画(rule: shad-overlay-no-animation)。
       effects: const [],
       // 弹出在触发器上方，右对齐（同限速 Popover，手动锚避免 Auto 右偏）
       anchor: const ShadAnchor(

@@ -2,7 +2,7 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     AgentEvent, AgentSnapshot, ApplicationErrorCode, ComponentKind, ComponentStatusDto,
     DaemonConfigSnapshot, DaemonEvent, PluginDto, RpcErrorData, ServiceEvent, WsServerMsg, method,
 };

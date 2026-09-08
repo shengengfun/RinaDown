@@ -15,7 +15,7 @@ const MAX_BODY_BYTES: usize = 4 * 1024 * 1024;
 #[test]
 fn daemon_process_enforces_wire_auth_conflict_body_limit_and_shutdown() {
     let address = reserve_loopback_address();
-    let data_dir = unique_temp_dir("fluxdown-daemon-process-contract");
+    let data_dir = unique_temp_dir("rinadown-daemon-process-contract");
     std::fs::create_dir_all(&data_dir).expect("create daemon test data dir");
     std::fs::write(data_dir.join("daemon.token"), format!("{TOKEN}\n"))
         .expect("write daemon test token");
@@ -34,12 +34,12 @@ fn daemon_process_enforces_wire_auth_conflict_body_limit_and_shutdown() {
     let wrong_role_response = rpc_call(
         &mut wrong_role,
         1,
-        fluxdown_protocol::method::SYSTEM_HELLO,
+        rinadown_protocol::method::SYSTEM_HELLO,
         Some(json!({
             "clientName": "process-contract-test",
             "clientVersion": "test",
-            "minProtocolVersion": fluxdown_protocol::MIN_PROTOCOL_VERSION,
-            "maxProtocolVersion": fluxdown_protocol::PROTOCOL_VERSION,
+            "minProtocolVersion": rinadown_protocol::MIN_PROTOCOL_VERSION,
+            "maxProtocolVersion": rinadown_protocol::PROTOCOL_VERSION,
             "requestedRole": "agent",
             "capabilities": []
         })),
@@ -53,12 +53,12 @@ fn daemon_process_enforces_wire_auth_conflict_body_limit_and_shutdown() {
     let hello = rpc_call(
         &mut socket,
         2,
-        fluxdown_protocol::method::SYSTEM_HELLO,
+        rinadown_protocol::method::SYSTEM_HELLO,
         Some(json!({
-            "clientName": "fluxdown-agent",
+            "clientName": "rinadown-agent",
             "clientVersion": "test",
-            "minProtocolVersion": fluxdown_protocol::MIN_PROTOCOL_VERSION,
-            "maxProtocolVersion": fluxdown_protocol::PROTOCOL_VERSION,
+            "minProtocolVersion": rinadown_protocol::MIN_PROTOCOL_VERSION,
+            "maxProtocolVersion": rinadown_protocol::PROTOCOL_VERSION,
             "requestedRole": "daemon",
             "capabilities": []
         })),
@@ -66,13 +66,13 @@ fn daemon_process_enforces_wire_auth_conflict_body_limit_and_shutdown() {
     assert_eq!(hello["result"]["role"], json!("daemon"));
     assert_eq!(
         hello["result"]["protocolVersion"],
-        json!(fluxdown_protocol::PROTOCOL_VERSION)
+        json!(rinadown_protocol::PROTOCOL_VERSION)
     );
 
     let config = rpc_call(
         &mut socket,
         3,
-        fluxdown_protocol::method::DAEMON_CONFIG_GET,
+        rinadown_protocol::method::DAEMON_CONFIG_GET,
         None,
     );
     let revision = config["result"]["revision"]
@@ -81,7 +81,7 @@ fn daemon_process_enforces_wire_auth_conflict_body_limit_and_shutdown() {
     let first_patch = rpc_call(
         &mut socket,
         4,
-        fluxdown_protocol::method::DAEMON_CONFIG_PATCH,
+        rinadown_protocol::method::DAEMON_CONFIG_PATCH,
         Some(json!({
             "expectedRevision": revision,
             "values": {"max_concurrent_tasks": "7"}
@@ -92,7 +92,7 @@ fn daemon_process_enforces_wire_auth_conflict_body_limit_and_shutdown() {
     let stale_patch = rpc_call(
         &mut socket,
         5,
-        fluxdown_protocol::method::DAEMON_CONFIG_PATCH,
+        rinadown_protocol::method::DAEMON_CONFIG_PATCH,
         Some(json!({
             "expectedRevision": revision,
             "values": {"max_concurrent_tasks": "8"}
@@ -122,15 +122,15 @@ struct ProcessGuard {
 
 impl ProcessGuard {
     fn spawn(address: SocketAddr, data_dir: &Path) -> Self {
-        let child = Command::new(env!("CARGO_BIN_EXE_fluxdownd"))
-            .env("FLUXDOWN_DAEMON_BIND", address.to_string())
-            .env("FLUXDOWN_DATA_DIR", data_dir)
-            .env_remove("FLUXDOWN_DATABASE_URL")
+        let child = Command::new(env!("CARGO_BIN_EXE_rinadownd"))
+            .env("RINADOWN_DAEMON_BIND", address.to_string())
+            .env("RINADOWN_DATA_DIR", data_dir)
+            .env_remove("RINADOWN_DATABASE_URL")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::inherit())
             .spawn()
-            .expect("spawn fluxdownd");
+            .expect("spawn rinadownd");
         Self { child: Some(child) }
     }
 
@@ -141,23 +141,23 @@ impl ProcessGuard {
             let status = Command::new("kill")
                 .args(["-TERM", &child.id().to_string()])
                 .status()
-                .expect("send SIGTERM to fluxdownd");
+                .expect("send SIGTERM to rinadownd");
             assert!(status.success(), "kill -TERM failed: {status}");
         }
         #[cfg(not(unix))]
-        child.kill().expect("terminate fluxdownd");
+        child.kill().expect("terminate rinadownd");
 
         let deadline = Instant::now() + timeout;
         loop {
-            if let Some(status) = child.try_wait().expect("wait for fluxdownd") {
+            if let Some(status) = child.try_wait().expect("wait for rinadownd") {
                 assert!(
                     status.success(),
-                    "fluxdownd exited unsuccessfully: {status}"
+                    "rinadownd exited unsuccessfully: {status}"
                 );
                 self.child = None;
                 return;
             }
-            assert!(Instant::now() < deadline, "fluxdownd did not stop in time");
+            assert!(Instant::now() < deadline, "rinadownd did not stop in time");
             thread::sleep(Duration::from_millis(20));
         }
     }
@@ -195,7 +195,7 @@ fn wait_until_listening(address: SocketAddr, timeout: Duration) {
         }
         thread::sleep(Duration::from_millis(20));
     }
-    panic!("fluxdownd did not listen on {address}");
+    panic!("rinadownd did not listen on {address}");
 }
 
 fn http_request(address: SocketAddr, headers: &str, body: Option<&[u8]>) -> String {
@@ -239,7 +239,7 @@ fn open_websocket(address: SocketAddr, token: &str) -> TcpStream {
 
 fn connect(address: SocketAddr) -> TcpStream {
     let stream =
-        TcpStream::connect_timeout(&address, Duration::from_secs(2)).expect("connect to fluxdownd");
+        TcpStream::connect_timeout(&address, Duration::from_secs(2)).expect("connect to rinadownd");
     stream
         .set_read_timeout(Some(Duration::from_secs(10)))
         .expect("set read timeout");

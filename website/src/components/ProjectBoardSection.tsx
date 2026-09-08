@@ -546,7 +546,7 @@ function TableView({
   const isLight = useIsLight();
   const { t } = useLocale();
 
-  const STORAGE_KEY = `fluxdown-board-sort-${view.id}`;
+  const STORAGE_KEY = `rinadown-board-sort-${view.id}`;
 
   const defaultSort = view.hasGroupBy ? "status" : "number";
   const defaultDir: SortDir = view.hasGroupBy ? "ASC" : "DESC";

@@ -1,7 +1,7 @@
 //! 设置分区：每个模块产出一个 [`SettingPage`]。
 //!
 //! 页面闭包只捕获 `Entity<SettingsStore>` 与预先解析好的文案；
-//! 所有键名、范围、枚举值以 `fluxdown_protocol` 目录为准。
+//! 所有键名、范围、枚举值以 `rinadown_protocol` 目录为准。
 
 pub(crate) mod about;
 pub(crate) mod api;
@@ -21,8 +21,8 @@ pub(crate) mod user_agent;
 pub(crate) mod webhook;
 pub(crate) mod webhook_dialog;
 
-use fluxdown_protocol::{DaemonConfigKind, daemon_config_field};
-use fluxdown_ui_i18n::Translator;
+use rinadown_protocol::{DaemonConfigKind, daemon_config_field};
+use rinadown_ui_i18n::Translator;
 use gpui::{AnyView, App, Entity, IntoElement as _, ParentElement as _, SharedString};
 use gpui_component::{
     Icon, IconName,
@@ -107,7 +107,7 @@ impl SectionContext<'_> {
             },
         )
         .default_value(SharedString::from(
-            fluxdown_protocol::daemon_config_default(key),
+            rinadown_protocol::daemon_config_default(key),
         ))
     }
 
@@ -127,7 +127,7 @@ impl SectionContext<'_> {
             },
         )
         .default_value(SharedString::from(
-            fluxdown_protocol::daemon_config_default(key),
+            rinadown_protocol::daemon_config_default(key),
         ))
     }
 
@@ -248,11 +248,11 @@ impl SectionContext<'_> {
 }
 
 fn default_bool(key: &str) -> bool {
-    matches!(fluxdown_protocol::daemon_config_default(key), "true" | "1")
+    matches!(rinadown_protocol::daemon_config_default(key), "true" | "1")
 }
 
 fn default_f64(key: &str) -> f64 {
-    fluxdown_protocol::daemon_config_default(key)
+    rinadown_protocol::daemon_config_default(key)
         .parse()
         .unwrap_or(0.0)
 }

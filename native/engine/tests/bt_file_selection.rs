@@ -1,9 +1,9 @@
-//! Regression test for zerx-lab/FluxDown#90: a known BT file selection must be
+//! Regression test for zerx-lab/RinaDown#90: a known BT file selection must be
 //! baked into `AddTorrentOptions.only_files` at add time. librqbit rejects
 //! `update_only_files` while `Initializing`, so a post-add update silently
 //! dropped the subset and downloaded every file.
 
-use fluxdown_engine::bt_downloader::{
+use rinadown_engine::bt_downloader::{
     BtSelectionStrategy, build_add_torrent_options, decide_bt_selection_strategy,
 };
 

@@ -4,17 +4,17 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use fluxdown_engine::bt_downloader::{BtConfig, BtMseMode};
-use fluxdown_engine::db::{Db, DbError};
-use fluxdown_engine::download_manager::{
+use rinadown_engine::bt_downloader::{BtConfig, BtMseMode};
+use rinadown_engine::db::{Db, DbError};
+use rinadown_engine::download_manager::{
     self, CreateGroupSpec, GroupItemSpec, NewTaskSpec, ResolvePreviewOutcome, TaskDone,
 };
-use fluxdown_engine::events::EventSink;
+use rinadown_engine::events::EventSink;
 #[cfg(hub_plugins)]
-use fluxdown_engine::plugin::{PluginError, PluginManager};
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::selection::HostSelection;
-use fluxdown_engine::{Engine, EngineConfig, EngineError};
+use rinadown_engine::plugin::{PluginError, PluginManager};
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::selection::HostSelection;
+use rinadown_engine::{Engine, EngineConfig, EngineError};
 use rinf::{DartSignal, RustSignal};
 use tokio::sync::{broadcast, mpsc};
 
@@ -63,12 +63,12 @@ use crate::signals::LinkCommand;
 #[cfg(hub_plugins)]
 use crate::signals::{MarketEntrySignal, MarketIndexLoaded, PluginList, PluginOpResult};
 use crate::updater;
-use fluxdown_api::server::{ApiServerConfig, ApiServerHandle, spawn_api_server};
-use fluxdown_api::service::TaskEvent;
+use rinadown_api::server::{ApiServerConfig, ApiServerHandle, spawn_api_server};
+use rinadown_api::service::TaskEvent;
 
 /// Compute default save directory (platform-dependent).
 ///
-/// 桌面端一律由系统 API 给出（`fluxdown_engine::user_dirs`）：Windows 读已知
+/// 桌面端一律由系统 API 给出（`rinadown_engine::user_dirs`）：Windows 读已知
 /// 文件夹 `FOLDERID_Downloads`、Linux 读 XDG user-dirs——用户把「下载」文件夹
 /// 迁到别的盘符/路径后仍然正确，绝不用 `$HOME/Downloads` 拼。
 pub(crate) fn default_save_dir() -> String {
@@ -76,11 +76,11 @@ pub(crate) fn default_save_dir() -> String {
     // SAF / All-files 权限，由 Dart 侧引导用户选择后经配置下发。
     #[cfg(target_os = "android")]
     {
-        if let Some(pkg) = fluxdown_engine::data_dir::android_package_name() {
+        if let Some(pkg) = rinadown_engine::data_dir::android_package_name() {
             return format!("/storage/emulated/0/Android/data/{pkg}/files/Download");
         }
     }
-    fluxdown_engine::user_dirs::download_dir_or_cwd()
+    rinadown_engine::user_dirs::download_dir_or_cwd()
 }
 
 /// Build a [`BtConfig`] from the raw config key-value map.
@@ -135,12 +135,12 @@ fn bt_config_from_map(cfg: &HashMap<String, String>) -> BtConfig {
             .get("bt_seed_limit_operator")
             .map(|v| {
                 if v.eq_ignore_ascii_case("and") {
-                    fluxdown_engine::bt_seeding::SeedingLimitOperator::And
+                    rinadown_engine::bt_seeding::SeedingLimitOperator::And
                 } else {
-                    fluxdown_engine::bt_seeding::SeedingLimitOperator::Or
+                    rinadown_engine::bt_seeding::SeedingLimitOperator::Or
                 }
             })
-            .unwrap_or(fluxdown_engine::bt_seeding::SeedingLimitOperator::Or),
+            .unwrap_or(rinadown_engine::bt_seeding::SeedingLimitOperator::Or),
         seed_then_action: cfg
             .get("bt_seed_then_action")
             .cloned()
@@ -162,15 +162,15 @@ fn bt_config_from_map(cfg: &HashMap<String, String>) -> BtConfig {
 /// back to the actor loop (which updates the BtConfig and notifies Dart).
 fn spawn_tracker_sub_refresh(
     db: Db,
-    tx: mpsc::Sender<fluxdown_engine::tracker_subscription::FetchOutcome>,
+    tx: mpsc::Sender<rinadown_engine::tracker_subscription::FetchOutcome>,
 ) {
     tokio::spawn(async move {
         let cfg = db.get_all_config().await.unwrap_or_default();
         let urls = cfg
             .get("bt_tracker_sub_urls")
             .cloned()
-            .unwrap_or_else(fluxdown_engine::tracker_subscription::default_subscription_urls);
-        let outcome = fluxdown_engine::tracker_subscription::fetch_subscriptions(&urls).await;
+            .unwrap_or_else(rinadown_engine::tracker_subscription::default_subscription_urls);
+        let outcome = rinadown_engine::tracker_subscription::fetch_subscriptions(&urls).await;
         if outcome.is_success() {
             let now = chrono::Utc::now().timestamp();
             if let Err(e) = db
@@ -198,16 +198,16 @@ fn spawn_tracker_sub_refresh(
 /// find-sources step, so no shared session needs invalidating here.
 fn spawn_ed2k_server_sub_refresh(
     db: Db,
-    tx: mpsc::Sender<fluxdown_engine::ed2k::server_subscription::ServerFetchOutcome>,
+    tx: mpsc::Sender<rinadown_engine::ed2k::server_subscription::ServerFetchOutcome>,
 ) {
     tokio::spawn(async move {
         let cfg = db.get_all_config().await.unwrap_or_default();
         let urls = cfg
             .get("ed2k_server_sub_urls")
             .cloned()
-            .unwrap_or_else(fluxdown_engine::ed2k::server_subscription::default_server_met_urls);
+            .unwrap_or_else(rinadown_engine::ed2k::server_subscription::default_server_met_urls);
         let outcome =
-            fluxdown_engine::ed2k::server_subscription::fetch_server_subscriptions(&urls).await;
+            rinadown_engine::ed2k::server_subscription::fetch_server_subscriptions(&urls).await;
         if outcome.is_success() {
             let now = chrono::Utc::now().timestamp();
             if let Err(e) = db
@@ -225,7 +225,7 @@ fn spawn_ed2k_server_sub_refresh(
             if let Err(e) = db
                 .set_config(
                     "ed2k_server_sub_cache_version",
-                    &fluxdown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION.to_string(),
+                    &rinadown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION.to_string(),
                 )
                 .await
             {
@@ -255,7 +255,7 @@ fn spawn_ed2k_nodes_dat_refresh(db: Db) {
         if url.is_empty() {
             return;
         }
-        match fluxdown_engine::ed2k::kad::fetch_nodes_dat(&url).await {
+        match rinadown_engine::ed2k::kad::fetch_nodes_dat(&url).await {
             Ok(bytes) => {
                 let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
                 let now = chrono::Utc::now().timestamp();
@@ -384,7 +384,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
 
     // Populate default tracker list on first launch (when DB value is empty).
     if bt_config.custom_trackers.trim().is_empty() {
-        let defaults = fluxdown_engine::bt_downloader::default_tracker_list();
+        let defaults = rinadown_engine::bt_downloader::default_tracker_list();
         if let Err(e) = db.set_config("bt_custom_trackers", &defaults).await {
             log_info!("[actor] failed to save default trackers: {}", e);
         }
@@ -441,7 +441,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
             proxy_config,
             user_agent,
             // db_dir 已由 `actors::create_actors` 通过
-            // `fluxdown_engine::data_dir::resolve_data_dir(None)` 解析。
+            // `rinadown_engine::data_dir::resolve_data_dir(None)` 解析。
             data_dir_override: Some(db_dir.clone()),
             database_url: None,
         },
@@ -542,7 +542,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
     // 完成（下载卡死）。
     #[cfg(hub_plugins)]
     let mut resolve_rx: mpsc::UnboundedReceiver<
-        fluxdown_engine::download_manager::ResolveOutcome,
+        rinadown_engine::download_manager::ResolveOutcome,
     > = match engine.manager.take_resolve_rx() {
         Some(rx) => rx,
         None => {
@@ -667,7 +667,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
     // Tracker 订阅刷新通道：后台 fetch 任务完成后把结果送回 actor 循环，
     // 由循环更新 BtConfig、失效 BT 会话并通知 Dart。
     let (tracker_sub_tx, mut tracker_sub_rx) =
-        mpsc::channel::<fluxdown_engine::tracker_subscription::FetchOutcome>(4);
+        mpsc::channel::<rinadown_engine::tracker_subscription::FetchOutcome>(4);
 
     // 启动时自动刷新：订阅启用且缓存超过 24 小时未更新。
     {
@@ -683,7 +683,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
         let now = chrono::Utc::now().timestamp();
         if sub_enabled
             && now.saturating_sub(updated_at)
-                > fluxdown_engine::tracker_subscription::REFRESH_INTERVAL_SECS
+                > rinadown_engine::tracker_subscription::REFRESH_INTERVAL_SECS
         {
             log_info!(
                 "[actor] tracker subscription stale (updated_at={}), auto-refreshing",
@@ -697,7 +697,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
 
     // ED2K 服务器订阅刷新通道：后台 fetch 任务完成后把结果送回 actor 循环通知 Dart。
     let (ed2k_sub_tx, mut ed2k_sub_rx) =
-        mpsc::channel::<fluxdown_engine::ed2k::server_subscription::ServerFetchOutcome>(4);
+        mpsc::channel::<rinadown_engine::ed2k::server_subscription::ServerFetchOutcome>(4);
 
     // 启动时自动刷新：订阅启用且缓存超过 24 小时未更新。
     {
@@ -717,12 +717,12 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
             .and_then(|v| v.parse::<i64>().ok())
             .unwrap_or(0);
         let version_stale =
-            cache_version < fluxdown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION;
+            cache_version < rinadown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION;
         if version_stale {
             log_info!(
                 "[actor] ed2k server sub cache version {} < {}, invalidating (byte-order fix)",
                 cache_version,
-                fluxdown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION
+                rinadown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION
             );
             let _ = engine.db.set_config("ed2k_server_sub_cache", "").await;
         }
@@ -730,7 +730,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
         if sub_enabled
             && (version_stale
                 || now.saturating_sub(updated_at)
-                    > fluxdown_engine::ed2k::server_subscription::REFRESH_INTERVAL_SECS)
+                    > rinadown_engine::ed2k::server_subscription::REFRESH_INTERVAL_SECS)
         {
             log_info!(
                 "[actor] ed2k server subscription stale (updated_at={}, version_stale={}), auto-refreshing",
@@ -770,7 +770,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
     // its request in a one-element Vec); the `native_msg_rx` select! branch
     // below handles both transports with identical logic.
     let (ext_dl_tx, mut native_msg_rx) =
-        mpsc::channel::<Vec<fluxdown_protocol::daemon::DownloadRequest>>(64);
+        mpsc::channel::<Vec<rinadown_protocol::daemon::DownloadRequest>>(64);
 
     // 本机 API 服务器（127.0.0.1）：探活 / 脚本接管 / aria2 兼容 / 管理 API。
     // 写操作经 api_cmd_rx 回到本事件循环串行执行；local_server_* 配置变更时
@@ -789,18 +789,18 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
     // 桌面在本地互联中主要充当**发起方**（发现并添加 NAS/服务器等局域网可达设备）；
     // 事件（发现/配对进度/名册）经 LinkEvent 信号回流 Dart。
     #[cfg(hub_link)]
-    let link_mgr: Option<Arc<fluxdown_engine::link::LinkManager>> = {
+    let link_mgr: Option<Arc<rinadown_engine::link::LinkManager>> = {
         let self_name = std::env::var("COMPUTERNAME")
             .or_else(|_| std::env::var("HOSTNAME"))
             .ok()
             .filter(|s| !s.trim().is_empty())
-            .unwrap_or_else(|| "FluxDown".to_string());
-        let self_info = fluxdown_engine::link::SelfInfo {
+            .unwrap_or_else(|| "RinaDown".to_string());
+        let self_info = rinadown_engine::link::SelfInfo {
             name: self_name,
             platform: Some(std::env::consts::OS.to_string()),
             app_version: None,
         };
-        let (link_tx, mut link_rx) = mpsc::channel::<fluxdown_engine::link::LinkEngineEvent>(64);
+        let (link_tx, mut link_rx) = mpsc::channel::<rinadown_engine::link::LinkEngineEvent>(64);
         // api_port = 本机 API 端口（供自报候选/mDNS 广播），从 config 读，回退 17800。
         let api_port = engine
             .db
@@ -810,7 +810,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
             .flatten()
             .and_then(|v| v.trim().parse::<u16>().ok())
             .unwrap_or(17800);
-        match fluxdown_engine::link::LinkManager::load(
+        match rinadown_engine::link::LinkManager::load(
             engine.db.clone(),
             self_info,
             api_port,
@@ -840,7 +840,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
         }
     };
     #[cfg(hub_plugins)]
-    let api_host: Arc<dyn fluxdown_api::service::ApiHost> = Arc::new(HubApiHost::new(
+    let api_host: Arc<dyn rinadown_api::service::ApiHost> = Arc::new(HubApiHost::new(
         engine.db.clone(),
         api_cmd_tx,
         ext_dl_tx.clone(),
@@ -852,7 +852,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
         link_mgr.clone(),
     ));
     #[cfg(not(hub_plugins))]
-    let api_host: Arc<dyn fluxdown_api::service::ApiHost> = Arc::new(HubApiHost::new(
+    let api_host: Arc<dyn rinadown_api::service::ApiHost> = Arc::new(HubApiHost::new(
         engine.db.clone(),
         api_cmd_tx,
         ext_dl_tx.clone(),
@@ -891,12 +891,12 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
             .get("magnet_assoc_user_disabled")
             .is_some_and(|v| v == "true");
         tokio::task::spawn_blocking(move || {
-            if !protocol_registry::is_registered(protocol_registry::FLUXDOWN) {
-                if let Err(e) = protocol_registry::register(protocol_registry::FLUXDOWN) {
-                    log_info!("[actor] auto-register fluxdown:// protocol failed: {}", e);
+            if !protocol_registry::is_registered(protocol_registry::RINADOWN) {
+                if let Err(e) = protocol_registry::register(protocol_registry::RINADOWN) {
+                    log_info!("[actor] auto-register rinadown:// protocol failed: {}", e);
                 }
             } else {
-                log_info!("[actor] fluxdown:// protocol already registered");
+                log_info!("[actor] rinadown:// protocol already registered");
             }
 
             if magnet_disabled {
@@ -946,7 +946,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
     struct ExtRequestCtx {
         headers: HashMap<String, String>,
         method: Option<String>,
-        body: Option<fluxdown_protocol::daemon::RequestBody>,
+        body: Option<rinadown_protocol::daemon::RequestBody>,
         cookies: String,
         referrer: String,
         /// 文件大小提示：>0 已知大小、-1 已确认可下载但大小未知（跳过 probe）、
@@ -996,7 +996,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
         /// 轮询节拍（60s）。
         Tick,
         /// off-actor 抓取/验证回流。
-        Engine(Box<fluxdown_engine::rss::RssEvent>),
+        Engine(Box<rinadown_engine::rss::RssEvent>),
     }
     enum WebhookSignal {
         RequestDeliveries(RequestWebhookDeliveries),
@@ -1116,7 +1116,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
         rss_poll_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
         // 做种限制求值节拍：走 aux 泵（主 select! 已满 64 分支，不得新增分支）。
         let mut seeding_interval =
-            tokio::time::interval(fluxdown_engine::bt_seeding::SEEDING_EVAL_INTERVAL);
+            tokio::time::interval(rinadown_engine::bt_seeding::SEEDING_EVAL_INTERVAL);
         seeding_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         tokio::spawn(async move {
             loop {
@@ -1538,7 +1538,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
                         let dispatcher = engine.manager.webhook();
                         tokio::spawn(async move {
                             let request_id = msg.request_id;
-                            let spec: fluxdown_engine::webhook::EndpointSpec =
+                            let spec: rinadown_engine::webhook::EndpointSpec =
                                 match serde_json::from_str(&msg.endpoint_json) {
                                     Ok(v) => v,
                                     Err(e) => {
@@ -1895,7 +1895,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
                 let path = signal.message.installer_path;
                 tokio::task::spawn_blocking(move || {
                     if let Err(e) = updater::install(&path) {
-                        fluxdown_engine::logger::report_error("updater", "install update", &e);
+                        rinadown_engine::logger::report_error("updater", "install update", &e);
                         // Report the error back to the UI so the user can retry
                         // (e.g. they cancelled the pkexec password dialog).
                         crate::signals::UpdateDownloadProgress {
@@ -1955,7 +1955,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
                     .send_signal_to_dart();
                 });
             }
-            // --- URL protocol signals (fluxdown:// deep links, ed2k:// links) ---
+            // --- URL protocol signals (rinadown:// deep links, ed2k:// links) ---
             Some(signal) = set_url_proto_recv.recv() => {
                 let scheme = signal.message.scheme;
                 let enable = signal.message.enable;
@@ -1997,7 +1997,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
             // --- System proxy detection ---
             Some(_) = detect_sys_proxy_recv.recv() => {
                 tokio::task::spawn_blocking(|| {
-                    match fluxdown_engine::proxy_config::detect_system_proxy() {
+                    match rinadown_engine::proxy_config::detect_system_proxy() {
                         Ok(Some(cfg)) => {
                             SystemProxyInfo {
                                 detected: true,
@@ -2367,16 +2367,16 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
             // send_signal_to_dart()（RustSignal 可从任意任务发送）。---
             Some(_) = req_ffmpeg_status_recv.recv() => {
                 let status =
-                    fluxdown_engine::components::ffmpeg_status(&engine.db, &engine.data_dir).await;
+                    rinadown_engine::components::ffmpeg_status(&engine.db, &engine.data_dir).await;
                 ffmpeg_status_report(status).send_signal_to_dart();
             }
             Some(_) = req_ffmpeg_versions_recv.recv() => {
                 let all_cfg = engine.db.get_all_config().await.unwrap_or_default();
                 let proxy_cfg = ProxyConfig::from_config_map(&all_cfg);
-                match fluxdown_engine::downloader::build_client(&proxy_cfg, "") {
+                match rinadown_engine::downloader::build_client(&proxy_cfg, "") {
                     Ok(client) => {
                         tokio::spawn(async move {
-                            match fluxdown_engine::components::list_versions(&client).await {
+                            match rinadown_engine::components::list_versions(&client).await {
                                 Ok(v) => {
                                     FfmpegVersionList {
                                         ok: true,
@@ -2413,7 +2413,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
                 let version = signal.message.version;
                 let all_cfg = engine.db.get_all_config().await.unwrap_or_default();
                 let proxy_cfg = ProxyConfig::from_config_map(&all_cfg);
-                match fluxdown_engine::downloader::build_client(&proxy_cfg, "") {
+                match rinadown_engine::downloader::build_client(&proxy_cfg, "") {
                     Ok(client) => {
                         let db = engine.db.clone();
                         let data_dir = engine.data_dir.clone();
@@ -2428,7 +2428,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
                                 }
                                 .send_signal_to_dart();
                             };
-                            let result = fluxdown_engine::components::install_ffmpeg(
+                            let result = rinadown_engine::components::install_ffmpeg(
                                 &db,
                                 &data_dir,
                                 &client,
@@ -2449,7 +2449,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
                             // 无论成败都重新探测一次：安装失败时 UI 需要看到
                             // 回退状态（如此前已有的托管版本仍然生效）。
                             let status =
-                                fluxdown_engine::components::ffmpeg_status(&db, &data_dir).await;
+                                rinadown_engine::components::ffmpeg_status(&db, &data_dir).await;
                             ffmpeg_status_report(status).send_signal_to_dart();
                         });
                     }
@@ -2461,7 +2461,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
             }
             Some(_) = uninstall_ffmpeg_recv.recv() => {
                 let result =
-                    fluxdown_engine::components::uninstall_ffmpeg(&engine.db, &engine.data_dir)
+                    rinadown_engine::components::uninstall_ffmpeg(&engine.db, &engine.data_dir)
                         .await;
                 match result {
                     Ok(()) => {
@@ -2474,7 +2474,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
                     }
                 }
                 let status =
-                    fluxdown_engine::components::ffmpeg_status(&engine.db, &engine.data_dir).await;
+                    rinadown_engine::components::ffmpeg_status(&engine.db, &engine.data_dir).await;
                 ffmpeg_status_report(status).send_signal_to_dart();
             }
             // --- yt-dlp 组件管理：与 ffmpeg 同构（状态本地探测直 await；版本
@@ -2482,16 +2482,16 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
             // send_signal_to_dart）。---
             Some(_) = req_ytdlp_status_recv.recv() => {
                 let status =
-                    fluxdown_engine::components::ytdlp_status(&engine.db, &engine.data_dir).await;
+                    rinadown_engine::components::ytdlp_status(&engine.db, &engine.data_dir).await;
                 ytdlp_status_report(status).send_signal_to_dart();
             }
             Some(_) = req_ytdlp_versions_recv.recv() => {
                 let all_cfg = engine.db.get_all_config().await.unwrap_or_default();
                 let proxy_cfg = ProxyConfig::from_config_map(&all_cfg);
-                match fluxdown_engine::downloader::build_client(&proxy_cfg, "") {
+                match rinadown_engine::downloader::build_client(&proxy_cfg, "") {
                     Ok(client) => {
                         tokio::spawn(async move {
-                            match fluxdown_engine::components::list_ytdlp_versions(&client).await {
+                            match rinadown_engine::components::list_ytdlp_versions(&client).await {
                                 Ok(v) => {
                                     YtdlpVersionList {
                                         ok: true,
@@ -2528,7 +2528,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
                 let version = signal.message.version;
                 let all_cfg = engine.db.get_all_config().await.unwrap_or_default();
                 let proxy_cfg = ProxyConfig::from_config_map(&all_cfg);
-                match fluxdown_engine::downloader::build_client(&proxy_cfg, "") {
+                match rinadown_engine::downloader::build_client(&proxy_cfg, "") {
                     Ok(client) => {
                         let db = engine.db.clone();
                         let data_dir = engine.data_dir.clone();
@@ -2542,7 +2542,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
                                 }
                                 .send_signal_to_dart();
                             };
-                            let result = fluxdown_engine::components::install_ytdlp(
+                            let result = rinadown_engine::components::install_ytdlp(
                                 &db,
                                 &data_dir,
                                 &client,
@@ -2561,7 +2561,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
                                 }
                             }
                             let status =
-                                fluxdown_engine::components::ytdlp_status(&db, &data_dir).await;
+                                rinadown_engine::components::ytdlp_status(&db, &data_dir).await;
                             ytdlp_status_report(status).send_signal_to_dart();
                         });
                     }
@@ -2573,7 +2573,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
             }
             Some(_) = uninstall_ytdlp_recv.recv() => {
                 let result =
-                    fluxdown_engine::components::uninstall_ytdlp(&engine.db, &engine.data_dir)
+                    rinadown_engine::components::uninstall_ytdlp(&engine.db, &engine.data_dir)
                         .await;
                 match result {
                     Ok(()) => {
@@ -2586,7 +2586,7 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
                     }
                 }
                 let status =
-                    fluxdown_engine::components::ytdlp_status(&engine.db, &engine.data_dir).await;
+                    rinadown_engine::components::ytdlp_status(&engine.db, &engine.data_dir).await;
                 ytdlp_status_report(status).send_signal_to_dart();
             }
             // --- Off-actor plugin resolve 回流(见插件系统契约一，关键：不接线
@@ -2622,7 +2622,7 @@ async fn send_plugin_list(plugin_manager: &PluginManager) {
 #[cfg(hub_plugins)]
 /// 插件写操作统一收尾：回发 `PluginOpResult` + 刷新后的 `PluginList`
 /// （见插件系统契约 hub 节 3：「每次操作后回发 PluginList + PluginOpResult」）。
-/// `failed_key` 恒为空——`fluxdown_engine::plugin::PluginError` 未暴露结构化
+/// `failed_key` 恒为空——`rinadown_engine::plugin::PluginError` 未暴露结构化
 /// 键名，仅 `message` 携带完整错误文本（含出错的设置项键名）。
 async fn finish_plugin_op(
     plugin_manager: &PluginManager,
@@ -2649,15 +2649,15 @@ async fn finish_plugin_op(
 
 #[cfg(hub_plugins)]
 /// 按插件声明权限探测缺失的基础组件（安装成功后调用，提醒式非阻断）。
-/// 依赖表见 `fluxdown_engine::plugin::dependencies`。
+/// 依赖表见 `rinadown_engine::plugin::dependencies`。
 async fn plugin_missing_components(
     plugin_manager: &PluginManager,
-    db: &fluxdown_engine::db::Db,
+    db: &rinadown_engine::db::Db,
     data_dir: &Path,
     identity: &str,
 ) -> Vec<String> {
     let perms = plugin_manager.permissions_of(identity).await;
-    fluxdown_engine::plugin::dependencies::missing_components(db, data_dir, &perms).await
+    rinadown_engine::plugin::dependencies::missing_components(db, data_dir, &perms).await
 }
 
 #[cfg(hub_plugins)]
@@ -2679,9 +2679,9 @@ async fn notify_plugin_manager_unavailable(op: &str, identity: &str) {
     .send_signal_to_dart();
 }
 
-/// `fluxdown_engine::components::FfmpegStatus` → `FfmpegStatusReport` 信号。
+/// `rinadown_engine::components::FfmpegStatus` → `FfmpegStatusReport` 信号。
 /// `source` 走 `FfmpegSource::as_str()` 保持与 server/web 端一致的 wire 字符串。
-fn ffmpeg_status_report(status: fluxdown_engine::components::FfmpegStatus) -> FfmpegStatusReport {
+fn ffmpeg_status_report(status: rinadown_engine::components::FfmpegStatus) -> FfmpegStatusReport {
     FfmpegStatusReport {
         source: status.source.as_str().to_string(),
         path: status.path,
@@ -2692,9 +2692,9 @@ fn ffmpeg_status_report(status: fluxdown_engine::components::FfmpegStatus) -> Ff
     }
 }
 
-/// `fluxdown_engine::components::YtdlpStatus` → `YtdlpStatusReport` 信号。
+/// `rinadown_engine::components::YtdlpStatus` → `YtdlpStatusReport` 信号。
 /// `source` 走 `ComponentSource::as_str()` 保持与 server/web 端一致的 wire 字符串。
-fn ytdlp_status_report(status: fluxdown_engine::components::YtdlpStatus) -> YtdlpStatusReport {
+fn ytdlp_status_report(status: rinadown_engine::components::YtdlpStatus) -> YtdlpStatusReport {
     YtdlpStatusReport {
         source: status.source.as_str().to_string(),
         path: status.path,
@@ -2716,9 +2716,9 @@ fn ytdlp_status_report(status: fluxdown_engine::components::YtdlpStatus) -> Ytdl
 async fn handle_api_command(
     cmd: ApiCommand,
     engine: &mut Engine,
-    tracker_sub_tx: &mpsc::Sender<fluxdown_engine::tracker_subscription::FetchOutcome>,
-    ed2k_sub_tx: &mpsc::Sender<fluxdown_engine::ed2k::server_subscription::ServerFetchOutcome>,
-    api_host: &Arc<dyn fluxdown_api::service::ApiHost>,
+    tracker_sub_tx: &mpsc::Sender<rinadown_engine::tracker_subscription::FetchOutcome>,
+    ed2k_sub_tx: &mpsc::Sender<rinadown_engine::ed2k::server_subscription::ServerFetchOutcome>,
+    api_host: &Arc<dyn rinadown_api::service::ApiHost>,
     api_server_handle: &mut ApiServerHandle,
     rinf_sink: &Arc<RinfEventSink>,
 ) {
@@ -2777,7 +2777,7 @@ async fn handle_api_command(
                     method: req.method,
                     body: req
                         .body
-                        .map(fluxdown_engine_protocol::request_body_to_engine),
+                        .map(rinadown_engine_protocol::request_body_to_engine),
                     audio_url: req.audio_url,
                     start_paused: req.start_paused,
                     http_user: req.http_user,
@@ -2970,11 +2970,11 @@ fn send_webhook_snapshot(engine: &Engine) {
     }
     .send_signal_to_dart();
     WebhookPresets {
-        presets: fluxdown_engine::webhook::preset_catalog()
+        presets: rinadown_engine::webhook::preset_catalog()
             .into_iter()
             .map(Into::into)
             .collect(),
-        variables: fluxdown_engine::webhook::TEMPLATE_VARIABLES
+        variables: rinadown_engine::webhook::TEMPLATE_VARIABLES
             .iter()
             .map(|v| (*v).to_string())
             .collect(),
@@ -2990,9 +2990,9 @@ async fn apply_config_key(
     engine: &mut Engine,
     key: &str,
     value: &str,
-    tracker_sub_tx: &mpsc::Sender<fluxdown_engine::tracker_subscription::FetchOutcome>,
-    ed2k_sub_tx: &mpsc::Sender<fluxdown_engine::ed2k::server_subscription::ServerFetchOutcome>,
-    api_host: &Arc<dyn fluxdown_api::service::ApiHost>,
+    tracker_sub_tx: &mpsc::Sender<rinadown_engine::tracker_subscription::FetchOutcome>,
+    ed2k_sub_tx: &mpsc::Sender<rinadown_engine::ed2k::server_subscription::ServerFetchOutcome>,
+    api_host: &Arc<dyn rinadown_api::service::ApiHost>,
     api_server_handle: &mut ApiServerHandle,
 ) {
     match key {
@@ -3095,7 +3095,7 @@ async fn apply_config_key(
             }
         }
         // Webhook 端点表：内存镜像热重载，改完立刻生效（设置页即改即存）。
-        fluxdown_engine::webhook::CONFIG_KEY_ENDPOINTS => {
+        rinadown_engine::webhook::CONFIG_KEY_ENDPOINTS => {
             engine.manager.set_webhook_endpoints(value);
         }
         "default_segments" => {
@@ -3228,7 +3228,7 @@ fn merge_ext_headers(
 /// 用户确认后恢复；信号级 cookies 仅在全批一致时携带（作为表单预填值），
 /// 不一致则留空、避免以偏概全。referrer/save_dir 取首个非空值。
 fn synthesize_batch_request(
-    reqs: &[fluxdown_protocol::daemon::DownloadRequest],
+    reqs: &[rinadown_protocol::daemon::DownloadRequest],
 ) -> ExternalDownloadRequest {
     // 控制字符防注入：filename 来自服务器 Content-Disposition（percent-decode
     // 后 %0A/%0D 会还原成字面 \n/\r），url/filename 若不剥离控制字符，恶意
@@ -3285,12 +3285,12 @@ fn synthesize_batch_request(
 
 /// 把浏览器扩展/Native Messaging 的 wire-format `RequestBody` 转换为引擎侧
 /// 传输无关的 `CapturedRequestBody`——两者字段形状一致，仅类型来源不同
-/// (fluxdown_api 是对外 wire 契约，engine 侧不感知传输层)。
+/// (rinadown_api 是对外 wire 契约，engine 侧不感知传输层)。
 fn nm_body_to_captured(
-    body: fluxdown_protocol::daemon::RequestBody,
-) -> fluxdown_engine::downloader::CapturedRequestBody {
-    use fluxdown_engine::downloader::CapturedRequestBody as Captured;
-    use fluxdown_protocol::daemon::RequestBody;
+    body: rinadown_protocol::daemon::RequestBody,
+) -> rinadown_engine::downloader::CapturedRequestBody {
+    use rinadown_engine::downloader::CapturedRequestBody as Captured;
+    use rinadown_protocol::daemon::RequestBody;
     match body {
         RequestBody::FormData { fields } => Captured::FormData { fields },
         RequestBody::Urlencoded { raw } => Captured::Urlencoded { raw },
@@ -3337,7 +3337,7 @@ fn opt(s: &str) -> Option<&str> {
 
 /// 汇总本机名册（含并发在线探测）并以 `LinkEvent{kind:"devices"}` 推给 Dart。
 #[cfg(hub_link)]
-async fn emit_link_devices(link: &fluxdown_engine::link::LinkManager) {
+async fn emit_link_devices(link: &rinadown_engine::link::LinkManager) {
     use rinf::RustSignal;
     let records = link.list_devices().await.unwrap_or_default();
     // 整体超时兜底：单次探测虽有自限时（DirectTransport 3s），但那是**当前唯一**
@@ -3365,11 +3365,11 @@ async fn emit_link_devices(link: &fluxdown_engine::link::LinkManager) {
     ev.send_signal_to_dart();
 }
 
-/// 把引擎侧 [`LinkEngineEvent`](fluxdown_engine::link::LinkEngineEvent) 转成
+/// 把引擎侧 [`LinkEngineEvent`](rinadown_engine::link::LinkEngineEvent) 转成
 /// Dart 信号（发现/配对成功/解除配对/错误）。
 #[cfg(hub_link)]
-fn emit_link_engine_event(ev: fluxdown_engine::link::LinkEngineEvent) {
-    use fluxdown_engine::link::{DiscoveryKind, LinkEngineEvent as E};
+fn emit_link_engine_event(ev: rinadown_engine::link::LinkEngineEvent) {
+    use rinadown_engine::link::{DiscoveryKind, LinkEngineEvent as E};
     use rinf::RustSignal;
     match ev {
         E::Discovered(p) => {
@@ -3425,7 +3425,7 @@ fn emit_link_engine_event(ev: fluxdown_engine::link::LinkEngineEvent) {
 #[cfg(hub_link)]
 async fn handle_link_command(
     msg: crate::signals::LinkCommand,
-    link: Arc<fluxdown_engine::link::LinkManager>,
+    link: Arc<rinadown_engine::link::LinkManager>,
 ) {
     use rinf::RustSignal;
     let emit_err = |m: String| {
@@ -3450,7 +3450,7 @@ async fn handle_link_command(
         }
         "stopDiscovery" => link.stop_discovery(),
         "probe" => match link.probe(&msg.host, msg.port as u16).await {
-            Ok(p) => emit_link_engine_event(fluxdown_engine::link::LinkEngineEvent::Discovered(p)),
+            Ok(p) => emit_link_engine_event(rinadown_engine::link::LinkEngineEvent::Discovered(p)),
             Err(e) => emit_err(e.to_string()),
         },
         "beginPairing" => {
@@ -3535,7 +3535,7 @@ async fn handle_link_command(
 mod tests {
     use super::*;
 
-    fn req(url: &str) -> fluxdown_protocol::daemon::DownloadRequest {
+    fn req(url: &str) -> rinadown_protocol::daemon::DownloadRequest {
         serde_json::from_value(serde_json::json!({ "url": url })).unwrap()
     }
 

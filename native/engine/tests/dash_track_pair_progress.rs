@@ -6,16 +6,16 @@
 //!   2. 进度事件的 total_bytes 必须为两轨 Content-Length 之和（Range 0-0 探测）。
 //!
 //! 用法（绑定本地端口，默认 ignore）：
-//!   cargo test -p fluxdown_engine --test dash_track_pair_progress -- --ignored
+//!   cargo test -p rinadown_engine --test dash_track_pair_progress -- --ignored
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::sync::Arc;
 
-use fluxdown_engine::db::Db;
-use fluxdown_engine::downloader::{DownloadParams, ProgressUpdate, RequestSpec, build_client};
-use fluxdown_engine::events::{EngineEvent, EventSink};
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::speed_limiter::SpeedLimiter;
+use rinadown_engine::db::Db;
+use rinadown_engine::downloader::{DownloadParams, ProgressUpdate, RequestSpec, build_client};
+use rinadown_engine::events::{EngineEvent, EventSink};
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::speed_limiter::SpeedLimiter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
@@ -79,7 +79,7 @@ async fn track_pair_reports_midway_progress_with_real_total() {
     let expected_total = (video.len() + audio.len()) as i64;
     let base = start_server(video.clone(), audio.clone()).await;
 
-    let work_dir = std::env::temp_dir().join("fluxdown-rt-trackpair");
+    let work_dir = std::env::temp_dir().join("rinadown-rt-trackpair");
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
     tokio::fs::create_dir_all(&work_dir).await.unwrap();
     let db = Db::open(&work_dir).await.expect("db");
@@ -119,7 +119,7 @@ async fn track_pair_reports_midway_progress_with_real_total() {
         is_resume: false,
         range_verified: true,
         db: db.clone(),
-        client: build_client(&ProxyConfig::default(), "FluxDownRealTest/1.0").expect("client"),
+        client: build_client(&ProxyConfig::default(), "RinaDownRealTest/1.0").expect("client"),
         progress_tx: tx,
         cancel_token: CancellationToken::new(),
         sink: Arc::new(NoopTestSink),
@@ -133,7 +133,7 @@ async fn track_pair_reports_midway_progress_with_real_total() {
         },
         hint_file_size: 0,
         proxy_config: ProxyConfig::default(),
-        selector: Arc::new(fluxdown_engine::NoopSelection),
+        selector: Arc::new(rinadown_engine::NoopSelection),
         checksum: String::new(),
         extra_headers: std::collections::HashMap::new(),
         spec: RequestSpec::empty_get(),
@@ -142,10 +142,10 @@ async fn track_pair_reports_midway_progress_with_real_total() {
         use_server_time: false,
         allow_overwrite: false,
         ffmpeg_path: None,
-        cdn: fluxdown_engine::cdn::CdnTaskInput::default(),
+        cdn: rinadown_engine::cdn::CdnTaskInput::default(),
     };
 
-    fluxdown_engine::dash_downloader::run_dash_download(params).await;
+    rinadown_engine::dash_downloader::run_dash_download(params).await;
     let _ = collector.await;
 
     let summary: Vec<(i32, i64, i64)> = {

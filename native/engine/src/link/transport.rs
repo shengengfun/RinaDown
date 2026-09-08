@@ -17,12 +17,12 @@ use super::types::{PeerRecord, TransportKind};
 
 /// 拨通一台已配对设备后得到的连接句柄。
 ///
-/// v1 Direct 下 `base_url` 即对端 fluxdown API 的 `http://ip:port`；未来 iroh/relay
+/// v1 Direct 下 `base_url` 即对端 rinadown API 的 `http://ip:port`；未来 iroh/relay
 /// 变体会把加密隧道封装为一个本地转发的 `base_url`，**数据面调度层只认 base_url**，
 /// 因此新增传输方式对上层零改动。
 #[derive(Debug, Clone)]
 pub struct PeerConn {
-    /// 对端 fluxdown API 基址（不含尾斜杠）。
+    /// 对端 rinadown API 基址（不含尾斜杠）。
     pub base_url: String,
     /// 本次连接实际走的传输类型（日志/诊断）。
     pub kind: TransportKind,

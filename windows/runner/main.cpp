@@ -14,7 +14,7 @@
 #pragma comment(lib, "dbghelp.lib")
 #pragma comment(lib, "advapi32.lib")
 
-static LONG WINAPI FluxDownCrashHandler(EXCEPTION_POINTERS* ep) {
+static LONG WINAPI RinaDownCrashHandler(EXCEPTION_POINTERS* ep) {
   std::ostringstream oss;
   oss << "[CRASH_HANDLER] Unhandled exception! Code=0x"
       << std::hex << ep->ExceptionRecord->ExceptionCode
@@ -27,11 +27,11 @@ static LONG WINAPI FluxDownCrashHandler(EXCEPTION_POINTERS* ep) {
 }
 
 // Unique mutex name for single-instance enforcement.
-static const wchar_t kMutexName[] = L"Global\\FluxDown_SingleInstance_Mutex";
+static const wchar_t kMutexName[] = L"Global\\RinaDown_SingleInstance_Mutex";
 // Window class name used by Flutter runner (must match win32_window.cpp).
 static const wchar_t kFlutterWindowClass[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 // Window title (must match CreateCentered call below).
-static const wchar_t kWindowTitle[] = L"FluxDown";
+static const wchar_t kWindowTitle[] = L"RinaDown";
 // Magic identifier for WM_COPYDATA to distinguish our messages.
 static const ULONG_PTR kCopyDataId = 0x464C5558; // "FLUX" in hex
 
@@ -45,7 +45,7 @@ static std::string JoinArguments(const std::vector<std::string>& args) {
   return result;
 }
 
-// Try to find the existing FluxDown window, send it our command-line args
+// Try to find the existing RinaDown window, send it our command-line args
 // via WM_COPYDATA, and bring it to the foreground.
 static bool SendArgsToExistingInstance(const std::vector<std::string>& args) {
   HWND existing = ::FindWindow(kFlutterWindowClass, kWindowTitle);
@@ -107,7 +107,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   // Collect command-line arguments early (needed for both paths).
   std::vector<std::string> command_line_arguments = GetCommandLineArguments();
 
-  ::SetUnhandledExceptionFilter(FluxDownCrashHandler);
+  ::SetUnhandledExceptionFilter(RinaDownCrashHandler);
 
   // --- Single-instance check ---
   // Try to create a named mutex. If it already exists, another instance

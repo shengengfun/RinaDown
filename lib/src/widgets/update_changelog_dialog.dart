@@ -145,7 +145,7 @@ class _ChangelogDialogContent extends StatelessWidget {
 
 /// 双语 release body 的语言标记（由 release 工作流翻译步骤写入），
 /// 与官网 ChangelogSection.tsx 的解析契约一致。
-final _langMarkerRe = RegExp(r'<!--\s*fluxdown:lang:(zh|en)\s*-->');
+final _langMarkerRe = RegExp(r'<!--\s*rinadown:lang:(zh|en)\s*-->');
 
 /// 从双语 release body 中取出当前语言区块。
 /// 无标记（历史版本 / 翻译失败回退）时原样返回全文。

@@ -6,15 +6,15 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 
-import 'package:flux_down/src/bindings/bindings.dart';
-import 'package:flux_down/src/models/settings_provider.dart';
-import 'package:flux_down/src/i18n/locale_provider.dart';
-import 'package:flux_down/src/models/plugin_provider.dart';
-import 'package:flux_down/src/pages/settings_page.dart';
-import 'package:flux_down/src/services/cloud/cloud_auth_service.dart';
-import 'package:flux_down/src/services/kv_store.dart';
-import 'package:flux_down/src/theme/app_theme.dart';
-import 'package:flux_down/src/theme/flux_theme_tokens.dart';
+import 'package:rina_down/src/bindings/bindings.dart';
+import 'package:rina_down/src/models/settings_provider.dart';
+import 'package:rina_down/src/i18n/locale_provider.dart';
+import 'package:rina_down/src/models/plugin_provider.dart';
+import 'package:rina_down/src/pages/settings_page.dart';
+import 'package:rina_down/src/services/cloud/cloud_auth_service.dart';
+import 'package:rina_down/src/services/kv_store.dart';
+import 'package:rina_down/src/theme/app_theme.dart';
+import 'package:rina_down/src/theme/flux_theme_tokens.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 Widget _wrap(Widget child) {
@@ -52,7 +52,7 @@ void main() {
   setUpAll(I18nStore.load);
 
   launchAtStartup.setup(
-    appName: 'FluxDownTest',
+    appName: 'RinaDownTest',
     appPath: Platform.resolvedExecutable,
   );
   binding.defaultBinaryMessenger.setMockMethodCallHandler(

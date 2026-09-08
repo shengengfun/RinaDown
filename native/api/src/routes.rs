@@ -7,7 +7,7 @@
 //! # Examples
 //!
 //! ```
-//! use fluxdown_api::routes;
+//! use rinadown_api::routes;
 //!
 //! assert_eq!(routes::API_TASKS, "/api/v1/tasks");
 //! assert_eq!(routes::task_path("abc"), "/api/v1/tasks/abc");

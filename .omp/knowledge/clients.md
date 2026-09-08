@@ -1,7 +1,7 @@
-# FluxDown internals · Flutter 前端 · 扩展 · 用户脚本 · Web SPA · 官网
+# RinaDown internals · Flutter 前端 · 扩展 · 用户脚本 · Web SPA · 官网
 
-> 本文件是 `FluxDown/AGENTS.md` 的深挖附录：只放**枚举性 / 可从源码复原**的细节，硬不变式与红线在 AGENTS.md。
-> 路径以 `FluxDown/` 为根（cwd=工作区根时前置 `FluxDown/`）。事实层以源码为准，文档给坐标。
+> 本文件是 `RinaDown/AGENTS.md` 的深挖附录：只放**枚举性 / 可从源码复原**的细节，硬不变式与红线在 AGENTS.md。
+> 路径以 `RinaDown/` 为根（cwd=工作区根时前置 `RinaDown/`）。事实层以源码为准，文档给坐标。
 
 ---
 
@@ -12,9 +12,9 @@
 - `i18n`：`build.rs` 自动嵌入 `assets/i18n/*.json`；locale 规范化、英文键级回退、空值回退和插值与 Flutter 基线同契约。
 - `theme` / `components`：公开完整 `SemanticThemeTokens`，通用组件只取活动 token；gpui-component 初始化已包含 gpui-base 初始化。
 - `shell`：只拥有窗口 chrome、路由与内容槽，不知道下载、设置、账户、RSS 或扩展。
-- `downloads` / `settings` / `account` / `rss` / `extensions`：各自拥有视图模型、controller 与 capability-local port；只消费 `fluxdown_protocol` DTO。
+- `downloads` / `settings` / `account` / `rss` / `extensions`：各自拥有视图模型、controller 与 capability-local port；只消费 `rinadown_protocol` DTO。
 - `app`：创建唯一 `AgentClient`，向全部 capability 注入 adapter，并把同一有序 snapshot/event 流分发到主窗口和设置窗口。
-- 运行链路：`fluxdown-desktop` 探活/单飞启动 `fluxdown-agent`；agent 探活/单飞启动 `fluxdownd`。关闭全部窗口不终止后两者。
+- 运行链路：`rinadown-desktop` 探活/单飞启动 `rinadown-agent`；agent 探活/单飞启动 `rinadownd`。关闭全部窗口不终止后两者。
 - 三个二进制作为同级文件进入 Windows/macOS/Linux app 包；agent/daemon 使用独立 bearer 文件，云 Token 只保存在 agent 私有状态。
 - gpui-base 尚未发布，依赖暂走固定 gpui-component git commit；Zed workspace 必须在 `Cargo.lock` 统一为单一提交，否则 `gpui` 类型会分裂。
 
@@ -40,7 +40,7 @@ SharedPreferences 门面，**便携模式**（`portable` 标记）写 `<exe>/por
 `config_sync_service.dart`（SSE 驱动实时配置同步，状态机 + 退避 + 防回声）、`cloud_client.dart`（REST + 401 自动刷新，base 由 `--dart-define FLUXCLOUD_BASE_URL`）、`cloud_auth_service.dart`（账号会话，登录即启用云）、`sync_catalog.dart`（per-key 读写绑定，**显式排除**设备本地键：路径/端口/token/代理/behavior）、`cloud_models.dart`、`device_identity.dart`（持久 deviceId/name/platform）、`nickname_pool.dart`。仅同步引擎配置的**跨设备通用**子集；下载数据不同步。
 
 ### 快速下载小窗：`popup/`（第二 Flutter 引擎）
-原生宿主以 `--quick-popup` 拉起 `runQuickPopupApp()`，**零插件注册 + 不初始化 Rust**，经 MethodChannel `fluxdown/popup_child` 与主引擎通信（主引擎侧 `services/popup_window_service.dart`）。payload（主题 tokens/语言/队列/目录/URL）JSON 注入；复用 `quick_download_form`/`manifest_select_view` 与同一 token→ShadTheme 管线。清单预解析命中时原窗切 ManifestSelectView。
+原生宿主以 `--quick-popup` 拉起 `runQuickPopupApp()`，**零插件注册 + 不初始化 Rust**，经 MethodChannel `rinadown/popup_child` 与主引擎通信（主引擎侧 `services/popup_window_service.dart`）。payload（主题 tokens/语言/队列/目录/URL）JSON 注入；复用 `quick_download_form`/`manifest_select_view` 与同一 token→ShadTheme 管线。清单预解析命中时原窗切 ManifestSelectView。
 
 ### 其它服务/模型（新）
 `analytics_service.dart`（两条匿名事件，`ANALYTICS_APP_KEY` define + `analytics_enabled` 门控）、`update_service.dart`（changelog vs `APP_VERSION`，`update_channel` stable/frontier）、`platform_utils.dart`（便携检测 + 数据目录迁移，与 `data_dir.rs` 同步）、`resolve_variant_service.dart`（rinf 信号驱动全局弹窗）；`models/`：`plugin_provider`、`components_provider`（Ffmpeg/Ytdlp 控制器）、`ua_presets`（UA 单一事实源）、`custom_category`、`manifest_breadcrumb`。
@@ -61,22 +61,22 @@ SharedPreferences 门面，**便携模式**（`portable` 标记）写 `<exe>/por
 
 ---
 
-## 浏览器扩展（`fluxDown/`）与用户脚本（`userscript/`）
+## 浏览器扩展（`rinaDown/`）与用户脚本（`userscript/`）
 
 ### 扩展（WXT，Chrome + Firefox MV3）
-- **通信**：全平台走 NMH。扩展 →（stdin/stdout）→ `fluxdown_nmh` →（Windows Named Pipe / Linux-mac UDS）→ App。消息 = 4 字节 LE 长度 + JSON。action：`ping`（只探不拉起）/`download`/`batch_download`（换行 join 单确认，按 700KB+1000 条分块防 1MB 帧上限，旧 App 回退逐条）/`warmup`（本地应答重叠冷启动）。
+- **通信**：全平台走 NMH。扩展 →（stdin/stdout）→ `rinadown_nmh` →（Windows Named Pipe / Linux-mac UDS）→ App。消息 = 4 字节 LE 长度 + JSON。action：`ping`（只探不拉起）/`download`/`batch_download`（换行 join 单确认，按 700KB+1000 条分块防 1MB 帧上限，旧 App 回退逐条）/`warmup`（本地应答重叠冷启动）。
 - **三层拦截**：`onHeadersReceived`（缓存元数据 + Firefox `webRequestBlocking` cancel）→ `onDeterminingFilename`（Chrome 主拦截 `suggest({cancel:true})`）→ `onCreated+onChanged`（兜底，Firefox 唯一路径）+ 页面态 `fetch-interceptor.ts`。
 - **资源嗅探**（`media-sniff.ts`）：视频/音频/HLS/DASH/大文件，按 tabId 分组 + badge。
 - Chrome ID 经 manifest key 钉住（匹配 NMH `allowed_origins`）；Alt+Shift+D 切换拦截；`Alt+Click` 15s 放行；声明零数据采集。
 
-### 用户脚本（`userscript/fluxdown.user.js`，Tampermonkey）
-页面态**扩展替代**（不能/不愿装扩展的用户）。`GM_xmlhttpRequest` POST 到本机 RPC `:17800/download`（带 `X-FluxDown-Client` 头 + 可选 token），拦截 DOM 下载 + hook fetch/XHR/MediaSource 嗅探。局限：无法拦截内核发起（Content-Disposition）下载、仅非 httpOnly cookie。
+### 用户脚本（`userscript/rinadown.user.js`，Tampermonkey）
+页面态**扩展替代**（不能/不愿装扩展的用户）。`GM_xmlhttpRequest` POST 到本机 RPC `:17800/download`（带 `X-RinaDown-Client` 头 + 可选 token），拦截 DOM 下载 + hook fetch/XHR/MediaSource 嗅探。局限：无法拦截内核发起（Content-Disposition）下载、仅非 httpOnly cookie。
 
 ---
 
 ## Web SPA（`web/`）
 
-React 19 + Vite 8 + TanStack（Router/Query/Table/Virtual/Form）+ Tailwind v4 + Radix + bun + oxlint + react-compiler。`bun run build` → `web/dist`，由 `fluxdown_server` **编译期内嵌**进二进制托管（SPA fallback→index.html；`FLUXDOWN_WEBROOT` 可覆盖成磁盘目录，见 hosts-and-api.md）——改了前端要重编服务器才生效。路由：`/login`、`/`（TasksScreen）、`/settings`（token 门禁，401→清凭据→/login）。`src/lib`：`api.ts`（typed REST）、`ws.ts`（可重连 WS live store）、`cloud/`（L2 云同步 client）、`i18n`、`task-group`、`manifest-selection`、`view-prefs`、`theme`、`format`。
+React 19 + Vite 8 + TanStack（Router/Query/Table/Virtual/Form）+ Tailwind v4 + Radix + bun + oxlint + react-compiler。`bun run build` → `web/dist`，由 `rinadown_server` **编译期内嵌**进二进制托管（SPA fallback→index.html；`RINADOWN_WEBROOT` 可覆盖成磁盘目录，见 hosts-and-api.md）——改了前端要重编服务器才生效。路由：`/login`、`/`（TasksScreen）、`/settings`（token 门禁，401→清凭据→/login）。`src/lib`：`api.ts`（typed REST）、`ws.ts`（可重连 WS live store）、`cloud/`（L2 云同步 client）、`i18n`、`task-group`、`manifest-selection`、`view-prefs`、`theme`、`format`。
 
 **双端信息架构对齐（硬约束）**：同一功能在 web 与桌面 App 的**归属位置必须一致，基准 = 桌面**——设置项跟随桌面 `settings_page.dart` 的分类（web 设置分区组件与桌面侧边栏分类一一对应：GeneralSettings↔通用、DownloadSettings↔下载、ProxySettings↔代理…），对话框字段的分区/排序跟随桌面对应对话框。给双端并行开发（含 subagent 派发）写任务时，**归属分类/排序必须写成一份共享契约**（明确"桌面 X 分类 + web 对应分区组件"），禁止两份各自措辞留给执行者解读。交付前自查：桌面截图里该功能在哪个菜单，web 就必须在哪个菜单。
 

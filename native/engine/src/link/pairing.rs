@@ -125,7 +125,7 @@ fn transcript_init(
     initiator_addrs: &[String],
 ) -> Vec<u8> {
     let mut t = Vec::with_capacity(256);
-    t.extend_from_slice(b"fluxdown-link-init-v1");
+    t.extend_from_slice(b"rinadown-link-init-v1");
     push_framed(&mut t, code.as_bytes());
     t.extend_from_slice(init_eph_pub);
     t.extend_from_slice(init_id_pub);
@@ -141,7 +141,7 @@ fn transcript_init(
 
 fn transcript_resp(resp_eph_pub: &[u8; 32], init_eph_pub: &[u8; 32]) -> Vec<u8> {
     let mut t = Vec::with_capacity(21 + 64);
-    t.extend_from_slice(b"fluxdown-link-resp-v1");
+    t.extend_from_slice(b"rinadown-link-resp-v1");
     t.extend_from_slice(resp_eph_pub);
     t.extend_from_slice(init_eph_pub);
     t

@@ -73,7 +73,7 @@ class _ToastState {
 // =============================================================================
 
 final Map<int, _ToastState> _states = {}; // hwnd → state
-const String _className = 'FluxDownToast_v3';
+const String _className = 'RinaDownToast_v3';
 
 // 复用的 POINT 指针：避免每 tick calloc/free（16ms × 整个 Toast 生命周期）
 final _sharedCursorPt = calloc<POINT>();

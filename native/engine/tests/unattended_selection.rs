@@ -15,10 +15,10 @@
 
 use std::sync::Arc;
 
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::download_manager::NewTaskSpec;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::download_manager::NewTaskSpec;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
 
 fn uniq() -> String {
     let n = std::time::SystemTime::now()
@@ -50,7 +50,7 @@ const MAGNET: &str = "magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef012345
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unattended_bt_task_preconfirms_all_files_and_persists_flag() {
-    let work = std::env::temp_dir().join(format!("fluxdown-unattended-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-unattended-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let mut engine = make_engine(&work).await;
     let save_dir = work.to_string_lossy().into_owned();
@@ -90,7 +90,7 @@ async fn unattended_bt_task_preconfirms_all_files_and_persists_flag() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn unattended_flag_persists_for_non_bt_tasks_too() {
-    let work = std::env::temp_dir().join(format!("fluxdown-unattended-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-unattended-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let mut engine = make_engine(&work).await;
     let save_dir = work.to_string_lossy().into_owned();
@@ -122,7 +122,7 @@ async fn unattended_flag_persists_for_non_bt_tasks_too() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn manual_creation_stays_attended() {
-    let work = std::env::temp_dir().join(format!("fluxdown-unattended-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-unattended-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let mut engine = make_engine(&work).await;
     let save_dir = work.to_string_lossy().into_owned();

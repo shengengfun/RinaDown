@@ -1,15 +1,15 @@
 //! 端到端生产路径验证：调**真实引擎函数** find_sources + download_block_from_peer，
 //! 把 eMule0.50a.zip 的第 0 块真正下到临时文件。证明 UI 里能下载。
-//! run: cargo run -p fluxdown_engine --example prod_download
+//! run: cargo run -p rinadown_engine --example prod_download
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
-use fluxdown_engine::ed2k::client::{ClientConfig, Source, shared_client};
-use fluxdown_engine::ed2k::hash::PART_SIZE;
-use fluxdown_engine::ed2k::peer::download_block_from_peer;
-use fluxdown_engine::speed_limiter::SpeedLimiter;
+use rinadown_engine::ed2k::client::{ClientConfig, Source, shared_client};
+use rinadown_engine::ed2k::hash::PART_SIZE;
+use rinadown_engine::ed2k::peer::download_block_from_peer;
+use rinadown_engine::speed_limiter::SpeedLimiter;
 use tokio::sync::OnceCell;
 use tokio_util::sync::CancellationToken;
 
@@ -64,7 +64,7 @@ async fn main() {
     }
 
     // 2. 真实 download_block_from_peer 逐个 HighID 源尝试，直到某个成功下块 0。
-    let dest = std::env::temp_dir().join("fluxdown_prod_probe.part");
+    let dest = std::env::temp_dir().join("rinadown_prod_probe.part");
     // 预分配目标文件到全长（peer.rs 用 open+write，需文件存在）。
     let _ = tokio::fs::write(&dest, vec![0u8; FILE_SIZE as usize]).await;
     let cancel = CancellationToken::new();

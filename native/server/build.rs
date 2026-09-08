@@ -1,9 +1,9 @@
 //! 构建期把 Web SPA 产物嵌入服务器二进制，实现单文件分发（下载即运行，
 //! 不再需要同级 `web/` 目录）。
 //!
-//! 资源目录：`FLUXDOWN_EMBED_WEBROOT` 覆盖，缺省仓库内 `web/dist`。目录缺失或
-//! 为空**不是错误**——本地 `cargo run -p fluxdown_server` 不必先构建前端，生成
-//! 空表即可，运行期由 `web_assets` 给出「未嵌入」提示页（或走 `FLUXDOWN_WEBROOT`
+//! 资源目录：`RINADOWN_EMBED_WEBROOT` 覆盖，缺省仓库内 `web/dist`。目录缺失或
+//! 为空**不是错误**——本地 `cargo run -p rinadown_server` 不必先构建前端，生成
+//! 空表即可，运行期由 `web_assets` 给出「未嵌入」提示页（或走 `RINADOWN_WEBROOT`
 //! 磁盘目录）。
 //!
 //! 产物 `$OUT_DIR/web_assets.rs` 只含 `include_bytes!` 引用（字节由 rustc 直接
@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 
 fn main() {
     println!("cargo::rerun-if-changed=build.rs");
-    println!("cargo::rerun-if-env-changed=FLUXDOWN_EMBED_WEBROOT");
+    println!("cargo::rerun-if-env-changed=RINADOWN_EMBED_WEBROOT");
 
     let manifest_dir = match std::env::var_os("CARGO_MANIFEST_DIR") {
         Some(v) => PathBuf::from(v),
@@ -30,7 +30,7 @@ fn main() {
 
     // 相对路径按包根解析（构建脚本的 cwd 即包根，但 include_bytes! 相对 OUT_DIR
     // 里的生成文件解析，故一律转绝对）。
-    let webroot = match std::env::var_os("FLUXDOWN_EMBED_WEBROOT") {
+    let webroot = match std::env::var_os("RINADOWN_EMBED_WEBROOT") {
         Some(v) => manifest_dir.join(v),
         None => manifest_dir.join("../../web/dist"),
     };
@@ -42,7 +42,7 @@ fn main() {
     }
     if files.is_empty() {
         println!(
-            "cargo::warning=Web UI not embedded: {} is missing or empty (run `bun run build` in web/, or set FLUXDOWN_EMBED_WEBROOT)",
+            "cargo::warning=Web UI not embedded: {} is missing or empty (run `bun run build` in web/, or set RINADOWN_EMBED_WEBROOT)",
             webroot.display()
         );
     } else if !files.contains_key("index.html") {

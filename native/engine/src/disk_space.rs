@@ -20,7 +20,7 @@ pub const PRECHECK_MARGIN: u64 = 64 * 1024 * 1024;
 /// # Examples
 ///
 /// ```
-/// let avail = fluxdown_engine::disk_space::available_space(&std::env::temp_dir());
+/// let avail = rinadown_engine::disk_space::available_space(&std::env::temp_dir());
 /// assert!(avail.is_some_and(|a| a > 0));
 /// ```
 pub fn available_space(dir: &Path) -> Option<u64> {
@@ -76,7 +76,7 @@ fn available_space_impl(dir: &Path) -> Option<u64> {
     // statvfs 返回 0(成功、结构已完整写入)后读取其字段。
     // 64-bit target 上 fsblkcnt_t/f_frsize 均为 64 位,无截断;32-bit
     // glibc 旧 ABI / 32-bit Android 上 fsblkcnt_t 为 u32,存在与 apple
-    // 相同的大卷截断风险——FluxDown 仅支持 64 位桌面端,不在支持矩阵内。
+    // 相同的大卷截断风险——RinaDown 仅支持 64 位桌面端,不在支持矩阵内。
     let mut stat: libc::statvfs = unsafe { std::mem::zeroed() };
     let ret = unsafe { libc::statvfs(c_path.as_ptr(), &mut stat) };
     (ret == 0).then(|| (stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64))
@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn available_space_returns_none_for_missing_path() {
-        let missing = std::env::temp_dir().join("fluxdown_definitely_missing_dir_xyz");
+        let missing = std::env::temp_dir().join("rinadown_definitely_missing_dir_xyz");
         // Windows GetDiskFreeSpaceExW 对不存在路径失败;Unix statvfs 同样
         // 报 ENOENT。两平台均应得到 None 而非 panic。
         assert!(available_space(&missing).is_none());

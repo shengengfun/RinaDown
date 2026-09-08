@@ -5,11 +5,11 @@ section: plugins
 order: 4
 ---
 
-Everything a plugin script can see: five entry points FluxDown calls, and the `flux` object it injects. All field names crossing the JS boundary are camelCase.
+Everything a plugin script can see: five entry points RinaDown calls, and the `flux` object it injects. All field names crossing the JS boundary are camelCase.
 
 ## Entry points
 
-Entry points are plain global functions. `async` functions and returned Promises are fully supported — FluxDown awaits the result.
+Entry points are plain global functions. `async` functions and returned Promises are fully supported — RinaDown awaits the result.
 
 ### `resolve(ctx)`
 
@@ -26,7 +26,7 @@ Called before protocol dispatch, on **every** start and resume of a matching tas
 | `userAgent` | string | Effective User-Agent. |
 | `extraHeaders` | object | Extra request headers as string key-values. |
 
-Return `null` or `undefined` to pass through (FluxDown downloads `ctx.url` unchanged). Otherwise return an object; every field except `url` is optional:
+Return `null` or `undefined` to pass through (RinaDown downloads `ctx.url` unchanged). Otherwise return an object; every field except `url` is optional:
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -36,11 +36,11 @@ Return `null` or `undefined` to pass through (FluxDown downloads `ctx.url` uncha
 | `totalBytes` | number | File size in bytes, if known. |
 | `extraHeaders` | object | Headers to send when downloading the resolved link. |
 | `ephemeral` | boolean | `true` = the link is one-shot / anti-hotlinked: skip the metadata probe (at the cost of weaker resume-integrity checks). Default `false`: probe normally and keep ETag-based resume validation. |
-| `rangeSupported` | boolean | `true` = you guarantee the resolved host honours HTTP Range requests (e.g. googlevideo). Combined with `ephemeral`, FluxDown still skips the probe but plans a full multi-segment download right away instead of the conservative single-stream start. Default `false`: without a probe, Range capability is learned from the first response. |
-| `variants` | array | Multiple quality/format choices. When present with more than one entry, FluxDown shows a picker dialog and the user's choice collapses into a single link before download (in a headless server or do-not-disturb download, `defaultVariantIndex` is used silently, exactly like HLS quality selection). Each entry: `{ label, url, audioUrl?, fileName?, totalBytes?, bandwidth?, width?, height?, container? }` — `label` and `url` are required. When `variants` is non-empty the top-level `url` may be empty. Up to 50 entries; each `label` ≤ 200 chars. |
+| `rangeSupported` | boolean | `true` = you guarantee the resolved host honours HTTP Range requests (e.g. googlevideo). Combined with `ephemeral`, RinaDown still skips the probe but plans a full multi-segment download right away instead of the conservative single-stream start. Default `false`: without a probe, Range capability is learned from the first response. |
+| `variants` | array | Multiple quality/format choices. When present with more than one entry, RinaDown shows a picker dialog and the user's choice collapses into a single link before download (in a headless server or do-not-disturb download, `defaultVariantIndex` is used silently, exactly like HLS quality selection). Each entry: `{ label, url, audioUrl?, fileName?, totalBytes?, bandwidth?, width?, height?, container? }` — `label` and `url` are required. When `variants` is non-empty the top-level `url` may be empty. Up to 50 entries; each `label` ≤ 200 chars. |
 | `defaultVariantIndex` | number | Which variant is the default (used on 60 s timeout / do-not-disturb / headless). Out-of-range values fall back to `0`. Default `0`. |
 
-After resolution, FluxDown re-examines the *resolved* URL to pick the protocol engine — a resolver may return an HLS playlist, a magnet link or an FTP URL and the right engine takes over.
+After resolution, RinaDown re-examines the *resolved* URL to pick the protocol engine — a resolver may return an HLS playlist, a magnet link or an FTP URL and the right engine takes over.
 
 Error behavior is fail-closed: an exception, timeout, invalid return value, or an uninstalled/disabled plugin all put the task into the error state. The original URL is never silently downloaded.
 
@@ -87,7 +87,7 @@ Guard rails, all enforced host-side:
 
 ### `flux.storage`
 
-Persistent key-value store, private to your plugin, survives app restarts (backed by the FluxDown database).
+Persistent key-value store, private to your plugin, survives app restarts (backed by the RinaDown database).
 
 - `flux.storage.get(key)` → `Promise<string | null>`
 - `flux.storage.set(key, value)` → `Promise<void>` — rejects when a single value exceeds **64 KB** or the plugin would exceed **100 keys**.
@@ -123,19 +123,19 @@ Read-only object with your manifest-declared settings, already typed: `string` f
 
 ### `flux.info`
 
-`{ identity, version, appVersion }` — your plugin's ID and version, and the FluxDown version hosting it.
+`{ identity, version, appVersion }` — your plugin's ID and version, and the RinaDown version hosting it.
 
 ### `flux.logger` and `console`
 
-`flux.logger.info/warn/error(...)` write to FluxDown's log file. `console.log/info/warn/error/debug` are mapped to the same place (`debug` logs at info level). Multiple arguments are joined with spaces; non-strings are JSON-stringified. Each line is truncated at 4 KB.
+`flux.logger.info/warn/error(...)` write to RinaDown's log file. `console.log/info/warn/error/debug` are mapped to the same place (`debug` logs at info level). Multiple arguments are joined with spaces; non-strings are JSON-stringified. Each line is truncated at 4 KB.
 
 ### `flux.task.requestRetry(opts)`
 
-`flux.task.requestRetry({ delayMs: 5000 })` — ask FluxDown to retry the failed task after a delay. Only meaningful inside `onError`; called anywhere else it logs a warning and does nothing. Retries share the task's automatic-retry budget, so a plugin cannot retry forever.
+`flux.task.requestRetry({ delayMs: 5000 })` — ask RinaDown to retry the failed task after a delay. Only meaningful inside `onError`; called anywhere else it logs a warning and does nothing. Retries share the task's automatic-retry budget, so a plugin cannot retry forever.
 
 ### `flux.ffmpeg`
 
-Available **only** when the manifest declares `permissions: ["ffmpeg"]` — otherwise `flux.ffmpeg` is `undefined`, so guard with `if (flux.ffmpeg)`. It runs the ffmpeg FluxDown resolves (a user-set path → the managed install → system `PATH`), so ffmpeg must also actually be present (installable from the app's Settings → Extensions → Components tab).
+Available **only** when the manifest declares `permissions: ["ffmpeg"]` — otherwise `flux.ffmpeg` is `undefined`, so guard with `if (flux.ffmpeg)`. It runs the ffmpeg RinaDown resolves (a user-set path → the managed install → system `PATH`), so ffmpeg must also actually be present (installable from the app's Settings → Extensions → Components tab).
 
 - `flux.ffmpeg.available()` → `Promise<{ available, version, source }>` — probe the effective ffmpeg. `source` is `"manual"` / `"managed"` / `"system"` / `"none"`.
 - `flux.ffmpeg.run(spec)` → `Promise<outcome>` — run ffmpeg. `spec`:
@@ -194,7 +194,7 @@ const info = JSON.parse(out.stdout);
 
 ### `flux.ytdlp`
 
-Available **only** when the manifest declares `permissions: ["ytdlp"]` — otherwise `flux.ytdlp` is `undefined`, so guard with `if (flux.ytdlp)`. It runs the yt-dlp FluxDown resolves (a user-set path → the managed install → system `PATH`), so yt-dlp must also actually be present (installable from the app's Settings → Extensions → Components tab).
+Available **only** when the manifest declares `permissions: ["ytdlp"]` — otherwise `flux.ytdlp` is `undefined`, so guard with `if (flux.ytdlp)`. It runs the yt-dlp RinaDown resolves (a user-set path → the managed install → system `PATH`), so yt-dlp must also actually be present (installable from the app's Settings → Extensions → Components tab).
 
 - `flux.ytdlp.available()` → `Promise<{ available, version, source }>` — probe the effective yt-dlp. `source` is `"manual"` / `"managed"` / `"system"` / `"none"`. A quick `run({ args: ['--version'] })` and checking `code === 0` works as a lighter-weight liveness probe too.
 - `flux.ytdlp.run(spec)` → `Promise<outcome>` — run yt-dlp. `spec`:
@@ -207,7 +207,7 @@ Available **only** when the manifest declares `permissions: ["ytdlp"]` — other
 
 Resolves to `{ code, stdout, stderr, timedOut, truncatedStdout, truncatedStderr }` — `code` is the exit code (`-1` when killed / none), `stdout`/`stderr` are truncated (256 KB / 64 KB), `timedOut` is `true` when the timeout killed the run.
 
-**The jail.** Unlike `flux.ffmpeg`, `flux.ytdlp` works in **every** context — `resolve` and every hook — since it has no dependency on a produced file. The jail isn't a task's output folder; it's a scratch directory the bridge keeps per plugin (lazily created under FluxDown's data directory), reused across calls. That's the working directory for the call, and `subdir` carves out a sub-folder inside it. Reference any files you read or write there by **relative** name. This is the same workspace `flux.fs` reads and writes — it's how you feed yt-dlp a cookie jar, config file, or subtitles: `flux.fs.writeFile('cookies.txt', …)` beforehand, reference the file by its relative name in `args`, then `flux.fs.remove('cookies.txt')` once the call returns.
+**The jail.** Unlike `flux.ffmpeg`, `flux.ytdlp` works in **every** context — `resolve` and every hook — since it has no dependency on a produced file. The jail isn't a task's output folder; it's a scratch directory the bridge keeps per plugin (lazily created under RinaDown's data directory), reused across calls. That's the working directory for the call, and `subdir` carves out a sub-folder inside it. Reference any files you read or write there by **relative** name. This is the same workspace `flux.fs` reads and writes — it's how you feed yt-dlp a cookie jar, config file, or subtitles: `flux.fs.writeFile('cookies.txt', …)` beforehand, reference the file by its relative name in `args`, then `flux.fs.remove('cookies.txt')` once the call returns.
 
 yt-dlp is a network tool, so unlike ffmpeg's jail, URL arguments and outbound network access are allowed — extracting from a remote URL is its entire job. What's blocked is anything that would step outside yt-dlp itself or escape the jail:
 
@@ -221,7 +221,7 @@ yt-dlp is a network tool, so unlike ffmpeg's jail, URL arguments and outbound ne
 
 `--ignore-config` is always prepended, so none of yt-dlp's own config files — which could otherwise smuggle in a blocked switch — get read either. At most 2 yt-dlp processes run at once across all plugins, and each child is killed on timeout or cancellation.
 
-FluxDown auto-injects `--ffmpeg-location` (pointing at the resolved managed/system ffmpeg) so merges (bestvideo+bestaudio), `-x` audio extraction, remuxing, and recoding all work — a plugin-supplied `--ffmpeg-location` is still rejected (see the table above), only the host's own injected path is trusted. It also auto-injects `--cache-dir <jail>/.cache`, keeping yt-dlp's cache inside the jail instead of leaking outside it.
+RinaDown auto-injects `--ffmpeg-location` (pointing at the resolved managed/system ffmpeg) so merges (bestvideo+bestaudio), `-x` audio extraction, remuxing, and recoding all work — a plugin-supplied `--ffmpeg-location` is still rejected (see the table above), only the host's own injected path is trusted. It also auto-injects `--cache-dir <jail>/.cache`, keeping yt-dlp's cache inside the jail instead of leaking outside it.
 
 Example — resolve a page by asking yt-dlp for its metadata JSON and picking a direct link out of it:
 

@@ -20,10 +20,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart' show Color, ThemeMode;
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flux_down/src/i18n/locale_provider.dart';
-import 'package:flux_down/src/models/settings_provider.dart';
-import 'package:flux_down/src/services/cloud/sync_catalog.dart';
-import 'package:flux_down/src/theme/theme_provider.dart';
+import 'package:rina_down/src/i18n/locale_provider.dart';
+import 'package:rina_down/src/models/settings_provider.dart';
+import 'package:rina_down/src/services/cloud/sync_catalog.dart';
+import 'package:rina_down/src/theme/theme_provider.dart';
 
 /// Contract key format: `^[a-z0-9_]+(\.[a-z0-9_]+)*$`, length 1..128.
 final _kKeyPattern = RegExp(r'^[a-z0-9_]+(\.[a-z0-9_]+)*$');

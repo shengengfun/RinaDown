@@ -166,7 +166,7 @@ pub struct LinkManager {
 impl LinkManager {
     /// 从引擎数据库加载（或首次生成并持久化）本机身份，构造门面。
     ///
-    /// `api_port` = 本机 fluxdown API 端口（mDNS 广播 + 自报候选用）。
+    /// `api_port` = 本机 rinadown API 端口（mDNS 广播 + 自报候选用）。
     pub async fn load(
         db: Db,
         self_info: SelfInfo,

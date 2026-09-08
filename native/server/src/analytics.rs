@@ -7,17 +7,17 @@
 //!   升级镜像保留，删卷重装 = 新 ID = 统计为新安装）。
 //! - `app_installed` 不受开关控制；`app_active` 受 Web 设置页「匿名使用统计」
 //!   开关（config 键 `analytics_enabled`）控制，每个 tick 实时读库。
-//! - 部署级硬关闭：环境变量 `FLUXDOWN_ANALYTICS=off`（NAS/隐私敏感环境一刀切）。
+//! - 部署级硬关闭：环境变量 `RINADOWN_ANALYTICS=off`（NAS/隐私敏感环境一刀切）。
 //!
 //! 本模块只依赖 `Db` 的通用 config KV 与 reqwest —— 下载引擎 crate 零感知。
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use fluxdown_engine::db::Db;
-use fluxdown_engine::{log_error, log_info};
+use rinadown_engine::db::Db;
+use rinadown_engine::{log_error, log_info};
 
-/// 编译期注入的 App-Key（CI：`FLUXDOWN_ANALYTICS_APP_KEY`）。空 = 未配置。
-const BAKED_APP_KEY: &str = match option_env!("FLUXDOWN_ANALYTICS_APP_KEY") {
+/// 编译期注入的 App-Key（CI：`RINADOWN_ANALYTICS_APP_KEY`）。空 = 未配置。
+const BAKED_APP_KEY: &str = match option_env!("RINADOWN_ANALYTICS_APP_KEY") {
     Some(v) => v,
     None => "",
 };
@@ -36,16 +36,16 @@ const K_ENABLED: &str = "analytics_enabled";
 
 /// 运行期 App-Key：环境变量覆盖编译期烘焙值（自建部署可自带 key 或留空禁用）。
 fn app_key() -> String {
-    match std::env::var("FLUXDOWN_ANALYTICS_APP_KEY") {
+    match std::env::var("RINADOWN_ANALYTICS_APP_KEY") {
         Ok(v) if !v.trim().is_empty() => v.trim().to_string(),
         _ => BAKED_APP_KEY.trim().to_string(),
     }
 }
 
-/// 部署级硬关闭：`FLUXDOWN_ANALYTICS=off|0|false`。
+/// 部署级硬关闭：`RINADOWN_ANALYTICS=off|0|false`。
 fn disabled_by_env() -> bool {
     matches!(
-        std::env::var("FLUXDOWN_ANALYTICS").as_deref(),
+        std::env::var("RINADOWN_ANALYTICS").as_deref(),
         Ok("off") | Ok("0") | Ok("false")
     )
 }
@@ -54,7 +54,7 @@ fn disabled_by_env() -> bool {
 /// （跨天时补发 `app_active`，长驻 NAS 进程不依赖重启）。
 pub async fn run(db: Db, server_version: &'static str) {
     if disabled_by_env() {
-        log_info!("[analytics] disabled by FLUXDOWN_ANALYTICS env");
+        log_info!("[analytics] disabled by RINADOWN_ANALYTICS env");
         return;
     }
     let key = app_key();

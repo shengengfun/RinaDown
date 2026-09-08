@@ -1,21 +1,21 @@
-//! `fluxdown_engine` 领域模型与 `fluxdown_protocol` wire DTO 的无状态转换。
+//! `rinadown_engine` 领域模型与 `rinadown_protocol` wire DTO 的无状态转换。
 //!
 //! 两端 crate 保持彼此独立；宿主只在边界调用本 crate 的命名函数。
 
-use fluxdown_engine::downloader::CapturedRequestBody;
-use fluxdown_engine::model::{
+use rinadown_engine::downloader::CapturedRequestBody;
+use rinadown_engine::model::{
     BtFileEntry, CdnNodeInfo, GroupInfo, HlsQualityOption, QueueInfo, QueuePosition,
     ResolveVariantOption, SegmentDetail, TaskInfo,
 };
-use fluxdown_engine::rss::model::{RssItemInfo, RssSourceInfo};
-use fluxdown_engine::webhook::{PresetInfo, WebhookDelivery};
-use fluxdown_protocol::daemon::{
+use rinadown_engine::rss::model::{RssItemInfo, RssSourceInfo};
+use rinadown_engine::webhook::{PresetInfo, WebhookDelivery};
+use rinadown_protocol::daemon::{
     BtFileDto, CdnNodeDto, GroupDto, HlsQualityOptionDto, QueueDto, QueuePositionDto, RequestBody,
     ResolveVariantOptionDto, RssItemDto, RssSourceDto, SegmentDetailDto, TaskDto,
     WebhookDeliveryDto, WebhookPresetDto,
 };
 #[cfg(feature = "components")]
-use fluxdown_protocol::daemon::{ComponentFfmpegStatus, ComponentVersions, ComponentYtdlpStatus};
+use rinadown_protocol::daemon::{ComponentFfmpegStatus, ComponentVersions, ComponentYtdlpStatus};
 
 /// 将捕获请求体转换为引擎请求体。
 #[must_use]
@@ -153,7 +153,7 @@ pub fn rss_source_dto_to_engine(source: RssSourceDto) -> RssSourceInfo {
         interval_minutes: if source.interval_minutes > 0 {
             source.interval_minutes
         } else {
-            fluxdown_engine::rss::model::DEFAULT_INTERVAL_MINUTES
+            rinadown_engine::rss::model::DEFAULT_INTERVAL_MINUTES
         },
         include_pattern: source.include_pattern,
         exclude_pattern: source.exclude_pattern,
@@ -166,7 +166,7 @@ pub fn rss_source_dto_to_engine(source: RssSourceDto) -> RssSourceInfo {
         max_per_fetch: if source.max_per_fetch > 0 {
             source.max_per_fetch
         } else {
-            fluxdown_engine::rss::model::DEFAULT_MAX_PER_FETCH
+            rinadown_engine::rss::model::DEFAULT_MAX_PER_FETCH
         },
         cookies: source.cookies,
         user_agent: source.user_agent,
@@ -298,10 +298,10 @@ pub fn webhook_preset_to_dto(preset: PresetInfo) -> WebhookPresetDto {
 #[cfg(feature = "plugins")]
 #[must_use]
 pub fn setting_field_to_dto(
-    field: fluxdown_engine::plugin::SettingField,
-) -> fluxdown_protocol::daemon::SettingFieldDto {
-    use fluxdown_engine::plugin::{SettingType, SettingWidget};
-    use fluxdown_protocol::daemon::{SettingFieldDto, SettingOptionDto};
+    field: rinadown_engine::plugin::SettingField,
+) -> rinadown_protocol::daemon::SettingFieldDto {
+    use rinadown_engine::plugin::{SettingType, SettingWidget};
+    use rinadown_protocol::daemon::{SettingFieldDto, SettingOptionDto};
 
     let setting_type = match field.ty {
         SettingType::String => "string",
@@ -347,9 +347,9 @@ pub fn setting_field_to_dto(
 #[cfg(feature = "plugins")]
 #[must_use]
 pub fn plugin_info_to_dto(
-    plugin: fluxdown_engine::plugin::PluginInfo,
-) -> fluxdown_protocol::daemon::PluginDto {
-    fluxdown_protocol::daemon::PluginDto {
+    plugin: rinadown_engine::plugin::PluginInfo,
+) -> rinadown_protocol::daemon::PluginDto {
+    rinadown_protocol::daemon::PluginDto {
         identity: plugin.identity,
         name: plugin.name,
         version: plugin.version,
@@ -372,9 +372,9 @@ pub fn plugin_info_to_dto(
 #[cfg(feature = "plugins")]
 #[must_use]
 pub fn market_entry_to_dto(
-    entry: fluxdown_engine::plugin::MarketEntry,
-) -> fluxdown_protocol::daemon::MarketEntryDto {
-    fluxdown_protocol::daemon::MarketEntryDto {
+    entry: rinadown_engine::plugin::MarketEntry,
+) -> rinadown_protocol::daemon::MarketEntryDto {
+    rinadown_protocol::daemon::MarketEntryDto {
         plugin_id: entry.plugin_id,
         version: entry.version,
         sequence: entry.sequence,
@@ -396,7 +396,7 @@ pub fn market_entry_to_dto(
 #[cfg(feature = "components")]
 #[must_use]
 pub fn ffmpeg_status_to_dto(
-    status: fluxdown_engine::components::FfmpegStatus,
+    status: rinadown_engine::components::FfmpegStatus,
 ) -> ComponentFfmpegStatus {
     ComponentFfmpegStatus {
         source: status.source.as_str().to_owned(),
@@ -412,7 +412,7 @@ pub fn ffmpeg_status_to_dto(
 #[cfg(feature = "components")]
 #[must_use]
 pub fn ffmpeg_versions_to_dto(
-    versions: fluxdown_engine::components::FfmpegVersions,
+    versions: rinadown_engine::components::FfmpegVersions,
 ) -> ComponentVersions {
     ComponentVersions {
         versions: versions.versions,
@@ -424,7 +424,7 @@ pub fn ffmpeg_versions_to_dto(
 #[cfg(feature = "components")]
 #[must_use]
 pub fn ytdlp_status_to_dto(
-    status: fluxdown_engine::components::YtdlpStatus,
+    status: rinadown_engine::components::YtdlpStatus,
 ) -> ComponentYtdlpStatus {
     ComponentYtdlpStatus {
         source: status.source.as_str().to_owned(),
@@ -440,7 +440,7 @@ pub fn ytdlp_status_to_dto(
 #[cfg(feature = "components")]
 #[must_use]
 pub fn ytdlp_versions_to_dto(
-    versions: fluxdown_engine::components::YtdlpVersions,
+    versions: rinadown_engine::components::YtdlpVersions,
 ) -> ComponentVersions {
     ComponentVersions {
         versions: versions.versions,

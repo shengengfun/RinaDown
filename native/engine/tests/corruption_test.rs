@@ -1,11 +1,11 @@
-//! 实证测试：直接调用 FluxDown 真实的 `run_coordinated_download`，
+//! 实证测试：直接调用 RinaDown 真实的 `run_coordinated_download`，
 //! 反复下载同一 URL，检测是否产生内容损坏。
 //!
 //! 与 `tests_repro/test_repeated.sh` 的区别：
-//!   - shell 脚本只用 curl 模拟"固定 Range 切片"，缺失了 FluxDown 的
+//!   - shell 脚本只用 curl 模拟"固定 Range 切片"，缺失了 RinaDown 的
 //!     **动态拆分（split_largest / try_proactive_split）** 这一关键变量。
 //!   - 本模块直接调用 `segment_coordinator::run_coordinated_download`，
-//!     完全复用 FluxDown 的真实代码：BufWriter / fallocate /
+//!     完全复用 RinaDown 的真实代码：BufWriter / fallocate /
 //!     SetFileInformationByHandle / 拆分协调 / cancel_token / etc.
 //!
 //! 用法：
@@ -19,12 +19,12 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use fluxdown_engine::db::Db;
-use fluxdown_engine::downloader::{ProgressUpdate, build_client, resolve_file_info};
-use fluxdown_engine::events::{EngineEvent, EventSink};
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::segment_coordinator::run_coordinated_download;
-use fluxdown_engine::speed_limiter::SpeedLimiter;
+use rinadown_engine::db::Db;
+use rinadown_engine::downloader::{ProgressUpdate, build_client, resolve_file_info};
+use rinadown_engine::events::{EngineEvent, EventSink};
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::segment_coordinator::run_coordinated_download;
+use rinadown_engine::speed_limiter::SpeedLimiter;
 use sha2::{Digest, Sha256};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -79,7 +79,7 @@ async fn compute_sha256(path: &std::path::Path) -> String {
     hex
 }
 
-/// 用 FluxDown 自己的 build_client 单流下载，作为 baseline。
+/// 用 RinaDown 自己的 build_client 单流下载，作为 baseline。
 /// 与 multi-segment 用完全一致的 client 配置（identity / TLS / UA），
 /// 确保对比公平：差异只在"单流 vs 多 segment 协调器"。
 async fn download_baseline(
@@ -132,7 +132,7 @@ fn spawn_progress_drain(mut rx: mpsc::Receiver<ProgressUpdate>) -> tokio::task::
     })
 }
 
-/// 单次完整的 multi-segment 下载，使用 FluxDown 真实代码路径。
+/// 单次完整的 multi-segment 下载，使用 RinaDown 真实代码路径。
 ///
 /// 返回 (实际文件大小, SHA256, 耗时)。
 async fn run_one_real_download(
@@ -148,9 +148,9 @@ async fn run_one_real_download(
     // 清理上一次的产物
     let _ = tokio::fs::remove_file(&dest).await;
 
-    // 构造 FluxDown 真实 client（与生产代码完全一致）
+    // 构造 RinaDown 真实 client（与生产代码完全一致）
     let proxy = ProxyConfig::default();
-    let client = build_client(&proxy, "Mozilla/5.0 FluxDownCorruptionTest/1.0")
+    let client = build_client(&proxy, "Mozilla/5.0 RinaDownCorruptionTest/1.0")
         .map_err(|e| format!("build_client: {e}"))?;
 
     // 创建独立 SQLite（每次迭代用独立 db 避免脏状态）
@@ -180,7 +180,7 @@ async fn run_one_real_download(
     let (progress_tx, progress_rx) = mpsc::channel::<ProgressUpdate>(256);
     let drain_handle = spawn_progress_drain(progress_rx);
 
-    let spec = fluxdown_engine::downloader::RequestSpec::empty_get();
+    let spec = rinadown_engine::downloader::RequestSpec::empty_get();
     let sink = NoopTestSink;
 
     let started = Instant::now();
@@ -192,7 +192,7 @@ async fn run_one_real_download(
         total_bytes,
         false,
         INITIAL_SEGMENTS,
-        fluxdown_engine::cdn::NodePool::single(client.clone()),
+        rinadown_engine::cdn::NodePool::single(client.clone()),
         &db,
         &progress_tx,
         &cancel,
@@ -201,7 +201,7 @@ async fn run_one_real_download(
         &sink,
         etag,
         last_modified,
-        fluxdown_engine::segment_coordinator::ReportScope::whole_task(),
+        rinadown_engine::segment_coordinator::ReportScope::whole_task(),
         0,
         false,
         None,
@@ -239,35 +239,35 @@ async fn run_one_real_download(
 ///   3. 反复用真实 `run_coordinated_download` 下载 N 次
 ///   4. 每次对比 SHA256，统计损坏率
 ///
-/// 这是**真实测试**——直接复用 FluxDown 自己的代码，不是模拟。
+/// 这是**真实测试**——直接复用 RinaDown 自己的代码，不是模拟。
 #[tokio::test(flavor = "current_thread")]
 #[ignore = "needs network and downloads ~80MB × N times, run with --ignored"]
 async fn real_multi_segment_corruption_repeat() {
     let work_dir =
-        std::env::temp_dir().join(format!("fluxdown_corruption_test_{}", std::process::id()));
+        std::env::temp_dir().join(format!("rinadown_corruption_test_{}", std::process::id()));
     let _ = tokio::fs::remove_dir_all(&work_dir).await;
     tokio::fs::create_dir_all(&work_dir)
         .await
         .expect("create work_dir");
 
     println!("==========================================");
-    println!("FluxDown 真实代码 multi-segment 损坏测试");
+    println!("RinaDown 真实代码 multi-segment 损坏测试");
     println!("URL          : {}", TEST_URL);
     println!("迭代次数     : {}", ITERATIONS);
     println!("初始 segment : {}", INITIAL_SEGMENTS);
     println!("工作目录     : {}", work_dir.display());
     println!("==========================================");
 
-    // ---- Step 0: probe（与 FluxDown 生产代码一致）----
-    println!("\n[Step 0] resolve_file_info — 模拟 FluxDown probe");
+    // ---- Step 0: probe（与 RinaDown 生产代码一致）----
+    println!("\n[Step 0] resolve_file_info — 模拟 RinaDown probe");
     let proxy = ProxyConfig::default();
-    let client = build_client(&proxy, "Mozilla/5.0 FluxDownCorruptionTest/1.0")
+    let client = build_client(&proxy, "Mozilla/5.0 RinaDownCorruptionTest/1.0")
         .expect("build_client for probe");
 
     let info = resolve_file_info(
         &client,
         TEST_URL,
-        &fluxdown_engine::downloader::RequestSpec::empty_get(),
+        &rinadown_engine::downloader::RequestSpec::empty_get(),
     )
     .await
     .expect("resolve_file_info");
@@ -296,7 +296,7 @@ async fn real_multi_segment_corruption_repeat() {
     let (base_size, base_sha) = download_baseline(
         TEST_URL,
         &base_dest,
-        "Mozilla/5.0 FluxDownCorruptionTest/1.0",
+        "Mozilla/5.0 RinaDownCorruptionTest/1.0",
     )
     .await
     .expect("baseline download");
@@ -390,7 +390,7 @@ async fn real_multi_segment_corruption_repeat() {
             "\n✅ {} 次真实下载全部 SHA 一致 — 该 URL 下未复现损坏",
             ITERATIONS
         );
-        println!("   说明 FluxDown segment_coordinator 在该场景下行为正确");
+        println!("   说明 RinaDown segment_coordinator 在该场景下行为正确");
     } else {
         println!(
             "\n❌ 复现了问题：{} 次损坏 / {} 次错误（共 {} 次）",

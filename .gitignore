@@ -63,11 +63,11 @@ nul
 *.db-shm
 *.db-wal
 
-# fluxDown plugin
+# rinaDown plugin
 node_modules
-fluxDown/.output/
-fluxDown/.wxt/
-fluxDown/dist/
+rinaDown/.output/
+rinaDown/.wxt/
+rinaDown/dist/
 
 # Vercel
 website/.vercel/
@@ -93,7 +93,7 @@ skills-lock.json
 # Test files
 test/batch_delete_scale_test.dart
 test/resume_all_test.dart
-website/fluxdown-website-latest.tar
+website/rinadown-website-latest.tar
 /docs/
 
 # ── 敏感信息（开源清理，严禁入库）──
@@ -108,7 +108,7 @@ client_secret*.json
 scripts/notify_config.json
 scripts/.send_progress
 scripts/filter_repo_replacements.txt
-fluxDown/stats.html
+rinaDown/stats.html
 android/local.properties
 **/flutter/ephemeral/
 **/Flutter/ephemeral/
@@ -126,5 +126,5 @@ assets/screenshot/
 website-v2/
 .tmp*
 
-# Incomplete / partial downloads (FluxDown downloader artifacts)
+# Incomplete / partial downloads (RinaDown downloader artifacts)
 *.fdownloading

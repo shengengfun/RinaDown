@@ -9,12 +9,12 @@
 
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/bindings/bindings.dart';
-import 'package:flux_down/src/i18n/locale_provider.dart';
-import 'package:flux_down/src/models/rss_provider.dart';
-import 'package:flux_down/src/theme/app_theme.dart';
-import 'package:flux_down/src/theme/flux_theme_tokens.dart';
-import 'package:flux_down/src/widgets/rss_item_list.dart';
+import 'package:rina_down/src/bindings/bindings.dart';
+import 'package:rina_down/src/i18n/locale_provider.dart';
+import 'package:rina_down/src/models/rss_provider.dart';
+import 'package:rina_down/src/theme/app_theme.dart';
+import 'package:rina_down/src/theme/flux_theme_tokens.dart';
+import 'package:rina_down/src/widgets/rss_item_list.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 /// 只替换 UI 读到的三个入口。真实 provider 的数据全部来自 rinf 信号，测试里

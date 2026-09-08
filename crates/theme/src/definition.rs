@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{AccentScheme, BuiltinThemeId};
 
-/// FluxDown GPUI 主题文件的当前 schema 版本。
+/// RinaDown GPUI 主题文件的当前 schema 版本。
 pub const THEME_SCHEMA_VERSION: u32 = 1;
 const SHADOW_ALPHA: f32 = 46.0 / 255.0;
 /// Flutter `accentBackground` alpha 的 8-bit 量化：0.10 / 0.15 / 0.18。
@@ -30,8 +30,8 @@ pub struct FluxThemeDefinition {
 }
 
 impl FluxThemeDefinition {
-    /// Flutter 客户端 `defaultLight` / `defaultDark` 使用的 FluxDown 默认主题。
-    pub fn fluxdown_default() -> Self {
+    /// Flutter 客户端 `defaultLight` / `defaultDark` 使用的 RinaDown 默认主题。
+    pub fn rinadown_default() -> Self {
         Self::builtin_pair(BuiltinThemeId::DefaultDark, BuiltinThemeId::DefaultLight)
     }
 
@@ -48,14 +48,14 @@ impl FluxThemeDefinition {
         let dark_palette = palette(dark);
         let light_palette = palette(light);
         let name = if dark == BuiltinThemeId::DefaultDark && light == BuiltinThemeId::DefaultLight {
-            SharedString::from("FluxDown Default")
+            SharedString::from("RinaDown Default")
         } else {
             SharedString::from(format!("{} / {}", dark_palette.name, light_palette.name))
         };
         Self {
             schema_version: THEME_SCHEMA_VERSION,
             name,
-            author: Some("FluxDown".into()),
+            author: Some("RinaDown".into()),
             light: semantic_tokens(color_tokens(light_palette)),
             dark: semantic_tokens(color_tokens(dark_palette)),
         }
@@ -90,7 +90,7 @@ impl FluxThemeDefinition {
 
 impl Default for FluxThemeDefinition {
     fn default() -> Self {
-        Self::fluxdown_default()
+        Self::rinadown_default()
     }
 }
 
@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn default_light_colors_match_flutter_tokens() {
-        let theme = FluxThemeDefinition::fluxdown_default();
+        let theme = FluxThemeDefinition::rinadown_default();
 
         assert_eq!(
             theme.light.colors,
@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn default_dark_colors_match_flutter_tokens() {
-        let theme = FluxThemeDefinition::fluxdown_default();
+        let theme = FluxThemeDefinition::rinadown_default();
 
         assert_eq!(
             theme.dark.colors,
@@ -356,7 +356,7 @@ mod tests {
 
     #[test]
     fn full_token_snapshot_round_trips_for_theme_editing() -> Result<(), serde_json::Error> {
-        let mut theme = FluxThemeDefinition::fluxdown_default();
+        let mut theme = FluxThemeDefinition::rinadown_default();
         theme.tokens_mut(ThemeMode::Light).spacing.xxl = px(40.);
 
         let json = serde_json::to_string(&theme)?;
@@ -381,7 +381,7 @@ mod tests {
         );
         assert_eq!(nord.dark.colors.destructive, color(0xBF616A));
         assert_eq!(nord.dark.colors.border, color(0x4C566A));
-        assert_eq!(nord.light, FluxThemeDefinition::fluxdown_default().light);
+        assert_eq!(nord.light, FluxThemeDefinition::rinadown_default().light);
 
         let warm = FluxThemeDefinition::builtin(BuiltinThemeId::WarmLight);
         assert_eq!(warm.light.colors.background, color(0xFFFBEB));
@@ -392,7 +392,7 @@ mod tests {
             color_with_alpha(0xE11D48, 26.0 / 255.0)
         );
         assert_eq!(warm.light.colors.destructive, color(0xDC2626));
-        assert_eq!(warm.dark, FluxThemeDefinition::fluxdown_default().dark);
+        assert_eq!(warm.dark, FluxThemeDefinition::rinadown_default().dark);
 
         let midnight = FluxThemeDefinition::builtin(BuiltinThemeId::MidnightBlue);
         assert_eq!(midnight.dark.colors.background, color(0x0F172A));
@@ -407,7 +407,7 @@ mod tests {
 
     #[test]
     fn accent_rewrites_derived_tokens_and_keeps_alpha() {
-        let theme = FluxThemeDefinition::fluxdown_default().with_accent(AccentScheme::Rose, 0);
+        let theme = FluxThemeDefinition::rinadown_default().with_accent(AccentScheme::Rose, 0);
         let rose = color(0xF43F5E);
         for tokens in [&theme.light, &theme.dark] {
             assert_eq!(tokens.colors.primary, rose);
@@ -426,13 +426,13 @@ mod tests {
         assert_eq!(theme.light.colors.background, color(0xF8F9FA));
 
         let custom =
-            FluxThemeDefinition::fluxdown_default().with_accent(AccentScheme::Custom, 0xFFFA_FAFA);
+            FluxThemeDefinition::rinadown_default().with_accent(AccentScheme::Custom, 0xFFFA_FAFA);
         assert_eq!(custom.light.colors.primary, color(0xFAFAFA));
         assert_eq!(custom.light.colors.primary_foreground, color(0x09090B));
 
         let unchanged =
-            FluxThemeDefinition::fluxdown_default().with_accent(AccentScheme::Blue, 0xFF00_0000);
-        assert_eq!(unchanged, FluxThemeDefinition::fluxdown_default());
+            FluxThemeDefinition::rinadown_default().with_accent(AccentScheme::Blue, 0xFF00_0000);
+        assert_eq!(unchanged, FluxThemeDefinition::rinadown_default());
     }
 
     #[test]

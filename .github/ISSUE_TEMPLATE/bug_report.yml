@@ -9,7 +9,7 @@ body:
         感谢反馈！请尽量填写完整，便于我们快速定位。
         Thanks for reporting! Please fill in as much as possible so we can reproduce quickly.
 
-        > 💡 也可以直接在应用内（状态栏反馈按钮）或[官网反馈页](https://fluxdown.zerx.dev/feedback)提交，会自动附带系统信息与日志。
+        > 💡 也可以直接在应用内（状态栏反馈按钮）或[官网反馈页](https://rinadown.zerx.dev/feedback)提交，会自动附带系统信息与日志。
   - type: textarea
     id: description
     attributes:
@@ -55,7 +55,7 @@ body:
     id: version
     attributes:
       label: 版本 / Version
-      description: FluxDown 版本号（关于页可见）/ App version (see About page)
+      description: RinaDown 版本号（关于页可见）/ App version (see About page)
       placeholder: v0.1.0
     validations:
       required: true

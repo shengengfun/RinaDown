@@ -5,6 +5,6 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** FluxDown 开源仓库地址 */
-export const GITHUB_REPO_URL = "https://github.com/zerx-lab/FluxDown";
+/** RinaDown 开源仓库地址 */
+export const GITHUB_REPO_URL = "https://github.com/zerx-lab/RinaDown";
 

@@ -29,7 +29,7 @@ class CompletionSound {
     if (_prepared && _wavPath != null) return;
     try {
       final dir = Directory.systemTemp;
-      final file = File('${dir.path}${Platform.pathSeparator}fluxdown_done.wav');
+      final file = File('${dir.path}${Platform.pathSeparator}rinadown_done.wav');
       final bytes = _synthesize();
       await file.writeAsBytes(bytes, flush: true);
       _wavPath = file.path;

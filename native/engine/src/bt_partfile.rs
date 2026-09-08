@@ -447,7 +447,7 @@ pub fn load_seed_factory(
 /// `is_type_id` 上报 `FilesystemStorageFactory` 的 TypeId 以通过白名单。
 ///
 /// 安全性：唯一消费该持久化条目的是 librqbit 启动时的会话恢复（用默认
-/// FilesystemStorage 重建），而 FluxDown 每次启动都在创建会话**之前**
+/// FilesystemStorage 重建），而 RinaDown 每次启动都在创建会话**之前**
 /// 删除 session.json（`clear_stale_session_state`），恢复路径从不会
 /// 消费这些条目；即便极端情况下被恢复，也只是回退到默认 storage 的
 /// 降级行为（重建占位文件），不会破坏数据。
@@ -873,7 +873,7 @@ mod tests {
 
     fn unique_dir(tag: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
-            "fluxdown_parts_test_{tag}_{}_{}",
+            "rinadown_parts_test_{tag}_{}_{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

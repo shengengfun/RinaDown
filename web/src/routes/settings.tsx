@@ -47,7 +47,7 @@ const NAV: { key: Category; labelKey: I18nKey; icon: LucideIcon }[] = [
   { key: 'about', labelKey: 'set.about', icon: Info },
 ]
 
-const CAT_KEY = 'fluxdown.settingsCat'
+const CAT_KEY = 'rinadown.settingsCat'
 const CATEGORIES = new Set<Category>(NAV.map((n) => n.key))
 
 function readStoredCat(): Category {

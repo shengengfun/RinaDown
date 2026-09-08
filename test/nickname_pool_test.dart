@@ -2,7 +2,7 @@
 // 纯函数，覆盖：同 seed 可复现、中英文拼接格式、词库中英下标对齐、无 seed 时有随机性。
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/services/cloud/nickname_pool.dart';
+import 'package:rina_down/src/services/cloud/nickname_pool.dart';
 
 void main() {
   group('NicknamePool.suggest', () {

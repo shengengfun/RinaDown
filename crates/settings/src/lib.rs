@@ -12,7 +12,7 @@ pub use port::{PortFuture, SettingsPort};
 pub use store::{SettingsError, SettingsErrorKind, SettingsStore};
 pub use view::{SettingsContentSlots, SettingsView};
 
-/// 将 FluxDown locale 映射为 gpui-component 支持的 locale。
+/// 将 RinaDown locale 映射为 gpui-component 支持的 locale。
 pub fn component_locale(locale: &str) -> &str {
     if locale == "zh" { "zh-CN" } else { "en" }
 }

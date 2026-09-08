@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use fluxdown_ui_downloads::DownloadAssets;
-use fluxdown_ui_shell::ShellAssets;
+use rinadown_ui_downloads::DownloadAssets;
+use rinadown_ui_shell::ShellAssets;
 use gpui::{AssetSource, Result, SharedString};
 
 /// composition root 组合 shell、能力 crate 与 gpui-component 的资源。
@@ -28,8 +28,8 @@ impl AssetSource for DesktopAssets {
 
 #[cfg(test)]
 mod tests {
-    use fluxdown_ui_downloads::DOWNLOAD_ICON_PATH;
-    use fluxdown_ui_shell::APP_LOGO_PATH;
+    use rinadown_ui_downloads::DOWNLOAD_ICON_PATH;
+    use rinadown_ui_shell::APP_LOGO_PATH;
     use gpui::AssetSource;
 
     use super::DesktopAssets;

@@ -1,9 +1,9 @@
 {
-  "identity": "fluxdown@ytdlp",
+  "identity": "rinadown@ytdlp",
   "name": "yt-dlp 通用视频解析",
   "version": "3.0.0",
-  "description": "经 FluxDown yt-dlp 组件把视频页解析为可下载直链，交回引擎多段并发下载 + 断点续传。为避免误接管任意链接，仅对一批社区默认、低版权风险的主流平台生效：YouTube / Bilibili（B站）/ Niconico / Twitch / Vimeo / Dailymotion / SoundCloud / AcFun（A站）。画质在下载时经画质选择弹框由用户挑选（含各分辨率与仅音频档，非在设置里固定）；可为需要登录的平台分别配置 Cookie（如 B站大会员画质、YouTube 会员/风控、Vimeo 私有视频）。⚠ YouTube 依赖 JS 运行时：需在系统 PATH 安装 Node.js（≥22）或 Deno（≥2.3），否则无法求解 n-sig 挑战（其他平台通常不需要）。签名直链自动按一次性 URL 处理并透传 http_headers 鉴权头。关闭「优先 MP4 容器」时下载完成后经 ffmpeg 转码为 H.264/AAC mp4。需在 App「组件」页安装 yt-dlp（及可选 ffmpeg）。",
-  "homepage": "https://fluxdown.zerx.dev",
+  "description": "经 RinaDown yt-dlp 组件把视频页解析为可下载直链，交回引擎多段并发下载 + 断点续传。为避免误接管任意链接，仅对一批社区默认、低版权风险的主流平台生效：YouTube / Bilibili（B站）/ Niconico / Twitch / Vimeo / Dailymotion / SoundCloud / AcFun（A站）。画质在下载时经画质选择弹框由用户挑选（含各分辨率与仅音频档，非在设置里固定）；可为需要登录的平台分别配置 Cookie（如 B站大会员画质、YouTube 会员/风控、Vimeo 私有视频）。⚠ YouTube 依赖 JS 运行时：需在系统 PATH 安装 Node.js（≥22）或 Deno（≥2.3），否则无法求解 n-sig 挑战（其他平台通常不需要）。签名直链自动按一次性 URL 处理并透传 http_headers 鉴权头。关闭「优先 MP4 容器」时下载完成后经 ffmpeg 转码为 H.264/AAC mp4。需在 App「组件」页安装 yt-dlp（及可选 ffmpeg）。",
+  "homepage": "https://rinadown.zerx.dev",
   "minAppVersion": "0.1.60",
   "permissions": ["ytdlp", "ffmpeg"],
   "resolvers": [
@@ -130,7 +130,7 @@
       "type": "string",
       "widget": "textarea",
       "default": "",
-      "helperScript": "(() => { if (!location.hostname.endsWith('youtube.com')) { console.log('%c[FluxDown] 请先打开并登录 www.youtube.com，再在本页 Console 执行本脚本', 'color:#e11'); return; } const readable = document.cookie.split('; ').filter(Boolean); const names = readable.map(s => s.split('=')[0]); const CRITICAL = ['__Secure-3PSID', '__Secure-3PSIDTS', 'LOGIN_INFO']; const missing = CRITICAL.filter(n => !names.includes(n)); if (missing.length === 0 && readable.length >= 5) { const s = readable.join('; '); try { copy(s); console.log('%c[FluxDown] 已复制 ' + readable.length + ' 条完整 cookie 到剪贴板，粘贴到插件 YouTube Cookie 输入框即可', 'color:#0a0'); } catch (e) { console.log('[FluxDown] 自动复制失败，请手动复制下面一行：'); console.log(s); } return; } console.log('%c[FluxDown] document.cookie 只能读到 ' + readable.length + ' 条 cookie，缺少登录会话 cookie（' + missing.join(', ') + '），无法通过 YouTube 风控。', 'color:#e11;font-weight:bold'); console.log('%cHttpOnly cookie 受浏览器保护、任何 Console 脚本都读不到。请改用下面任一方法获取完整 cookie：', 'color:#333'); console.log('%c方法 A（推荐，无需插件）：', 'font-weight:bold'); console.log('  1. 按 F12 打开开发者工具，切到「网络 / Network」面板'); console.log('  2. 刷新本页（F5），在请求列表点任意一条 www.youtube.com 的请求'); console.log('  3. 在「标头 / Headers」→「请求标头 / Request Headers」中找到 cookie: 一行'); console.log('  4. 完整复制 cookie: 后面的全部内容，粘贴到插件 YouTube Cookie 输入框'); console.log('%c方法 B：用「Get cookies.txt」等浏览器扩展导出 youtube.com 的 cookies.txt，整段内容粘贴到输入框', 'color:#333'); })();",
+      "helperScript": "(() => { if (!location.hostname.endsWith('youtube.com')) { console.log('%c[RinaDown] 请先打开并登录 www.youtube.com，再在本页 Console 执行本脚本', 'color:#e11'); return; } const readable = document.cookie.split('; ').filter(Boolean); const names = readable.map(s => s.split('=')[0]); const CRITICAL = ['__Secure-3PSID', '__Secure-3PSIDTS', 'LOGIN_INFO']; const missing = CRITICAL.filter(n => !names.includes(n)); if (missing.length === 0 && readable.length >= 5) { const s = readable.join('; '); try { copy(s); console.log('%c[RinaDown] 已复制 ' + readable.length + ' 条完整 cookie 到剪贴板，粘贴到插件 YouTube Cookie 输入框即可', 'color:#0a0'); } catch (e) { console.log('[RinaDown] 自动复制失败，请手动复制下面一行：'); console.log(s); } return; } console.log('%c[RinaDown] document.cookie 只能读到 ' + readable.length + ' 条 cookie，缺少登录会话 cookie（' + missing.join(', ') + '），无法通过 YouTube 风控。', 'color:#e11;font-weight:bold'); console.log('%cHttpOnly cookie 受浏览器保护、任何 Console 脚本都读不到。请改用下面任一方法获取完整 cookie：', 'color:#333'); console.log('%c方法 A（推荐，无需插件）：', 'font-weight:bold'); console.log('  1. 按 F12 打开开发者工具，切到「网络 / Network」面板'); console.log('  2. 刷新本页（F5），在请求列表点任意一条 www.youtube.com 的请求'); console.log('  3. 在「标头 / Headers」→「请求标头 / Request Headers」中找到 cookie: 一行'); console.log('  4. 完整复制 cookie: 后面的全部内容，粘贴到插件 YouTube Cookie 输入框'); console.log('%c方法 B：用「Get cookies.txt」等浏览器扩展导出 youtube.com 的 cookies.txt，整段内容粘贴到输入框', 'color:#333'); })();",
       "helperLabel": "复制 YouTube Cookie 脚本"
     },
     {
@@ -140,7 +140,7 @@
       "type": "string",
       "widget": "textarea",
       "default": "",
-      "helperScript": "(() => { const h = location.hostname; if (!h.endsWith('bilibili.com')) { console.log('%c[FluxDown] 请先打开并登录 www.bilibili.com，再在本页 Console 执行本脚本', 'color:#e11'); return; } const readable = document.cookie.split('; ').filter(Boolean); const names = readable.map(s => s.split('=')[0]); if (!names.includes('SESSDATA')) { console.log('%c[FluxDown] 未读到 SESSDATA（HttpOnly，Console 读不到）。请用「开发者工具→网络 / Network 面板→刷新→点任意 bilibili.com 请求→请求标头 cookie:」完整复制后粘贴到插件 Bilibili Cookie 输入框', 'color:#e11;font-weight:bold'); return; } const s = readable.join('; '); try { copy(s); console.log('%c[FluxDown] 已复制 ' + readable.length + ' 条 cookie 到剪贴板，粘贴到插件 Bilibili Cookie 输入框即可', 'color:#0a0'); } catch (e) { console.log('[FluxDown] 自动复制失败，请手动复制下面一行：'); console.log(s); } })();",
+      "helperScript": "(() => { const h = location.hostname; if (!h.endsWith('bilibili.com')) { console.log('%c[RinaDown] 请先打开并登录 www.bilibili.com，再在本页 Console 执行本脚本', 'color:#e11'); return; } const readable = document.cookie.split('; ').filter(Boolean); const names = readable.map(s => s.split('=')[0]); if (!names.includes('SESSDATA')) { console.log('%c[RinaDown] 未读到 SESSDATA（HttpOnly，Console 读不到）。请用「开发者工具→网络 / Network 面板→刷新→点任意 bilibili.com 请求→请求标头 cookie:」完整复制后粘贴到插件 Bilibili Cookie 输入框', 'color:#e11;font-weight:bold'); return; } const s = readable.join('; '); try { copy(s); console.log('%c[RinaDown] 已复制 ' + readable.length + ' 条 cookie 到剪贴板，粘贴到插件 Bilibili Cookie 输入框即可', 'color:#0a0'); } catch (e) { console.log('[RinaDown] 自动复制失败，请手动复制下面一行：'); console.log(s); } })();",
       "helperLabel": "复制 Bilibili Cookie 脚本"
     },
     {
@@ -178,7 +178,7 @@
     {
       "key": "extraArgs",
       "title": "附加 yt-dlp 参数（高级）",
-      "description": "追加到 yt-dlp 解析命令的额外参数，空格分隔（如 --geo-bypass --extractor-args \"generic:impersonate\"）。用于释放 yt-dlp 高级能力。⚠ 出于安全，FluxDown 会拒绝 --exec / --downloader / --config-location / --load-info-json / --cookies-from-browser 等危险开关；--ffmpeg-location 由 FluxDown 自动注入，请勿手填。含空格的单个参数值请用引号包裹。",
+      "description": "追加到 yt-dlp 解析命令的额外参数，空格分隔（如 --geo-bypass --extractor-args \"generic:impersonate\"）。用于释放 yt-dlp 高级能力。⚠ 出于安全，RinaDown 会拒绝 --exec / --downloader / --config-location / --load-info-json / --cookies-from-browser 等危险开关；--ffmpeg-location 由 RinaDown 自动注入，请勿手填。含空格的单个参数值请用引号包裹。",
       "type": "string",
       "widget": "text",
       "default": ""

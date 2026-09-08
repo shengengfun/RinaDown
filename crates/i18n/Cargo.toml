@@ -1,5 +1,5 @@
 [package]
-name = "fluxdown_ui_i18n"
+name = "rinadown_ui_i18n"
 version = "0.1.0"
 edition.workspace = true
 build = "build.rs"

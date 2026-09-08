@@ -2,7 +2,7 @@
 //!
 //! 桌面（Windows/macOS/Linux）开启 `hub_plugins` cfg，源码里所有 plugin 相关代码随之编译；
 //! 移动端（Android/iOS）关闭——`rquickjs-sys` 对这两个平台的 ABI 无预置 bindings，交叉编译必失败，
-//! 且移动端暂不需要插件能力。`Cargo.toml` 里对 `fluxdown_engine`/`fluxdown_api` 的 `plugins`
+//! 且移动端暂不需要插件能力。`Cargo.toml` 里对 `rinadown_engine`/`rinadown_api` 的 `plugins`
 //! feature 依赖分裂同样按 target_os 判定（rquickjs 是否被引入），与本文件保持同源。
 //!
 //! 本地可用 `HUB_FORCE_NO_PLUGINS=1 cargo check -p hub` 在桌面 host 上验证「关闭 plugins」分支

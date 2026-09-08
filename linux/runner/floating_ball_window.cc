@@ -511,7 +511,7 @@ static void drag_data_received_cb(GtkWidget* /*widget*/,
 static void context_menu_item_activate_cb(GtkMenuItem* item, gpointer user_data) {
   FloatingBallWindow* self = (FloatingBallWindow*)user_data;
   const int id = GPOINTER_TO_INT(
-      g_object_get_data(G_OBJECT(item), "fluxdown-menu-item-id"));
+      g_object_get_data(G_OBJECT(item), "rinadown-menu-item-id"));
   g_autoptr(FlValue) args = fl_value_new_map();
   fl_value_set_string_take(args, "id", fl_value_new_int(id));
   fl_method_channel_invoke_method(self->channel, "onMenuAction", args,
@@ -558,7 +558,7 @@ static void ensure_window(FloatingBallWindow* self) {
   // window (mirrors the Windows WS_EX_NOACTIVATE-style behavior implied by
   // the "dumb window" contract).
   gtk_window_set_accept_focus(GTK_WINDOW(window), FALSE);
-  gtk_window_set_title(GTK_WINDOW(window), "FluxDown Floating Ball");
+  gtk_window_set_title(GTK_WINDOW(window), "RinaDown Floating Ball");
   gtk_widget_set_size_request(window, self->logical_size, self->logical_size);
 
   GdkScreen* screen = gtk_window_get_screen(GTK_WINDOW(window));
@@ -1084,7 +1084,7 @@ static FlMethodResponse* handle_show_context_menu(FloatingBallWindow* self,
               ? fl_value_get_string(label_value)
               : "";
       menu_item = gtk_menu_item_new_with_label(label);
-      g_object_set_data(G_OBJECT(menu_item), "fluxdown-menu-item-id",
+      g_object_set_data(G_OBJECT(menu_item), "rinadown-menu-item-id",
                         GINT_TO_POINTER(id));
       g_signal_connect(menu_item, "activate",
                        G_CALLBACK(context_menu_item_activate_cb), self);
@@ -1140,7 +1140,7 @@ FloatingBallWindow* floating_ball_window_new(FlBinaryMessenger* messenger) {
   self->bitmap_scale = 1.0;
 
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
-  self->channel = fl_method_channel_new(messenger, "com.fluxdown/floating_ball",
+  self->channel = fl_method_channel_new(messenger, "com.rinadown/floating_ball",
                                         FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(self->channel, method_call_cb, self,
                                             nullptr);

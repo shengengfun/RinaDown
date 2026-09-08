@@ -1,14 +1,14 @@
 ---
 title: 命令行客户端
-description: fluxdown 命令行客户端 —— aria2c 风格的下载客户端，从终端或脚本驱动管理 API。
+description: rinadown 命令行客户端 —— aria2c 风格的下载客户端，从终端或脚本驱动管理 API。
 section: api
 order: 2
 sourceHash: "fa193ab09799"
 ---
 
-FluxDown 提供一个命令行客户端 `fluxdown`，对标 `aria2c`。它有两种工作模式：
+RinaDown 提供一个命令行客户端 `rinadown`，对标 `aria2c`。它有两种工作模式：
 
-- **远程模式（默认）**：一个薄的 typed HTTP 客户端，运行在[管理 API](/docs/zh/api/overview/) 之上。绝大多数命令都与运行中的 FluxDown 桌面应用或 [Headless 服务器](/docs/zh/headless-server/setup/) 通信（默认 `http://127.0.0.1:17800`，也可指向任意地址），因此它管理的正是你在应用里看到的同一批任务与队列。在这个角色下，可以把它理解为一个可脚本化的远程遥控器，与 `aria2c` 的 RPC 客户端模式相同。
+- **远程模式（默认）**：一个薄的 typed HTTP 客户端，运行在[管理 API](/docs/zh/api/overview/) 之上。绝大多数命令都与运行中的 RinaDown 桌面应用或 [Headless 服务器](/docs/zh/headless-server/setup/) 通信（默认 `http://127.0.0.1:17800`，也可指向任意地址），因此它管理的正是你在应用里看到的同一批任务与队列。在这个角色下，可以把它理解为一个可脚本化的远程遥控器，与 `aria2c` 的 RPC 客户端模式相同。
 - **独立模式（`add --local`）**：完全脱离运行中的实例，在 CLI 进程内**内嵌下载引擎**直接下载。这条路径不连服务器、不需要 token，适合无 GUI 的环境或一次性脚本化下载。详见 [`add`](#add) 与下方的[独立模式](#独立模式---local)一节。
 
 此外 [`config`](#config) 子命令是纯本地文件操作，同样不连服务器。
@@ -18,14 +18,14 @@ FluxDown 提供一个命令行客户端 `fluxdown`，对标 `aria2c`。它有两
 CLI 是 workspace 里的一个 crate（`native/cli`）。从源码构建：
 
 ```bash
-cargo build -p fluxdown_cli --release
-# 二进制位于 target/release/fluxdown（Windows 上为 fluxdown.exe）
+cargo build -p rinadown_cli --release
+# 二进制位于 target/release/rinadown（Windows 上为 rinadown.exe）
 ```
 
 或在开发时直接经 Cargo 运行：
 
 ```bash
-cargo run -p fluxdown_cli -- ping
+cargo run -p rinadown_cli -- ping
 ```
 
 ## 配置
@@ -34,8 +34,8 @@ cargo run -p fluxdown_cli -- ping
 
 | 选项 | 环境变量 | 默认值 | 含义 |
 |---|---|---|---|
-| `--url <URL>` | `FLUXDOWN_URL` | `http://127.0.0.1:17800` | FluxDown 实例的基址。 |
-| `--token <TOKEN>` | `FLUXDOWN_TOKEN` | （无） | 管理 API token。除 `ping` 外每条命令都需要。 |
+| `--url <URL>` | `RINADOWN_URL` | `http://127.0.0.1:17800` | RinaDown 实例的基址。 |
+| `--token <TOKEN>` | `RINADOWN_TOKEN` | （无） | 管理 API token。除 `ping` 外每条命令都需要。 |
 | `--timeout <SECS>` | — | `30` | 单请求超时（秒）。 |
 | `--json` | — | 关 | 输出机器可读的 JSON，而非格式化文本。 |
 
@@ -45,13 +45,13 @@ token 来自你运行中的实例：桌面应用在**设置 → 本机 API 服�
 
 ```bash
 # 方式 A：导出环境变量（仅当前 shell 会话有效）
-export FLUXDOWN_TOKEN="fxd_your_token_here"
-export FLUXDOWN_URL="http://127.0.0.1:17800"   # 可选；这就是默认值
-fluxdown list
+export RINADOWN_TOKEN="fxd_your_token_here"
+export RINADOWN_URL="http://127.0.0.1:17800"   # 可选；这就是默认值
+rinadown list
 
 # 方式 B：持久化一次，之后无需再 export
-fluxdown config set token fxd_your_token_here
-fluxdown list
+rinadown config set token fxd_your_token_here
+rinadown list
 ```
 
 CLI 始终直连给定地址，绝不走系统代理，因此即便设置了 `HTTP_PROXY` 环境变量，本地实例依然可正常连接。
@@ -78,16 +78,16 @@ CLI 始终直连给定地址，绝不走系统代理，因此即便设置了 `HT
 
 ```bash
 # 单个 URL，全部自动
-fluxdown add https://example.com/file.zip
+rinadown add https://example.com/file.zip
 
 # 一次多个 URL
-fluxdown add https://example.com/a.zip https://example.com/b.zip
+rinadown add https://example.com/a.zip https://example.com/b.zip
 
 # 从文件读取 URL（每行一个；空行与 # 开头的行被忽略）
-fluxdown add -i urls.txt
+rinadown add -i urls.txt
 
 # 从 stdin 读取 URL
-cat urls.txt | fluxdown add -i -
+cat urls.txt | rinadown add -i -
 ```
 
 `add` 选项：
@@ -113,8 +113,8 @@ cat urls.txt | fluxdown add -i -
 加上 `--local`，`add` 就不再连接任何运行中的实例，而是在 CLI 进程内**内嵌下载引擎**（与桌面应用/服务器同一套引擎）直接完成下载。这是让 CLI **脱机独立运行**的唯一路径——无需运行中的 App 或服务器，也不需要 token。
 
 ```bash
-# 完全脱机下载，不依赖任何运行中的 FluxDown 实例
-fluxdown add https://example.com/file.zip --local
+# 完全脱机下载，不依赖任何运行中的 RinaDown 实例
+rinadown add https://example.com/file.zip --local
 ```
 
 行为要点：
@@ -129,9 +129,9 @@ fluxdown add https://example.com/file.zip --local
 ### list
 
 ```bash
-fluxdown list
-fluxdown list --status downloading
-fluxdown --json list          # 脚本友好输出
+rinadown list
+rinadown list --status downloading
+rinadown --json list          # 脚本友好输出
 ```
 
 `--status` 接受名称或数字码：`pending`/`0`、`downloading`/`1`、`paused`/`2`、`completed`/`3`、`error`/`4`、`preparing`/`5`。纯文本输出是一张包含 ID、状态、进度、大小、名称的表格；`--json` 输出原始 `TaskDto` 数组（camelCase 字段 —— 见 [API 概览](/docs/zh/api/overview/)）。
@@ -139,22 +139,22 @@ fluxdown --json list          # 脚本友好输出
 ### status、pause、resume、rm
 
 ```bash
-fluxdown status 42a14870-9276-4ea2-84ea-eb75ae497766
-fluxdown pause  42a14870-9276-4ea2-84ea-eb75ae497766
-fluxdown resume 42a14870-9276-4ea2-84ea-eb75ae497766
+rinadown status 42a14870-9276-4ea2-84ea-eb75ae497766
+rinadown pause  42a14870-9276-4ea2-84ea-eb75ae497766
+rinadown resume 42a14870-9276-4ea2-84ea-eb75ae497766
 
 # 仅删除任务记录
-fluxdown rm 42a14870-9276-4ea2-84ea-eb75ae497766
+rinadown rm 42a14870-9276-4ea2-84ea-eb75ae497766
 # 删除记录并删除磁盘上的文件
-fluxdown rm 42a14870-9276-4ea2-84ea-eb75ae497766 --delete-files
+rinadown rm 42a14870-9276-4ea2-84ea-eb75ae497766 --delete-files
 ```
 
 ### pause-all、resume-all、queue
 
 ```bash
-fluxdown pause-all
-fluxdown resume-all
-fluxdown queue           # 列出命名队列
+rinadown pause-all
+rinadown resume-all
+rinadown queue           # 列出命名队列
 ```
 
 ### watch
@@ -162,9 +162,9 @@ fluxdown queue           # 列出命名队列
 `watch` 轮询实例并重绘一张进度表（每次刷新前清屏），直至所有被监视的任务到达终态（完成 / 出错），然后退出。
 
 ```bash
-fluxdown watch                 # 全部活动任务
-fluxdown watch <ID>            # 单个任务
-fluxdown watch --interval 2    # 每 2 秒刷新（默认 1）
+rinadown watch                 # 全部活动任务
+rinadown watch <ID>            # 单个任务
+rinadown watch --interval 2    # 每 2 秒刷新（默认 1）
 ```
 
 ### config
@@ -172,18 +172,18 @@ fluxdown watch --interval 2    # 每 2 秒刷新（默认 1）
 `config` 读写一个本地配置文件，让你不必每次都导出环境变量（类似 `go env -w`）。它从不连接服务器。合法的键为 `url`、`token`、`timeout`。
 
 ```bash
-fluxdown config set token fxd_your_token_here   # 持久化 token
-fluxdown config set url http://192.168.1.10:17800
-fluxdown config set timeout 60
+rinadown config set token fxd_your_token_here   # 持久化 token
+rinadown config set url http://192.168.1.10:17800
+rinadown config set timeout 60
 
-fluxdown config get token        # 打印单个值
-fluxdown config list             # 列出全部键（未设置显示 "(unset)"）
-fluxdown --json config list      # 机器可读输出
-fluxdown config unset token      # 清除单个值
-fluxdown config path             # 打印配置文件路径
+rinadown config get token        # 打印单个值
+rinadown config list             # 列出全部键（未设置显示 "(unset)"）
+rinadown --json config list      # 机器可读输出
+rinadown config unset token      # 清除单个值
+rinadown config path             # 打印配置文件路径
 ```
 
-配置文件是平台配置目录下的 `cli.toml`（Windows `%APPDATA%\zerx\fluxdown\config\`、Linux `$XDG_CONFIG_HOME/fluxdown/`、macOS `~/Library/Application Support/dev.zerx.fluxdown/`）。存储的 `token` 为明文；在 Unix 上文件以 `0600` 权限创建（仅属主可读写）。这里设置的值，在具体某次调用时会被显式 `--flag` 或对应环境变量覆盖。
+配置文件是平台配置目录下的 `cli.toml`（Windows `%APPDATA%\zerx\rinadown\config\`、Linux `$XDG_CONFIG_HOME/rinadown/`、macOS `~/Library/Application Support/dev.zerx.rinadown/`）。存储的 `token` 为明文；在 Unix 上文件以 `0600` 权限创建（仅属主可读写）。这里设置的值，在具体某次调用时会被显式 `--flag` 或对应环境变量覆盖。
 
 ## 退出码
 
@@ -195,7 +195,7 @@ CLI 沿用 `aria2c` 的退出状态约定，方便脚本按失败类别分支处
 | `1` | 未知错误。 |
 | `2` | 请求超时（或 clap 报告的未给出子命令）。 |
 | `3` | 未找到（404 —— 例如任务 ID 不存在）。 |
-| `5` | 网络错误（无法连接 —— FluxDown 在运行吗？）。 |
+| `5` | 网络错误（无法连接 —— RinaDown 在运行吗？）。 |
 | `7` | 中断且仍有未完成下载（`--local` 模式下 Ctrl-C）。 |
 | `24` | 鉴权失败（token 缺失或无效）。 |
 | `32` | 参数非法（400，或非法输入，如未知的状态过滤器）。 |
@@ -206,4 +206,4 @@ CLI 展示尺寸时一律使用 1024 进制单位（`KiB`、`MiB`、`GiB`）。�
 
 ## 与 aria2 及 API 的关系
 
-CLI 有两种角色：远程模式驱动同一套管理 API，独立模式（`add --local`）内嵌引擎脱机下载。若你已有面向 aria2 的工具链，[aria2 兼容 RPC 端点](/docs/zh/api/overview/#curl-示例)可能更合适；面向 AI 客户端则用 [MCP](/docs/zh/api/overview/#mcpmodel-context-protocol)。远程模式与这些入口操作的是同一批任务与队列。Metalink、XML-RPC、以及 aria2 的会话保存/恢复刻意未实现 —— FluxDown 的 SQLite 存储已在重启间持久化了一切。
+CLI 有两种角色：远程模式驱动同一套管理 API，独立模式（`add --local`）内嵌引擎脱机下载。若你已有面向 aria2 的工具链，[aria2 兼容 RPC 端点](/docs/zh/api/overview/#curl-示例)可能更合适；面向 AI 客户端则用 [MCP](/docs/zh/api/overview/#mcpmodel-context-protocol)。远程模式与这些入口操作的是同一批任务与队列。Metalink、XML-RPC、以及 aria2 的会话保存/恢复刻意未实现 —— RinaDown 的 SQLite 存储已在重启间持久化了一切。

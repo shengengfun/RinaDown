@@ -437,7 +437,7 @@ mod tests {
     async fn probe_alive_filters_dead_candidates() {
         // 活端口：本地 listener；死端口：TEST-NET-1 保留地址（不可路由，
         // 依赖 2s 超时剔除）。遥测采样需要 Db：临时目录建库。
-        let dir = std::env::temp_dir().join(format!("fluxdown_cdnprobe_{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("rinadown_cdnprobe_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let db = crate::db::Db::open(&dir).await.unwrap();
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

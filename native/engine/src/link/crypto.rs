@@ -24,7 +24,7 @@ pub const LINK_AUTH_SKEW_SECS: i64 = 120;
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::link::crypto::fingerprint;
+/// use rinadown_engine::link::crypto::fingerprint;
 /// let fp = fingerprint(&[0u8; 32]);
 /// assert_eq!(fp.len(), 64);
 /// ```
@@ -42,7 +42,7 @@ pub fn fingerprint(public_key: &[u8]) -> String {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::link::crypto::derive_sas;
+/// use rinadown_engine::link::crypto::derive_sas;
 /// let z = [7u8; 32];
 /// let a = [1u8; 32];
 /// let b = [2u8; 32];
@@ -61,7 +61,7 @@ pub fn derive_sas(z: &[u8], pub_a: &[u8; 32], pub_b: &[u8; 32]) -> String {
     info.extend_from_slice(lo);
     info.extend_from_slice(hi);
 
-    let hk = Hkdf::<Sha256>::new(Some(b"fluxdown-link-sas-v1"), z);
+    let hk = Hkdf::<Sha256>::new(Some(b"rinadown-link-sas-v1"), z);
     let mut okm = [0u8; 4];
     // 长度固定 4 字节 << 255*32，expand 不会失败；仍显式处理错误不 unwrap。
     if hk.expand(&info, &mut okm).is_err() {
@@ -76,15 +76,15 @@ pub fn derive_sas(z: &[u8], pub_a: &[u8; 32], pub_b: &[u8; 32]) -> String {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::link::crypto::derive_link_key;
+/// use rinadown_engine::link::crypto::derive_link_key;
 /// let k = derive_link_key(&[9u8; 32]);
 /// assert_eq!(k.len(), 32);
 /// ```
 #[must_use]
 pub fn derive_link_key(z: &[u8]) -> Vec<u8> {
-    let hk = Hkdf::<Sha256>::new(Some(b"fluxdown-link-key-salt-v1"), z);
+    let hk = Hkdf::<Sha256>::new(Some(b"rinadown-link-key-salt-v1"), z);
     let mut okm = [0u8; 32];
-    if hk.expand(b"fluxdown-link-key-v1", &mut okm).is_err() {
+    if hk.expand(b"rinadown-link-key-v1", &mut okm).is_err() {
         return z.to_vec();
     }
     okm.to_vec()
@@ -92,8 +92,8 @@ pub fn derive_link_key(z: &[u8]) -> Vec<u8> {
 
 /// 从每对设备独立的 `link_secret` 派生数据面 AEAD 加密密钥。
 ///
-/// **域分隔**：HKDF salt/info 标签与 [`derive_sas`]（`"fluxdown-link-sas-v1"`）、
-/// [`derive_link_key`]（`"fluxdown-link-key-salt-v1"`/`"fluxdown-link-key-v1"`）
+/// **域分隔**：HKDF salt/info 标签与 [`derive_sas`]（`"rinadown-link-sas-v1"`）、
+/// [`derive_link_key`]（`"rinadown-link-key-salt-v1"`/`"rinadown-link-key-v1"`）
 /// 均不同——AEAD 加密密钥绝不能等于 HMAC 鉴权用的 `link_secret` 本身或与
 /// SAS 相关，否则一把密钥材料挪作多用途，任一用途的密码学分析结果都可能
 /// 波及其余用途。
@@ -101,17 +101,17 @@ pub fn derive_link_key(z: &[u8]) -> Vec<u8> {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::link::crypto::derive_link_aead_key;
+/// use rinadown_engine::link::crypto::derive_link_aead_key;
 /// let k = derive_link_aead_key(&[6u8; 32]);
 /// assert_eq!(k.len(), 32);
 /// ```
 #[must_use]
 pub fn derive_link_aead_key(link_secret: &[u8]) -> [u8; 32] {
-    let hk = Hkdf::<Sha256>::new(Some(b"fluxdown-link-aead-salt-v1"), link_secret);
+    let hk = Hkdf::<Sha256>::new(Some(b"rinadown-link-aead-salt-v1"), link_secret);
     let mut okm = [0u8; 32];
     // 长度固定 32 字节 << 255*32，expand 不会失败；仍显式处理错误分支
     // （clippy 禁 unwrap/expect）。
-    if hk.expand(b"fluxdown-link-aead-v1", &mut okm).is_err() {
+    if hk.expand(b"rinadown-link-aead-v1", &mut okm).is_err() {
         return [0u8; 32];
     }
     okm
@@ -128,7 +128,7 @@ pub fn derive_link_aead_key(link_secret: &[u8]) -> [u8; 32] {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::link::crypto::{open_link_body, seal_link_body};
+/// use rinadown_engine::link::crypto::{open_link_body, seal_link_body};
 /// let key = [1u8; 32];
 /// let sealed = seal_link_body(&key, b"hello");
 /// assert_eq!(open_link_body(&key, &sealed).as_deref(), Some(b"hello".as_slice()));
@@ -179,7 +179,7 @@ pub fn open_link_body(key: &[u8; 32], sealed: &[u8]) -> Option<Vec<u8>> {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::link::crypto::{link_auth_tag, verify_link_auth_tag};
+/// use rinadown_engine::link::crypto::{link_auth_tag, verify_link_auth_tag};
 /// let key = [3u8; 32];
 /// let body = b"{}";
 /// let tag = link_auth_tag(&key, "POST", "/api/v1/link/tasks", 1000, "abc", body);

@@ -1,13 +1,13 @@
 //! `engine::model::*` ↔ `hub::signals::*` 类型转换。
 //!
-//! orphan rule 决定了不能跨 crate 共享同一 derive 类型(`fluxdown_engine` 不
+//! orphan rule 决定了不能跨 crate 共享同一 derive 类型(`rinadown_engine` 不
 //! 知道、也不能依赖 `rinf`),因此这里为每个引擎领域类型手写一个到对应
 //! Dart 信号 DTO 的 `From` 实现——这是标准 repository-pattern 边界收口做法,
 //! 内容是搬移字段而非新写业务逻辑。
 
-use fluxdown_engine::model;
-use fluxdown_engine::rss::model as rss_model;
-use fluxdown_engine::webhook;
+use rinadown_engine::model;
+use rinadown_engine::rss::model as rss_model;
+use rinadown_engine::webhook;
 
 use crate::signals;
 

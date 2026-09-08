@@ -13,9 +13,9 @@ use crate::{
     },
     strings::NewDownloadStrings,
 };
-use fluxdown_protocol::CreateTaskRequest;
-use fluxdown_ui_i18n::Translator;
-use fluxdown_ui_theme::active_theme;
+use rinadown_protocol::CreateTaskRequest;
+use rinadown_ui_i18n::Translator;
+use rinadown_ui_theme::active_theme;
 use gpui::{
     Anchor, App, AppContext as _, ClickEvent, Context, Div, Entity, InteractiveElement as _,
     IntoElement, ParentElement, Pixels, Render, SharedString, StatefulInteractiveElement as _,
@@ -279,7 +279,7 @@ impl NewDownloadView {
     fn draft_options(&self, later: bool, queue_override: Option<String>, cx: &App) -> DraftOptions {
         let queue_id = queue_override.unwrap_or_else(|| {
             if later {
-                fluxdown_protocol::LATER_QUEUE_ID.to_owned()
+                rinadown_protocol::LATER_QUEUE_ID.to_owned()
             } else {
                 self.context.queue_id.clone()
             }
@@ -1051,7 +1051,7 @@ impl NewDownloadView {
     fn render_footer(&self, cx: &mut Context<Self>) -> Div {
         let tokens = active_theme(cx).tokens().clone();
         let enabled = self.can_submit(cx);
-        let later_queue = self.queue_label(fluxdown_protocol::LATER_QUEUE_ID);
+        let later_queue = self.queue_label(rinadown_protocol::LATER_QUEUE_ID);
         let start_queue = self.queue_label(&self.context.queue_id);
         h_flex()
             .w_full()

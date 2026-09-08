@@ -6,11 +6,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::events::{EngineEvent, EventSink};
-use fluxdown_engine::plugin::manifest::PluginManifest;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection};
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::events::{EngineEvent, EventSink};
+use rinadown_engine::plugin::manifest::PluginManifest;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::{Engine, EngineConfig, NoopSelection};
 
 fn examples_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/plugins")
@@ -92,7 +92,7 @@ async fn recv_preview_ready(
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn manifest_playground_preview_produces_valid_manifest() {
     let work = std::env::temp_dir().join(format!(
-        "fluxdown-example-playground-{}-{}",
+        "rinadown-example-playground-{}-{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -145,7 +145,7 @@ async fn manifest_playground_preview_produces_valid_manifest() {
 
     // stress 数据集：1000 项（清单契约上限，恰好放行）。
     pm.update_settings(
-        "fluxdown@manifest-playground",
+        "rinadown@manifest-playground",
         &[("dataset".to_string(), "stress".to_string())],
     )
     .await

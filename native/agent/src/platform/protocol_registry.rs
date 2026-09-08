@@ -1,8 +1,8 @@
-//! URL scheme（`fluxdown://` 深链、`ed2k://`、`magnet:`）系统默认处理程序注册。
+//! URL scheme（`rinadown://` 深链、`ed2k://`、`magnet:`）系统默认处理程序注册。
 //!
 //! 注册目标是官方桌面程序：Windows 写入 HKCU 注册表并指向同级
-//! `fluxdown-desktop.exe`；Linux 通过 `xdg-mime` 指向打包的
-//! `com.fluxdown.app.desktop`；macOS 通过 Launch Services 指向当前 `.app`
+//! `rinadown-desktop.exe`；Linux 通过 `xdg-mime` 指向打包的
+//! `com.rinadown.app.desktop`；macOS 通过 Launch Services 指向当前 `.app`
 //! bundle（scheme 必须已在 `CFBundleURLTypes` 中声明）。
 //!
 //! Windows 注册表结构（与 Inno Setup 安装器一致）：
@@ -13,13 +13,13 @@
 //! HKCU\Software\Classes\<scheme>\shell\open\command → "\"<exe>\" \"%1\""
 //! ```
 //! 运行期直接写 winreg，不在安装器 [Registry] 跟踪范围内，因此
-//! `installer/windows/setup.iss` 卸载时显式清理 `fluxdown`/`ed2k`/`magnet`
+//! `installer/windows/setup.iss` 卸载时显式清理 `rinadown`/`ed2k`/`magnet`
 //! 键——两处需保持同步。
 
 /// 本程序可声明为系统默认处理程序的 URL scheme。
 #[derive(Clone, Copy)]
 pub struct UrlScheme {
-    /// 不含 `://` 的小写 scheme 名（如 `fluxdown`）。
+    /// 不含 `://` 的小写 scheme 名（如 `rinadown`）。
     pub scheme: &'static str,
     /// Windows shell 描述（class 键默认值）；Linux/macOS 由 `.desktop` /
     /// bundle id 命名处理程序，不使用。
@@ -28,9 +28,9 @@ pub struct UrlScheme {
 }
 
 /// 本程序自有深链 scheme。
-pub const FLUXDOWN: UrlScheme = UrlScheme {
-    scheme: "fluxdown",
-    desc: "URL:FluxDown Protocol",
+pub const RINADOWN: UrlScheme = UrlScheme {
+    scheme: "rinadown",
+    desc: "URL:RinaDown Protocol",
 };
 
 /// eDonkey2000 链接（`ed2k://|file|…`）；eMule/aMule 等客户端会合法竞争。
@@ -46,14 +46,14 @@ pub const MAGNET: UrlScheme = UrlScheme {
 };
 
 /// `PlatformIntegrationDto.url_protocols` 的固定枚举顺序。
-pub const SCHEMES: [UrlScheme; 3] = [MAGNET, ED2K, FLUXDOWN];
+pub const SCHEMES: [UrlScheme; 3] = [MAGNET, ED2K, RINADOWN];
 
 /// 把 wire scheme 名解析为允许列表中的 [`UrlScheme`]。
 ///
 /// 注册原语直接写 shell/注册表，scheme 绝不能是调用方任意字符串。
 pub fn from_name(name: &str) -> Option<UrlScheme> {
     match name {
-        "fluxdown" => Some(FLUXDOWN),
+        "rinadown" => Some(RINADOWN),
         "ed2k" => Some(ED2K),
         "magnet" => Some(MAGNET),
         _ => None,
@@ -77,7 +77,7 @@ mod inner {
     /// `proto` 是否已注册到**桌面程序**。
     ///
     /// 仅当 `HKCU\Software\Classes\<scheme>` 存在、带 `URL Protocol` 值，且
-    /// `shell\open\command` 指向同级 `fluxdown-desktop.exe` 时为 true。exe
+    /// `shell\open\command` 指向同级 `rinadown-desktop.exe` 时为 true。exe
     /// 路径比对能识别程序移动/升级后的过期注册，也把其他客户端（ed2k 竞争者）
     /// 的注册判定为“未注册”而不是冒领。桌面程序不可定位时退回“值存在”语义，
     /// 避免瞬时 I/O 错误导致误判。
@@ -166,7 +166,7 @@ mod inner {
         if !is_registered(proto, desktop) {
             tracing::info!(
                 scheme,
-                "URL protocol not registered to FluxDown, skipping removal"
+                "URL protocol not registered to RinaDown, skipping removal"
             );
             return Ok(());
         }
@@ -188,7 +188,7 @@ mod inner {
 
     use super::UrlScheme;
     use crate::platform::PlatformError;
-    use crate::platform::xdg::{DESKTOP_ENTRY, query_default_is_fluxdown, remove_default};
+    use crate::platform::xdg::{DESKTOP_ENTRY, query_default_is_rinadown, remove_default};
 
     pub fn supported(_desktop: Option<&Path>) -> bool {
         true
@@ -198,14 +198,14 @@ mod inner {
         format!("x-scheme-handler/{}", proto.scheme)
     }
 
-    /// FluxDown 是否为 `proto` 的默认处理程序。
+    /// RinaDown 是否为 `proto` 的默认处理程序。
     pub fn is_registered(proto: UrlScheme, _desktop: Option<&Path>) -> bool {
-        query_default_is_fluxdown(&mime_type(proto))
+        query_default_is_rinadown(&mime_type(proto))
     }
 
-    /// 把 FluxDown 注册为 `proto` 的默认处理程序。
+    /// 把 RinaDown 注册为 `proto` 的默认处理程序。
     ///
-    /// 要求打包的 `com.fluxdown.app.desktop` 已安装到 XDG applications 目录并在
+    /// 要求打包的 `com.rinadown.app.desktop` 已安装到 XDG applications 目录并在
     /// `MimeType` 中声明该 scheme。
     pub fn register(proto: UrlScheme, _desktop: Option<&Path>) -> Result<(), PlatformError> {
         let status = std::process::Command::new("xdg-mime")
@@ -270,7 +270,7 @@ mod inner {
     /// 把本 bundle 设为 `proto` 的默认处理程序。
     pub fn register(proto: UrlScheme, _desktop: Option<&Path>) -> Result<(), PlatformError> {
         let bundle_id = main_bundle_id().ok_or(PlatformError::Unsupported(
-            "fluxdown-agent is not running inside an app bundle",
+            "rinadown-agent is not running inside an app bundle",
         ))?;
         let scheme = cf_string(proto.scheme)?;
         let id = cf_string(&bundle_id)?;
@@ -293,7 +293,7 @@ mod inner {
         if !is_registered(proto, desktop) {
             tracing::info!(
                 scheme = proto.scheme,
-                "URL protocol not registered to FluxDown, skipping removal"
+                "URL protocol not registered to RinaDown, skipping removal"
             );
             return Ok(());
         }

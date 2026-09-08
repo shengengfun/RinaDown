@@ -1,6 +1,6 @@
 //! rquickjs 0.12.1 能力 spike（feature: full-async + parallel，禁 rust-alloc/allocator）。
 //!
-//! 运行：`cargo run -p fluxdown_engine --example plugin_spike --features plugins`
+//! 运行：`cargo run -p rinadown_engine --example plugin_spike --features plugins`
 //!
 //! ## 验证结论（实测记录于下方 main 输出）
 //! 1. `set_memory_limit(N)` 超限时 eval 返回 `Err(Error::Allocation)`（非 abort），

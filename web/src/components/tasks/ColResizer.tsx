@@ -11,8 +11,8 @@ export interface PanelWidthConf {
   max: number
 }
 
-export const SIDEBAR_W: PanelWidthConf = { key: 'fluxdown.sidebarWidth', def: 220, min: 180, max: 320 }
-export const DETAIL_W: PanelWidthConf = { key: 'fluxdown.detailWidth', def: 340, min: 240, max: 420 }
+export const SIDEBAR_W: PanelWidthConf = { key: 'rinadown.sidebarWidth', def: 220, min: 180, max: 320 }
+export const DETAIL_W: PanelWidthConf = { key: 'rinadown.detailWidth', def: 340, min: 240, max: 420 }
 
 export function loadWidth(c: PanelWidthConf): number {
   const v = Number(localStorage.getItem(c.key))

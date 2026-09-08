@@ -1,11 +1,11 @@
-name: fluxdown
+name: rinadown
 services:
   website:
     build:
       context: .
       dockerfile: Dockerfile
-    image: fluxdown-website:latest
-    container_name: fluxdown-website
+    image: rinadown-website:latest
+    container_name: rinadown-website
     restart: unless-stopped
     ports:
       - "4321:4321"

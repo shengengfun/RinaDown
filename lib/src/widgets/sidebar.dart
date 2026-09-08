@@ -248,7 +248,7 @@ class _SidebarState extends State<Sidebar> {
                 return ClipRRect(
                   borderRadius: m.brMd,
                   child: Image.asset(
-                    'assets/logo/fluxdown_logo.png',
+                    'assets/logo/rinadown_logo.png',
                     width: 22,
                     height: 22,
                     filterQuality: FilterQuality.medium,

@@ -24,9 +24,9 @@ bool isPortableMode() {
 }
 
 /// SQLite 主库文件名；`-wal` / `-shm` 为其伴生文件（见 `_migrateDbGroup`）。
-const _dbFile = 'flux_down.db';
-const _dbWal = 'flux_down.db-wal';
-const _dbShm = 'flux_down.db-shm';
+const _dbFile = 'rina_down.db';
+const _dbWal = 'rina_down.db-wal';
+const _dbShm = 'rina_down.db-shm';
 
 /// 独立迁移项（不含 DB 三件套——那组走 `_migrateDbGroup` 原子迁移）。
 // KEEP IN SYNC with native/engine/src/data_dir.rs KNOWN_ITEMS
@@ -142,21 +142,21 @@ void _persistFailures(String newDir, List<String> failures) {
 /// | Platform        | Mode      | Directory                                      |
 /// |-----------------|-----------|-------------------------------------------------|
 /// | Windows         | Portable  | `<exe_dir>/portable_data/`                      |
-/// | Windows         | Installed | `%LOCALAPPDATA%\FluxDown\`                      |
-/// | Linux           | —         | `$XDG_DATA_HOME/fluxdown/`                      |
-/// | macOS           | —         | `~/Library/Application Support/fluxdown/`        |
+/// | Windows         | Installed | `%LOCALAPPDATA%\RinaDown\`                      |
+/// | Linux           | —         | `$XDG_DATA_HOME/rinadown/`                      |
+/// | macOS           | —         | `~/Library/Application Support/rinadown/`        |
 String resolveDataDir() {
   if (Platform.isAndroid) {
-    return '/data/data/com.fluxdown.app/files/fluxdown';
+    return '/data/data/com.rinadown.app/files/rinadown';
   }
   if (Platform.isLinux) {
     final xdgData = Platform.environment['XDG_DATA_HOME'] ??
         '${Platform.environment['HOME']}/.local/share';
-    return '$xdgData/fluxdown';
+    return '$xdgData/rinadown';
   }
   if (Platform.isMacOS) {
     final home = Platform.environment['HOME'] ?? '';
-    return '$home/Library/Application Support/fluxdown';
+    return '$home/Library/Application Support/rinadown';
   }
   // Windows
   if (Platform.isWindows && isPortableMode()) {
@@ -172,5 +172,5 @@ String resolveDataDir() {
   final localAppData = Platform.environment['LOCALAPPDATA'] ??
       Platform.environment['APPDATA'] ??
       File(Platform.resolvedExecutable).parent.path;
-  return '$localAppData${Platform.pathSeparator}FluxDown';
+  return '$localAppData${Platform.pathSeparator}RinaDown';
 }

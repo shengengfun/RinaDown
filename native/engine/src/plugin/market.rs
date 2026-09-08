@@ -2,7 +2,7 @@
 //!
 //! 市场不是网站，而是**一份可验证的数据格式**：Git 版本化的索引（联邦式，任何人可
 //! fork 另立），插件包内容寻址（`content_hash = sha256(整个 .fxplug zip)`），经多源
-//! （CDN / R2 / 众包镜像）分发。**FluxDown 用自己的引擎下载并本地验证插件**。
+//! （CDN / R2 / 众包镜像）分发。**RinaDown 用自己的引擎下载并本地验证插件**。
 //!
 //! ## v1 范围（记录在案的取舍）
 //! - 完整性基座 = `content_hash`（sha256，已在依赖树）+ Git Merkle DAG 防篡改 +
@@ -26,8 +26,8 @@ use super::runtime::PluginError;
 /// 内置官方索引候选源（不同法域/托管，共享同一 index_id；任一存活即可用）。
 /// 首个成功者胜出；用户可经配置覆盖/追加。
 pub const DEFAULT_INDEX_SOURCES: &[&str] = &[
-    "https://raw.githubusercontent.com/zerx-lab/fluxdown-plugin-index/main/index.json",
-    "https://cdn.jsdelivr.net/gh/zerx-lab/fluxdown-plugin-index@main/index.json",
+    "https://raw.githubusercontent.com/zerx-lab/rinadown-plugin-index/main/index.json",
+    "https://cdn.jsdelivr.net/gh/zerx-lab/rinadown-plugin-index@main/index.json",
 ];
 
 /// 下载/校验/安装的错误。

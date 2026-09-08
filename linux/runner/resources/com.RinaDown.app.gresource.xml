@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/com/rinadown/app">
+    <file alias="icons/hicolor/256x256/apps/com.rinadown.app.png">assets/logo/rinadown_logo.png</file>
+    <file alias="icons/hicolor/scalable/apps/com.rinadown.app.svg">assets/logo/rinadown_logo.svg</file>
+  </gresource>
+</gresources>

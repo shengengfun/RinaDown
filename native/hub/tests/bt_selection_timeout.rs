@@ -1,6 +1,6 @@
 //! Regression tests for the BT file-selection timeout behavior introduced
-//! in stage 6 of the fluxdown_engine decoupling (see
-//! `docs/fluxdown-engine-decouple-plan.md` Verification item 5a, line 146):
+//! in stage 6 of the rinadown_engine decoupling (see
+//! `docs/rinadown-engine-decouple-plan.md` Verification item 5a, line 146):
 //!
 //! > 5a. **BT 超时行为变更验证**:针对阶段 6 步骤 24 引入的"BT 文件选择从
 //! > 无限等待改为有限超时"变更,测试断言 (a) 超时阈值内收到
@@ -26,7 +26,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use fluxdown_engine::selection::{HostSelection, SelectionOutcome};
+use rinadown_engine::selection::{HostSelection, SelectionOutcome};
 use hub::rinf_selection::RinfHostSelection;
 
 /// (a) An answer delivered *within* the timeout window must win, regardless

@@ -1,5 +1,5 @@
 ---
-description: FluxDown 的悬浮/弹出层一律无进出场动画——ShadTooltip 必须 effects/const []，showShadDialog 必须 animateIn/animateOut/const []，不得沿用 shadcn_ui 默认的淡入位移
+description: RinaDown 的悬浮/弹出层一律无进出场动画——ShadTooltip 必须 effects/const []，showShadDialog 必须 animateIn/animateOut/const []，不得沿用 shadcn_ui 默认的淡入位移
 condition:
   - 'ShadTooltip\('
   - 'ShadPopover\('
@@ -7,7 +7,7 @@ condition:
 interruptMode: never
 ---
 
-你正在写 shadcn_ui 的弹出层。**FluxDown 的既定观感是：提示与弹窗要么不出现，要么立刻在那儿。**
+你正在写 shadcn_ui 的弹出层。**RinaDown 的既定观感是：提示与弹窗要么不出现，要么立刻在那儿。**
 shadcn_ui 默认的 200ms 淡入+位移在本项目一律关掉——tooltip 已经等了 500ms 悬浮延迟，
 再叠一段入场只是把等待继续拖长；弹窗动画则让连续操作（确认→再确认）显得黏滞。
 

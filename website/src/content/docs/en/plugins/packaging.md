@@ -34,11 +34,11 @@ The plugin is extracted to `<data dir>/plugins/<identity>/`. Installing the same
 
 ## The plugin market
 
-FluxDown's market is **a data format, not a service** — an index the app reads directly, with no backend and no account. The pieces:
+RinaDown's market is **a data format, not a service** — an index the app reads directly, with no backend and no account. The pieces:
 
-- **An index** — a Git-versioned JSON file listing plugins, versions and download mirrors. The default index lives at `zerx-lab/fluxdown-plugin-index` on GitHub; anyone can fork it and run their own. Users can add custom index sources in the app.
-- **Content addressing** — every published version records `contentHash = sha256(<the .fxplug file>)`. After downloading from any mirror, FluxDown recomputes the hash and rejects a mismatch. A compromised mirror cannot swap the payload.
-- **Multiple mirrors** — each version lists several download URLs (raw.githubusercontent, jsDelivr, GitHub Releases…). FluxDown tries them in order. Mirror URLs must be `https` and must not point at private/loopback/metadata addresses.
+- **An index** — a Git-versioned JSON file listing plugins, versions and download mirrors. The default index lives at `zerx-lab/rinadown-plugin-index` on GitHub; anyone can fork it and run their own. Users can add custom index sources in the app.
+- **Content addressing** — every published version records `contentHash = sha256(<the .fxplug file>)`. After downloading from any mirror, RinaDown recomputes the hash and rejects a mismatch. A compromised mirror cannot swap the payload.
+- **Multiple mirrors** — each version lists several download URLs (raw.githubusercontent, jsDelivr, GitHub Releases…). RinaDown tries them in order. Mirror URLs must be `https` and must not point at private/loopback/metadata addresses.
 - **Rollback protection** — each index carries a monotonically increasing `sequence`; the app remembers the highest value seen per index and refuses an older one.
 
 v1 has no author-level cryptographic signatures — integrity rests on content addressing plus TLS plus Git history. The index schema reserves signature fields so they can be added later without breaking existing clients.

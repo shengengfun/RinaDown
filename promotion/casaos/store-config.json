@@ -1,14 +1,14 @@
 {
   "version": 2,
-  "store_id": "zerx-fluxdown",
+  "store_id": "zerx-rinadown",
   "name": {
-    "en_US": "FluxDown Store",
-    "zh_CN": "FluxDown 应用商店"
+    "en_US": "RinaDown Store",
+    "zh_CN": "RinaDown 应用商店"
   },
   "description": {
-    "en_US": "Official FluxDown download manager for CasaOS / ZimaOS",
-    "zh_CN": "FluxDown 下载管理器官方 CasaOS / ZimaOS 源"
+    "en_US": "Official RinaDown download manager for CasaOS / ZimaOS",
+    "zh_CN": "RinaDown 下载管理器官方 CasaOS / ZimaOS 源"
   },
   "maintainer": "zerx-lab",
-  "url": "https://github.com/zerx-lab/FluxDown"
+  "url": "https://github.com/zerx-lab/RinaDown"
 }

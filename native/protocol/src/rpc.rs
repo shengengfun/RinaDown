@@ -12,7 +12,7 @@ pub const PROTOCOL_VERSION: u32 = 2;
 /// 本机服务接受的最低协议版本。
 pub const MIN_PROTOCOL_VERSION: u32 = 2;
 
-/// 本机服务在 FluxDown 架构中的职责。
+/// 本机服务在 RinaDown 架构中的职责。
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
@@ -286,7 +286,7 @@ mod tests {
     #[test]
     fn negotiates_protocol_v2_and_stable_hello_shape() -> Result<(), serde_json::Error> {
         let client = ClientHello {
-            client_name: "fluxdown-desktop".to_owned(),
+            client_name: "rinadown-desktop".to_owned(),
             client_version: "1.0.0".to_owned(),
             min_protocol_version: MIN_PROTOCOL_VERSION,
             max_protocol_version: PROTOCOL_VERSION,
@@ -297,7 +297,7 @@ mod tests {
 
         let service = ServiceHello::new(
             ServiceRole::Agent,
-            "fluxdown-agent",
+            "rinadown-agent",
             "1.0.0",
             "instance-1",
             vec!["agent.gateway".to_owned()],
@@ -307,7 +307,7 @@ mod tests {
             wire,
             json!({
                 "role": "agent",
-                "serviceName": "fluxdown-agent",
+                "serviceName": "rinadown-agent",
                 "serviceVersion": "1.0.0",
                 "protocolVersion": 2,
                 "instanceId": "instance-1",

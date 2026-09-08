@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocale } from "@/lib/i18n";
 
-// ── 数据类型（对应 fluxdown-themes 仓库 index.json）──
+// ── 数据类型（对应 rinadown-themes 仓库 index.json）──
 
-const THEMES_REPO = "zerx-lab/fluxdown-themes";
+const THEMES_REPO = "zerx-lab/rinadown-themes";
 const RAW_BASE = `https://raw.githubusercontent.com/${THEMES_REPO}/main`;
 const REPO_URL = `https://github.com/${THEMES_REPO}`;
 
@@ -432,12 +432,12 @@ export default function ThemeMarketPage() {
           <div className="text-center py-20">
             <p className="text-sm text-dark-text-muted">{t("themes.loadError")}</p>
             <a
-              href="https://github.com/zerx-lab/fluxdown-themes"
+              href="https://github.com/zerx-lab/rinadown-themes"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 inline-block text-xs text-brand-sky hover:underline"
             >
-              github.com/zerx-lab/fluxdown-themes →
+              github.com/zerx-lab/rinadown-themes →
             </a>
           </div>
         )}

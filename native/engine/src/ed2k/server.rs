@@ -58,7 +58,7 @@ impl std::fmt::Display for PeerAddr {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::server::id_to_ipv4;
+/// use rinadown_engine::ed2k::server::id_to_ipv4;
 /// use std::net::Ipv4Addr;
 /// // 1.2.3.4 小端打包 = 0x04030201
 /// assert_eq!(id_to_ipv4(0x0403_0201), Ipv4Addr::new(1, 2, 3, 4));
@@ -138,7 +138,7 @@ fn parse_server_addr(s: &str) -> Option<(String, u16)> {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::server::parse_server_list;
+/// use rinadown_engine::ed2k::server::parse_server_list;
 /// let list = parse_server_list("1.2.3.4:4661, 5.6.7.8:4242");
 /// assert_eq!(list, vec!["1.2.3.4:4661".to_string(), "5.6.7.8:4242".to_string()]);
 /// ```
@@ -215,7 +215,7 @@ pub(crate) fn build_login_payload(listen_port: u16) -> Vec<u8> {
     let tags: Vec<Vec<u8>> = vec![
         encode_u32_tag(CT_VERSION, ED2K_VERSION),
         encode_u32_tag(CT_SERVER_FLAGS, flags),
-        encode_string_tag(CT_NAME, "FluxDown"),
+        encode_string_tag(CT_NAME, "RinaDown"),
         encode_u32_tag(CT_EMULE_VERSION, EMULE_VERSION),
     ];
 

@@ -1,7 +1,7 @@
-//! FluxDown 下载核心进程的应用边界。
+//! RinaDown 下载核心进程的应用边界。
 //!
 //! 本 crate 只承载本地下载、任务管理与下载功能装配；账户、云同步和 UI 状态属于
-//! `fluxdown_agent` 或具体客户端。
+//! `rinadown_agent` 或具体客户端。
 
 pub mod actor;
 pub mod blob_store;
@@ -13,10 +13,10 @@ pub mod runtime;
 pub mod selection;
 pub mod service;
 
-use fluxdown_protocol::{ServiceHello, ServiceRole};
+use rinadown_protocol::{ServiceHello, ServiceRole};
 
 /// 下载核心进程名。
-pub const SERVICE_NAME: &str = "fluxdownd";
+pub const SERVICE_NAME: &str = "rinadownd";
 
 /// 返回下载核心用于协议协商的稳定身份。
 #[must_use]
@@ -32,7 +32,7 @@ pub fn service_hello(instance_id: impl Into<String>, capabilities: Vec<String>) 
 
 #[cfg(test)]
 mod tests {
-    use fluxdown_protocol::{PROTOCOL_VERSION, ServiceRole};
+    use rinadown_protocol::{PROTOCOL_VERSION, ServiceRole};
 
     use super::{SERVICE_NAME, service_hello};
 

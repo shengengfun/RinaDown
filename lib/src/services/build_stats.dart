@@ -1,4 +1,4 @@
-// FluxDown 构建期统计信息。
+// RinaDown 构建期统计信息。
 //
 // Release CI（.github/workflows/release.yml）在 `flutter build` 时经
 // `--dart-define` 从 git 历史动态注入以下三个值：

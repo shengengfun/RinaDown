@@ -1,7 +1,7 @@
 //! 受管组件子页：每个组件（ffmpeg / yt-dlp）一张卡片 —— 生效状态、系统 PATH、
 //! 手动路径、托管安装（版本列表 / 安装 / 更新 / 卸载 / 下载进度）。
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     ApplicationErrorCode, ComponentKind, ComponentStatusDto, ComponentVersions,
     DaemonConfigSnapshot, RpcErrorData,
 };

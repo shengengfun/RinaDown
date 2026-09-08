@@ -1,12 +1,12 @@
-//! CLI 式同进程直接调用 `fluxdown_engine` 的最小可执行证明。
+//! CLI 式同进程直接调用 `rinadown_engine` 的最小可执行证明。
 //!
-//! 不依赖 `hub`/`rinf` 的任何符号,仅 `use fluxdown_engine::*`,构造
+//! 不依赖 `hub`/`rinf` 的任何符号,仅 `use rinadown_engine::*`,构造
 //! `Engine::new(config, Arc::new(NoopSink), Arc::new(NoopSelection))`,对一个
 //! 本地 HTTP 服务器提供的小文件发起一次完整的"创建任务 → 下载 → 完成"流程。
 //!
 //! 运行:
 //! ```text
-//! cargo run --example headless_download -p fluxdown_engine
+//! cargo run --example headless_download -p rinadown_engine
 //! ```
 //!
 //! 期望:进程退出码为 0,目标文件被创建且内容与源文件字节相同。
@@ -21,12 +21,12 @@ use std::net::TcpListener;
 use std::sync::Arc;
 use std::time::Duration;
 
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
 
 /// 固定内容,便于校验下载结果字节完全一致。
-const FILE_BODY: &[u8] = b"fluxdown-engine headless download example payload\n";
+const FILE_BODY: &[u8] = b"rinadown-engine headless download example payload\n";
 
 /// 启动一个极简本地 HTTP/1.1 服务器:对每个请求返回固定 body(HEAD 请求
 /// 省略 body)。probe 阶段(HEAD/GET Range:0-0)与真正下载各自开一条新
@@ -69,7 +69,7 @@ fn spawn_local_file_server() -> std::io::Result<(u16, std::thread::JoinHandle<()
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let work_dir = std::env::temp_dir().join(format!(
-        "fluxdown-engine-headless-example-{}",
+        "rinadown-engine-headless-example-{}",
         std::process::id()
     ));
     tokio::fs::create_dir_all(&work_dir).await?;
@@ -103,7 +103,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     engine
         .manager
-        .create_task(fluxdown_engine::download_manager::NewTaskSpec {
+        .create_task(rinadown_engine::download_manager::NewTaskSpec {
             url,
             save_dir: work_dir.to_string_lossy().into_owned(),
             file_name: "payload.bin".to_string(),

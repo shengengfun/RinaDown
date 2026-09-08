@@ -191,22 +191,22 @@ fn manifest_check(chromium: &str, firefox: &str) -> DiagnosticCheck {
     }
 }
 
-/// `fluxdown://` deep links, `magnet:`/`ed2k://` handlers, `.torrent`
+/// `rinadown://` deep links, `magnet:`/`ed2k://` handlers, `.torrent`
 /// association.
 ///
-/// Levels differ on purpose: `fluxdown://` is auto-registered and its absence
+/// Levels differ on purpose: `rinadown://` is auto-registered and its absence
 /// is a real fault, while `magnet`/`ed2k`/`.torrent` are opt-in — reporting
 /// those as errors would train users to ignore the page.
 fn probe_shell_registration() -> Vec<DiagnosticCheck> {
     let mut out = Vec::with_capacity(4);
 
     for proto in [
-        crate::protocol_registry::FLUXDOWN,
+        crate::protocol_registry::RINADOWN,
         crate::protocol_registry::MAGNET,
         crate::protocol_registry::ED2K,
     ] {
         let registered = crate::protocol_registry::is_registered(proto);
-        let own = proto.scheme == crate::protocol_registry::FLUXDOWN.scheme;
+        let own = proto.scheme == crate::protocol_registry::RINADOWN.scheme;
         #[cfg(target_os = "windows")]
         let claimed_by_other = !registered && crate::protocol_registry::is_claimed_by_other(proto);
         #[cfg(not(target_os = "windows"))]
@@ -233,7 +233,7 @@ fn probe_shell_registration() -> Vec<DiagnosticCheck> {
             "torrent_association",
             "",
             OK,
-            ".torrent opens with FluxDown".to_string(),
+            ".torrent opens with RinaDown".to_string(),
             "",
         ));
     } else {
@@ -252,9 +252,9 @@ fn probe_shell_registration() -> Vec<DiagnosticCheck> {
 /// A full-disk or permission-denied log directory silently swallows the very
 /// evidence a bug report needs, so the probe actually writes.
 fn probe_log_dir() -> DiagnosticCheck {
-    let dir = fluxdown_engine::logger::log_dir();
-    let files = fluxdown_engine::logger::list_log_files();
-    let health = fluxdown_engine::logger::health();
+    let dir = rinadown_engine::logger::log_dir();
+    let files = rinadown_engine::logger::list_log_files();
+    let health = rinadown_engine::logger::health();
     let total: u64 = files.iter().map(|f| f.size).sum();
     let mut summary = format!(
         "{} ({} files, {:.1} MB; writer initialized={}, failures={})",
@@ -294,7 +294,7 @@ fn probe_log_dir() -> DiagnosticCheck {
 }
 
 fn environment_lines(nmh_exe: &str) -> Vec<String> {
-    let log_dir = fluxdown_engine::logger::log_dir();
+    let log_dir = rinadown_engine::logger::log_dir();
     let data_dir = log_dir
         .parent()
         .map(|p| p.display().to_string())
@@ -333,26 +333,26 @@ fn nmh_log_path() -> Option<PathBuf> {
         std::env::var("TEMP")
             .or_else(|_| std::env::var("TMP"))
             .ok()
-            .map(|tmp| Path::new(&tmp).join("fluxdown_nmh.log"))
+            .map(|tmp| Path::new(&tmp).join("rinadown_nmh.log"))
     }
     #[cfg(not(windows))]
     {
         let home = std::env::var("HOME").ok().filter(|h| !h.is_empty());
         let Some(home) = home else {
-            return Some(Path::new("/tmp").join("fluxdown_nmh.log"));
+            return Some(Path::new("/tmp").join("rinadown_nmh.log"));
         };
         let dir = if cfg!(target_os = "macos") {
             Path::new(&home)
                 .join("Library")
                 .join("Application Support")
-                .join("fluxdown")
+                .join("rinadown")
         } else {
             Path::new(&home)
                 .join(".local")
                 .join("share")
-                .join("fluxdown")
+                .join("rinadown")
         };
-        Some(dir.join("fluxdown_nmh.log"))
+        Some(dir.join("rinadown_nmh.log"))
     }
 }
 
@@ -558,7 +558,7 @@ mod tests {
             .filter(|c| c.id == "url_protocol")
             .map(|c| c.target.as_str())
             .collect();
-        assert_eq!(schemes, ["fluxdown", "magnet", "ed2k"]);
+        assert_eq!(schemes, ["rinadown", "magnet", "ed2k"]);
 
         let local = report
             .checks

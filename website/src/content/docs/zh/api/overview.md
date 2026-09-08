@@ -1,15 +1,15 @@
 ---
 title: API 总览
-description: FluxDown 的 HTTP API——五组路由、鉴权方式,以及它与 headless 服务器的关系。
+description: RinaDown 的 HTTP API——五组路由、鉴权方式,以及它与 headless 服务器的关系。
 section: api
 order: 1
 sourceHash: "618afb3e9283"
 ---
 
-FluxDown 内置一套小型 HTTP API,供浏览器扩展、油猴脚本、aria2 客户端与自动化工具使用,存在于两个地方:
+RinaDown 内置一套小型 HTTP API,供浏览器扩展、油猴脚本、aria2 客户端与自动化工具使用,存在于两个地方:
 
 - **桌面客户端**,地址 `http://127.0.0.1:17800`(端口可配置,地址硬编码为回环,永远不会暴露在网络上)。管理 API 分组默认关闭,其余分组默认开启;具体见桌面客户端的本机 API 设置。
-- **[headless 服务器](/docs/zh/headless-server/setup/)**,地址取决于 `FLUXDOWN_BIND` 的设置(默认 `0.0.0.0:17800`——刻意监听网络接口,因为远程管理正是它存在的意义)。管理 API 在这里恒开,并且在桌面客户端已有的端点之外额外挂载了几个 headless 专属端点(队列、配置、文件取回、WebSocket、服务器文件系统浏览)。
+- **[headless 服务器](/docs/zh/headless-server/setup/)**,地址取决于 `RINADOWN_BIND` 的设置(默认 `0.0.0.0:17800`——刻意监听网络接口,因为远程管理正是它存在的意义)。管理 API 在这里恒开,并且在桌面客户端已有的端点之外额外挂载了几个 headless 专属端点(队列、配置、文件取回、WebSocket、服务器文件系统浏览)。
 
 两者共用同一套路由常量、请求/响应 JSON 契约与鉴权规则——区别只在于哪些路由组被启用,以及由哪个宿主实现。
 
@@ -18,7 +18,7 @@ FluxDown 内置一套小型 HTTP API,供浏览器扩展、油猴脚本、aria2 �
 | 分组 | 端点 | 开关 | 鉴权 |
 |---|---|---|---|
 | 探活 | `GET /ping` | 总开关 | 无 |
-| 脚本接管 | `POST /download`、`POST /download/batch` | `local_server_takeover_enabled`(默认开) | 必须带 `X-FluxDown-Client` 头,外加可选 token |
+| 脚本接管 | `POST /download`、`POST /download/batch` | `local_server_takeover_enabled`(默认开) | 必须带 `X-RinaDown-Client` 头,外加可选 token |
 | aria2 兼容 RPC | `POST /jsonrpc`(`aria2.addUri`、`aria2.getVersion`、`aria2.getGlobalStat`、`system.multicall`、`system.listMethods`) | `local_server_jsonrpc_enabled`(默认开) | 可选 token |
 | 管理 API | `GET /api/v1/info`、`GET/POST /api/v1/tasks`、`GET/DELETE /api/v1/tasks/{id}`、`PUT /api/v1/tasks/{id}/pause\|continue`、`PUT /api/v1/tasks/pause\|continue`、`GET /api/v1/queues` | `local_server_api_enabled`(桌面默认关,headless 服务器恒开) | **强制** token |
 | MCP | `POST /mcp`(`initialize`、`tools/list`、`tools/call`、`ping`) | `local_server_mcp_enabled`(桌面默认关,headless 服务器恒开) | **强制** token(与管理 API 共用) |
@@ -33,18 +33,18 @@ headless 服务器额外把这些端点挂在 `/api/v1/*` 下,是桌面客户端
 
 | 路由组 | 接受的形式 |
 |---|---|
-| 脚本接管 | `X-FluxDown-Token` 头(仅在配置了 token 时才校验;token 为空即该分组不鉴权)。无论是否配置 token,都必须带 `X-FluxDown-Client` 头——靠 CORS 挡住任意网页脚本的门禁。 |
-| aria2 兼容 RPC | `X-FluxDown-Token` 头,**或** aria2 自己的约定——在 JSON-RPC 调用的 `params[0]` 里传 `token:xxx`。 |
-| 管理 API(`/api/v1/*`) | `Authorization: Bearer <token>` **或** `X-FluxDown-Token` 头。未配置 token 时该分组的一切请求都会被拒绝(403)——这组端点不能在无鉴权状态下运行。 |
+| 脚本接管 | `X-RinaDown-Token` 头(仅在配置了 token 时才校验;token 为空即该分组不鉴权)。无论是否配置 token,都必须带 `X-RinaDown-Client` 头——靠 CORS 挡住任意网页脚本的门禁。 |
+| aria2 兼容 RPC | `X-RinaDown-Token` 头,**或** aria2 自己的约定——在 JSON-RPC 调用的 `params[0]` 里传 `token:xxx`。 |
+| 管理 API(`/api/v1/*`) | `Authorization: Bearer <token>` **或** `X-RinaDown-Token` 头。未配置 token 时该分组的一切请求都会被拒绝(403)——这组端点不能在无鉴权状态下运行。 |
 | `/api/v1/ws`、`/api/v1/tasks/{id}/file` | `?token=<token>` 查询参数(浏览器的导航跳转/WebSocket 升级无法自定义请求头)。 |
 
 所有 token 校验都使用常量时间比较,避免时序侧信道。
 
 ### 跨域(CORS)
 
-服务默认对任何请求都**不返回** `Access-Control-Allow-Origin`,网页里的跨域 `fetch()` 会在预检阶段被浏览器拦下——这正是"脚本接管必须带 `X-FluxDown-Client` 头"能挡住任意网页的原因(油猴脚本走 `GM_xmlhttpRequest`,不受 CORS 约束)。
+服务默认对任何请求都**不返回** `Access-Control-Allow-Origin`,网页里的跨域 `fetch()` 会在预检阶段被浏览器拦下——这正是"脚本接管必须带 `X-RinaDown-Client` 头"能挡住任意网页的原因(油猴脚本走 `GM_xmlhttpRequest`,不受 CORS 约束)。
 
-设置里的**允许任意网页跨域访问(CORS)**(`local_server_cors_allow_all`,默认关)可以放弃这道防线:开启后预检与真实响应都带 `Access-Control-Allow-Origin: *`,预检额外带 `Access-Control-Allow-Private-Network: true`,等价于 aria2 的 `--rpc-allow-origin-all`。用途是让那些"用浏览器 `fetch` 探测 aria2 服务"的网站能识别到 FluxDown;代价是任意网页都能探测本机端口并提交下载链接。此时仍生效的防护:桌面端接管/aria2 提交会弹确认框,管理 API 与 MCP 仍强制校验 token。
+设置里的**允许任意网页跨域访问(CORS)**(`local_server_cors_allow_all`,默认关)可以放弃这道防线:开启后预检与真实响应都带 `Access-Control-Allow-Origin: *`,预检额外带 `Access-Control-Allow-Private-Network: true`,等价于 aria2 的 `--rpc-allow-origin-all`。用途是让那些"用浏览器 `fetch` 探测 aria2 服务"的网站能识别到 RinaDown;代价是任意网页都能探测本机端口并提交下载链接。此时仍生效的防护:桌面端接管/aria2 提交会弹确认框,管理 API 与 MCP 仍强制校验 token。
 
 ## 接管 / aria2 与管理 API 的语义区别
 
@@ -90,9 +90,9 @@ curl -X POST http://<host>:17800/jsonrpc \
 
 ## MCP(Model Context Protocol)
 
-FluxDown 支持通过 HTTP 提供 [MCP](https://modelcontextprotocol.io) 服务,让 AI 客户端(Claude Desktop、Cursor、Cline 及任何支持 MCP 的智能体)用自然语言驱动下载。它是单个端点 `POST /mcp`,由与管理 API 相同的 token 保护。
+RinaDown 支持通过 HTTP 提供 [MCP](https://modelcontextprotocol.io) 服务,让 AI 客户端(Claude Desktop、Cursor、Cline 及任何支持 MCP 的智能体)用自然语言驱动下载。它是单个端点 `POST /mcp`,由与管理 API 相同的 token 保护。
 
-MCP 是"JSON-RPC 2.0 over 单 HTTP 端点"(不是 REST)——每个操作都是一次 POST 到 `/mcp`,靠请求体里的 `method` 区分,采用 Streamable HTTP 传输的无状态子集:请求返回 `application/json`,通知返回 `202 Accepted`,不跟踪会话 id。用 `Authorization: Bearer <token>`(或 `X-FluxDown-Token`)鉴权;规范允许内部部署用静态 bearer token 代替 OAuth 2.1。
+MCP 是"JSON-RPC 2.0 over 单 HTTP 端点"(不是 REST)——每个操作都是一次 POST 到 `/mcp`,靠请求体里的 `method` 区分,采用 Streamable HTTP 传输的无状态子集:请求返回 `application/json`,通知返回 `202 Accepted`,不跟踪会话 id。用 `Authorization: Bearer <token>`(或 `X-RinaDown-Token`)鉴权;规范允许内部部署用静态 bearer token 代替 OAuth 2.1。
 
 ### 工具列表
 
@@ -119,7 +119,7 @@ MCP 是"JSON-RPC 2.0 over 单 HTTP 端点"(不是 REST)——每个操作都是�
 ```json
 {
   "mcpServers": {
-    "fluxdown": {
+    "rinadown": {
       "url": "http://<host>:17800/mcp",
       "headers": { "Authorization": "Bearer <token>" }
     }
@@ -138,27 +138,27 @@ curl -X POST http://<host>:17800/mcp \
                  "arguments":{"url":"https://example.com/file.zip","segments":8}}}'
 ```
 
-## fluxdown:// URL 协议
+## rinadown:// URL 协议
 
-在 HTTP API 之外,FluxDown 还注册了一个自定义 URL 协议,任何网页、脚本或第三方应用都可以用它转交下载——不需要发起本机 HTTP 调用:
+在 HTTP API 之外,RinaDown 还注册了一个自定义 URL 协议,任何网页、脚本或第三方应用都可以用它转交下载——不需要发起本机 HTTP 调用:
 
 ```text
-fluxdown://download?url=<percent 编码的 URL>&filename=<可选文件名>
+rinadown://download?url=<percent 编码的 URL>&filename=<可选文件名>
 ```
 
-- `url`——必填。要下载的地址,需 percent 编码(`http`/`https`/`ftp` 直链或 `magnet:` 链接)。缺少或为空 `url` 参数的 `fluxdown://` URL 会被静默忽略。
+- `url`——必填。要下载的地址,需 percent 编码(`http`/`https`/`ftp` 直链或 `magnet:` 链接)。缺少或为空 `url` 参数的 `rinadown://` URL 会被静默忽略。
 - `filename`——可选。建议文件名,会预填给用户保留或修改。当真实文件名只存在于接收方永远看不到的 `Content-Disposition` 响应头里时特别有用。
 
 由谁响应取决于平台:
 
-- **桌面端(Windows、macOS、Linux)**——客户端注册系统协议处理器(Windows 每次启动写注册表;macOS 经 `CFBundleURLTypes` 声明;Linux 经 `.desktop` 文件的 `x-scheme-handler` 条目)。打开 `fluxdown://` URL 会启动客户端(或转发给已在运行的实例),并把请求路由进与浏览器扩展请求相同的外部下载流程:默认弹快速下载确认框,用户开启免打扰下载后则静默建任务。在 Android 以及受限的桌面环境中,浏览器扩展本身也可以经此协议投递——见 [fluxdown:// 协议模式](/docs/zh/browser-extension/usage/)。
+- **桌面端(Windows、macOS、Linux)**——客户端注册系统协议处理器(Windows 每次启动写注册表;macOS 经 `CFBundleURLTypes` 声明;Linux 经 `.desktop` 文件的 `x-scheme-handler` 条目)。打开 `rinadown://` URL 会启动客户端(或转发给已在运行的实例),并把请求路由进与浏览器扩展请求相同的外部下载流程:默认弹快速下载确认框,用户开启免打扰下载后则静默建任务。在 Android 以及受限的桌面环境中,浏览器扩展本身也可以经此协议投递——见 [rinadown:// 协议模式](/docs/zh/browser-extension/usage/)。
 - **Android**——应用为该 scheme 声明了 VIEW intent-filter。打开 URL 会唤起应用并显示新建下载弹层,`url` 与 `filename` 已预填;用户确认后才开始下载。弹层打开期间陆续到达的协议 URL 会作为新行合入其中(浏览器扩展在 Android 上就是这样投递批量下载的)。
 
 一个普通的 HTML 链接就能完成集成:
 
 ```html
-<a href="fluxdown://download?url=https%3A%2F%2Fexample.com%2Ffile.zip&filename=file.zip">
-  用 FluxDown 下载
+<a href="rinadown://download?url=https%3A%2F%2Fexample.com%2Ffile.zip&filename=file.zip">
+  用 RinaDown 下载
 </a>
 ```
 

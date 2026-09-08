@@ -446,7 +446,7 @@ pub struct PlatformIntegrationDto {
     pub file_association_supported: bool,
     pub torrent_associated: bool,
     pub url_protocol_supported: bool,
-    /// scheme → 是否已注册到 FluxDown（`magnet` / `ed2k` / `fluxdown`）。
+    /// scheme → 是否已注册到 RinaDown（`magnet` / `ed2k` / `rinadown`）。
     pub url_protocols: BTreeMap<String, bool>,
     /// 注册目标可执行文件；空表示未找到桌面程序。
     pub desktop_executable: String,

@@ -1,6 +1,6 @@
 //! FluxCloud HTTP 私有模型；含令牌的类型不得导出到本机协议。
 
-use fluxdown_protocol::{AgentSessionDto, CloudDevice, CloudPlan, CloudUser, Entitlements};
+use rinadown_protocol::{AgentSessionDto, CloudDevice, CloudPlan, CloudUser, Entitlements};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize)]

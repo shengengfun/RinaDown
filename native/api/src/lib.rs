@@ -1,8 +1,8 @@
-//! `fluxdown_api` —— FluxDown 本机 HTTP API：契约 + axum 服务器，零 FFI 依赖。
+//! `rinadown_api` —— RinaDown 本机 HTTP API：契约 + axum 服务器，零 FFI 依赖。
 //!
 //! 本 crate 把 HTTP 传输与宿主实现拆开：
 //!
-//! - `fluxdown_protocol` —— 唯一 wire JSON 契约（camelCase）
+//! - `rinadown_protocol` —— 唯一 wire JSON 契约（camelCase）
 //! - [`routes`] —— 路径常量
 //! - [`service`] —— [`ApiHost`](service::ApiHost) trait：宿主能力契约
 //! - [`server`] —— axum 服务器（探活 / 脚本接管 / aria2 / 管理 API）
@@ -16,9 +16,9 @@
 //! ```no_run
 //! use std::sync::Arc;
 //! use async_trait::async_trait;
-//! use fluxdown_api::server::{ApiServerConfig, spawn_api_server};
-//! use fluxdown_api::service::{ApiError, ApiHost};
-//! use fluxdown_protocol::daemon::{CreateTaskRequest, DownloadRequest, QueueDto, TaskDto};
+//! use rinadown_api::server::{ApiServerConfig, spawn_api_server};
+//! use rinadown_api::service::{ApiError, ApiHost};
+//! use rinadown_protocol::daemon::{CreateTaskRequest, DownloadRequest, QueueDto, TaskDto};
 //!
 //! struct MyHost;
 //!

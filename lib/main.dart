@@ -81,7 +81,7 @@ void _logFirstFrameWhenRasterized(Stopwatch startupStopwatch) {
 
 Future<void> main(List<String> args) async {
   // 独立快速下载小窗引擎入口：原生宿主以 --quick-popup 参数启动第二引擎。
-  // 该引擎零插件注册、不初始化 Rust，所有环境数据经 fluxdown/popup_child
+  // 该引擎零插件注册、不初始化 Rust，所有环境数据经 rinadown/popup_child
   // 通道注入（见 lib/src/popup/popup_app.dart）。必须在任何插件调用之前分发。
   if (args.contains('--quick-popup')) {
     await runQuickPopupApp();
@@ -126,12 +126,12 @@ Future<void> main(List<String> args) async {
       .toList();
 
   // 提取启动参数中的协议 URL（系统协议处理器：浏览器扩展协议模式 /
-  // 网页 <a href="fluxdown://..."> / ed2k:// 电驴链接唤起本 exe）。
+  // 网页 <a href="rinadown://..."> / ed2k:// 电驴链接唤起本 exe）。
   final protocolRequests = args.map(_parseProtocolArg).nonNulls.toList();
 
   logInfo(
     'main',
-    'FluxDown starting, args=$args, torrentFiles=${torrentFilePaths.length}, '
+    'RinaDown starting, args=$args, torrentFiles=${torrentFilePaths.length}, '
         'protocolRequests=${protocolRequests.length}',
   );
 
@@ -163,7 +163,7 @@ Future<void> main(List<String> args) async {
     await initializeRust(assignRustSignal);
     logInfo('main', 'starting mobile shell');
     runApp(
-      FluxDownMobileApp(
+      RinaDownMobileApp(
         themeProvider: themeProvider,
         localeNotifier: localeNotifier,
       ),
@@ -213,7 +213,7 @@ Future<void> main(List<String> args) async {
   final autostartInit = () async {
     // 注册时附带 --silentStart；Windows 路径加引号，避免空格截断。
     launchAtStartup.setup(
-      appName: 'FluxDown',
+      appName: 'RinaDown',
       appPath: Platform.isWindows
           ? '"${Platform.resolvedExecutable}"'
           : Platform.resolvedExecutable,
@@ -227,7 +227,7 @@ Future<void> main(List<String> args) async {
           'query',
           r'HKCU\Software\Microsoft\Windows\CurrentVersion\Run',
           '/v',
-          'FluxDown',
+          'RinaDown',
         ]);
         if (regResult.exitCode == 0) {
           needsReEnable = true;
@@ -286,7 +286,7 @@ Future<void> main(List<String> args) async {
   logInfo('main', 'calling runApp...');
 
   runApp(
-    FluxDownApp(
+    RinaDownApp(
       themeProvider: themeProvider,
       localeNotifier: localeNotifier,
       initialTorrentFiles: torrentFilePaths,
@@ -312,7 +312,7 @@ String _decodeFilePath(String arg) {
 /// 解析协议启动参数（系统协议处理器唤起本 exe 时经启动参数传入）。
 ///
 /// 三种形态：
-/// - `fluxdown://download?url=<encoded-url>&filename=<name>`——自有深链，
+/// - `rinadown://download?url=<encoded-url>&filename=<name>`——自有深链，
 ///   拆出内层真实 URL；host 不是 download 或缺 url 参数时忽略。
 /// - `ed2k://|file|<name>|<size>|<hash>|/`——电驴链接本身就是下载地址，
 ///   原样透传（`|` 不是合法 URI 字符，不能过 [Uri.tryParse]）。
@@ -323,32 +323,32 @@ String _decodeFilePath(String arg) {
   if (lower.startsWith('ed2k://') || lower.startsWith('magnet:')) {
     return (url: arg.trim(), filename: '');
   }
-  if (!lower.startsWith('fluxdown://')) return null;
+  if (!lower.startsWith('rinadown://')) return null;
   final uri = Uri.tryParse(arg);
   if (uri == null || uri.host.toLowerCase() != 'download') {
-    logInfo('main', 'ignoring malformed fluxdown:// arg: $arg');
+    logInfo('main', 'ignoring malformed rinadown:// arg: $arg');
     return null;
   }
   final url = uri.queryParameters['url']?.trim() ?? '';
   if (url.isEmpty) {
-    logInfo('main', 'fluxdown:// arg missing url parameter: $arg');
+    logInfo('main', 'rinadown:// arg missing url parameter: $arg');
     return null;
   }
   final filename = uri.queryParameters['filename']?.trim() ?? '';
   return (url: url, filename: filename);
 }
 
-class FluxDownApp extends StatefulWidget {
+class RinaDownApp extends StatefulWidget {
   final ThemeProvider themeProvider;
   final LocaleNotifier localeNotifier;
 
   /// .torrent file paths passed via command-line args (Windows file association).
   final List<String> initialTorrentFiles;
 
-  /// fluxdown:// 协议请求（Windows 注册表协议处理器经启动参数传入）。
+  /// rinadown:// 协议请求（Windows 注册表协议处理器经启动参数传入）。
   final List<({String url, String filename})> initialProtocolRequests;
 
-  const FluxDownApp({
+  const RinaDownApp({
     super.key,
     required this.themeProvider,
     required this.localeNotifier,
@@ -358,15 +358,15 @@ class FluxDownApp extends StatefulWidget {
 
   /// 允许子组件通过 context 访问 ThemeProvider
   static ThemeProvider of(BuildContext context) {
-    final state = context.findAncestorStateOfType<_FluxDownAppState>();
+    final state = context.findAncestorStateOfType<_RinaDownAppState>();
     return state!.themeProvider;
   }
 
   @override
-  State<FluxDownApp> createState() => _FluxDownAppState();
+  State<RinaDownApp> createState() => _RinaDownAppState();
 }
 
-class _FluxDownAppState extends State<FluxDownApp>
+class _RinaDownAppState extends State<RinaDownApp>
     with WindowListener, WidgetsBindingObserver {
   late final ThemeProvider themeProvider;
   late final LocaleNotifier _localeNotifier;
@@ -377,7 +377,7 @@ class _FluxDownAppState extends State<FluxDownApp>
 
   /// MethodChannel for receiving args from second instances (single-instance).
   static const _singleInstanceChannel = MethodChannel(
-    'com.fluxdown/single_instance',
+    'com.rinadown/single_instance',
   );
 
   /// 防止 _performGracefulExit 被并发调用多次
@@ -392,7 +392,7 @@ class _FluxDownAppState extends State<FluxDownApp>
   @override
   void initState() {
     super.initState();
-    logInfo('FluxDownApp', 'initState');
+    logInfo('RinaDownApp', 'initState');
     themeProvider = widget.themeProvider;
     _localeNotifier = widget.localeNotifier;
     themeProvider.addListener(_onThemeChanged);
@@ -457,21 +457,21 @@ class _FluxDownAppState extends State<FluxDownApp>
     Future.delayed(const Duration(seconds: 5), () {
       if (!mounted) return;
       if (!_settingsForExternal.autoCheckUpdate) {
-        logInfo('FluxDownApp', 'auto check for updates skipped (disabled)');
+        logInfo('RinaDownApp', 'auto check for updates skipped (disabled)');
         return;
       }
-      logInfo('FluxDownApp', 'auto check for updates');
+      logInfo('RinaDownApp', 'auto check for updates');
       UpdateService.instance.checkForUpdate();
     });
 
-    // Handle .torrent files and fluxdown:// protocol URLs passed via
+    // Handle .torrent files and rinadown:// protocol URLs passed via
     // command-line args (Windows file association / protocol handler).
     // Wait for SettingsProvider to finish loading config from Rust so we have
     // a valid defaultSaveDir, instead of a fragile fixed delay.
     if (widget.initialTorrentFiles.isNotEmpty ||
         widget.initialProtocolRequests.isNotEmpty) {
       logInfo(
-        'FluxDownApp',
+        'RinaDownApp',
         'will process ${widget.initialTorrentFiles.length} torrent file(s) and '
             '${widget.initialProtocolRequests.length} protocol request(s) after config loads',
       );
@@ -492,12 +492,12 @@ class _FluxDownAppState extends State<FluxDownApp>
     // the command-line args here via MethodChannel.
     _singleInstanceChannel.setMethodCallHandler(_handleSecondInstance);
 
-    logInfo('FluxDownApp', 'initState done');
+    logInfo('RinaDownApp', 'initState done');
   }
 
   @override
   void dispose() {
-    logInfo('FluxDownApp', 'dispose called');
+    logInfo('RinaDownApp', 'dispose called');
     _pendingRescan?.cancel();
     UpdateService.instance.removeListener(_onUpdateServiceChanged);
     _singleInstanceChannel.setMethodCallHandler(null);
@@ -514,11 +514,11 @@ class _FluxDownAppState extends State<FluxDownApp>
     themeProvider.removeListener(_onThemeChanged);
     themeProvider.dispose();
     super.dispose();
-    logInfo('FluxDownApp', 'dispose done');
+    logInfo('RinaDownApp', 'dispose done');
   }
 
   void _onThemeChanged() {
-    logInfo('FluxDownApp', 'themeChanged, mounted=$mounted');
+    logInfo('RinaDownApp', 'themeChanged, mounted=$mounted');
     if (mounted) {
       setState(() {});
       _updateTrayTheme();
@@ -552,7 +552,7 @@ class _FluxDownAppState extends State<FluxDownApp>
   }
 
   void _onLocaleChanged() {
-    logInfo('FluxDownApp', 'localeChanged to $currentLocale, mounted=$mounted');
+    logInfo('RinaDownApp', 'localeChanged to $currentLocale, mounted=$mounted');
     if (mounted) setState(() {});
     // 语言变更后刷新托盘菜单
     TrayService.instance.refreshMenu();
@@ -587,7 +587,7 @@ class _FluxDownAppState extends State<FluxDownApp>
     final ctx = _navigatorKey.currentContext;
     if (ctx == null) return;
 
-    logInfo('FluxDownApp', 'showing update changelog dialog');
+    logInfo('RinaDownApp', 'showing update changelog dialog');
     svc.markChangelogShown();
 
     showUpdateChangelogDialog(
@@ -609,7 +609,7 @@ class _FluxDownAppState extends State<FluxDownApp>
     if (ctx == null) return;
 
     final s = S.of(currentLocale);
-    logInfo('FluxDownApp', 'showing update failure dialog');
+    logInfo('RinaDownApp', 'showing update failure dialog');
 
     showShadDialog<void>(
       context: ctx,
@@ -621,7 +621,7 @@ class _FluxDownAppState extends State<FluxDownApp>
         ),
         actions: [
           ShadButton.outline(
-            onPressed: () => launchUrl(Uri.parse('https://fluxdown.zerx.dev')),
+            onPressed: () => launchUrl(Uri.parse('https://rinadown.zerx.dev')),
             child: Text(s.updateFailedOpenSite),
           ),
           ShadButton(
@@ -665,7 +665,7 @@ class _FluxDownAppState extends State<FluxDownApp>
     //  配置真的没到时 defaultSaveDir 为空，下游会记日志并跳过，不写错路径）。
     timeout = Timer(const Duration(seconds: 10), () {
       logInfo(
-        'FluxDownApp',
+        'RinaDownApp',
         'config load timed out after 10s, handling torrent files with fallback dir',
       );
       cleanup();
@@ -755,7 +755,7 @@ class _FluxDownAppState extends State<FluxDownApp>
     void apply() {
       if (!_settingsForExternal.startMinimizedToTray) return;
       logInfo(
-        'FluxDownApp',
+        'RinaDownApp',
         'startMinimizedToTray enabled, hiding main window',
       );
       unawaited(TrayService.instance.hideToTray());
@@ -785,7 +785,7 @@ class _FluxDownAppState extends State<FluxDownApp>
     });
   }
 
-  /// Handle .torrent files and fluxdown:// protocol URLs passed via
+  /// Handle .torrent files and rinadown:// protocol URLs passed via
   /// command-line args. Torrent files create tasks directly with the default
   /// save directory; protocol URLs route into the same external download
   /// flow as browser-extension requests (silent / popup / dialog).
@@ -795,14 +795,14 @@ class _FluxDownAppState extends State<FluxDownApp>
     if (saveDir.isEmpty) {
       if (widget.initialTorrentFiles.isNotEmpty) {
         logInfo(
-          'FluxDownApp',
+          'RinaDownApp',
           'default save dir not ready, skipping torrent file handling',
         );
       }
       return;
     }
     for (final path in widget.initialTorrentFiles) {
-      logInfo('FluxDownApp', 'creating task from torrent file: $path');
+      logInfo('RinaDownApp', 'creating task from torrent file: $path');
       // Reuse the static helper from DownloadController — avoids duplicating
       // the file-read + signal-send logic. DownloadController in HomePage
       // will pick up the resulting task via Rust signal stream.
@@ -810,7 +810,7 @@ class _FluxDownAppState extends State<FluxDownApp>
     }
   }
 
-  /// 分发启动参数中的协议请求（fluxdown:// / ed2k://；幂等：配置加载监听器
+  /// 分发启动参数中的协议请求（rinadown:// / ed2k://；幂等：配置加载监听器
   /// 与超时兜底可能双触发 _handleInitialTorrentFiles）。
   bool _protocolRequestsDispatched = false;
 
@@ -818,7 +818,7 @@ class _FluxDownAppState extends State<FluxDownApp>
     if (_protocolRequestsDispatched) return;
     _protocolRequestsDispatched = true;
     for (final req in widget.initialProtocolRequests) {
-      logInfo('FluxDownApp', 'dispatching protocol arg: ${req.url}');
+      logInfo('RinaDownApp', 'dispatching protocol arg: ${req.url}');
       ExternalDownloadService.handleLocalRequest(
         url: req.url,
         filename: req.filename,
@@ -827,13 +827,13 @@ class _FluxDownAppState extends State<FluxDownApp>
   }
 
   /// Called when a second instance sends its command-line args via WM_COPYDATA.
-  /// Extracts .torrent file paths / protocol URLs (fluxdown:// deep links,
+  /// Extracts .torrent file paths / protocol URLs (rinadown:// deep links,
   /// ed2k:// links), dispatches
   /// them, then brings the window to the foreground.
   Future<dynamic> _handleSecondInstance(MethodCall call) async {
     if (call.method == 'onSecondInstance') {
       final args = (call.arguments as List<dynamic>).cast<String>();
-      logInfo('FluxDownApp', 'received second-instance args: $args');
+      logInfo('RinaDownApp', 'received second-instance args: $args');
 
       // Bring window to foreground.
       await restoreMainWindow();
@@ -842,7 +842,7 @@ class _FluxDownAppState extends State<FluxDownApp>
       // 系统启动第二实例，参数经 WM_COPYDATA 转发到本主实例）。
       final protocolRequests = args.map(_parseProtocolArg).nonNulls.toList();
       for (final req in protocolRequests) {
-        logInfo('FluxDownApp', 'second-instance protocol arg: ${req.url}');
+        logInfo('RinaDownApp', 'second-instance protocol arg: ${req.url}');
         ExternalDownloadService.handleLocalRequest(
           url: req.url,
           filename: req.filename,
@@ -859,13 +859,13 @@ class _FluxDownAppState extends State<FluxDownApp>
 
       if (torrentPaths.isEmpty) {
         if (protocolRequests.isEmpty) {
-          logInfo('FluxDownApp', 'no actionable second-instance args');
+          logInfo('RinaDownApp', 'no actionable second-instance args');
         }
         return;
       }
 
       logInfo(
-        'FluxDownApp',
+        'RinaDownApp',
         'second-instance torrent files: ${torrentPaths.length}',
       );
 
@@ -873,7 +873,7 @@ class _FluxDownAppState extends State<FluxDownApp>
       final saveDir = _settingsForExternal.defaultSaveDir;
       if (saveDir.isEmpty) {
         logInfo(
-          'FluxDownApp',
+          'RinaDownApp',
           'config not loaded yet, waiting before handling second-instance torrents',
         );
         // Use a completer to wait for config.
@@ -903,7 +903,7 @@ class _FluxDownAppState extends State<FluxDownApp>
 
       for (final path in torrentPaths) {
         logInfo(
-          'FluxDownApp',
+          'RinaDownApp',
           'creating task from second-instance torrent: $path',
         );
         DownloadController.sendTorrentFileSignal(path, dir);
@@ -916,7 +916,7 @@ class _FluxDownAppState extends State<FluxDownApp>
   /// 先隐藏窗口让用户感知「秒退」，再后台执行清理。
   Future<void> _performGracefulExit() async {
     logInfo(
-      'FluxDownApp',
+      'RinaDownApp',
       '_performGracefulExit called, _isExiting=$_isExiting',
     );
     // 防止重入：快速双击关闭或托盘退出+窗口关闭同时触发
@@ -928,30 +928,30 @@ class _FluxDownAppState extends State<FluxDownApp>
       await WindowStateService.instance.saveNow();
 
       // 立即隐藏窗口，给用户「秒退」的视觉反馈
-      logInfo('FluxDownApp', 'hiding window immediately...');
+      logInfo('RinaDownApp', 'hiding window immediately...');
       await windowManager.hide();
 
       // 释放唤醒锁（Windows 线程级状态随进程退出也会清除，此处保证子进程回收）
-      logInfo('FluxDownApp', 'shutting down PowerService...');
+      logInfo('RinaDownApp', 'shutting down PowerService...');
       await PowerService.instance.shutdown();
 
       // 后台清理：通知服务 → 托盘图标
-      logInfo('FluxDownApp', 'shutting down NotificationService...');
+      logInfo('RinaDownApp', 'shutting down NotificationService...');
       NotificationService.instance.shutdown();
-      logInfo('FluxDownApp', 'waiting for pending notifications...');
+      logInfo('RinaDownApp', 'waiting for pending notifications...');
       await NotificationService.instance.waitForPending();
-      logInfo('FluxDownApp', 'destroying floating ball...');
+      logInfo('RinaDownApp', 'destroying floating ball...');
       FloatingBallService.instance.destroy();
-      logInfo('FluxDownApp', 'destroying tray...');
+      logInfo('RinaDownApp', 'destroying tray...');
       await TrayService.instance.destroy();
 
       // 便携模式下 KvStore 写入有防抖，退出前强制落盘，避免刚改的设置丢失。
       await KvStore.instance.flush();
-      logInfo('FluxDownApp', 'destroying window...');
+      logInfo('RinaDownApp', 'destroying window...');
       await LogService.instance.dispose();
       await windowManager.destroy();
     } catch (e, stack) {
-      logError('FluxDownApp', '_performGracefulExit error', e, stack);
+      logError('RinaDownApp', '_performGracefulExit error', e, stack);
       // 兜底：无论如何都尝试销毁窗口
       try {
         await windowManager.destroy();
@@ -965,7 +965,7 @@ class _FluxDownAppState extends State<FluxDownApp>
 
   @override
   void onWindowClose() async {
-    logInfo('FluxDownApp', 'onWindowClose called, _isExiting=$_isExiting');
+    logInfo('RinaDownApp', 'onWindowClose called, _isExiting=$_isExiting');
     // 已经在退出流程中，不再重复处理
     if (_isExiting) return;
 
@@ -973,13 +973,13 @@ class _FluxDownAppState extends State<FluxDownApp>
     await WindowStateService.instance.saveNow();
 
     final closeToTray = SettingsProvider.globalInstance?.closeToTray ?? true;
-    logInfo('FluxDownApp', 'closeToTray=$closeToTray');
+    logInfo('RinaDownApp', 'closeToTray=$closeToTray');
 
     // 当用户设置了「关闭到托盘」时，隐藏窗口而非退出
     if (closeToTray) {
-      logInfo('FluxDownApp', 'hiding to tray...');
+      logInfo('RinaDownApp', 'hiding to tray...');
       await TrayService.instance.hideToTray();
-      logInfo('FluxDownApp', 'hidden to tray');
+      logInfo('RinaDownApp', 'hidden to tray');
     } else {
       await _performGracefulExit();
     }
@@ -987,7 +987,7 @@ class _FluxDownAppState extends State<FluxDownApp>
 
   @override
   void onWindowFocus() {
-    logInfo('FluxDownApp', 'onWindowFocus');
+    logInfo('RinaDownApp', 'onWindowFocus');
     // Wayland 降级形态③：主窗获焦时读一次剪贴板（失焦读取被协议门控）
     unawaited(WaylandDegradationService.instance.checkClipboardOnRestore());
     // 文件跟踪：主窗获焦时用户可能刚在资源管理器删/移了文件，触发一次重扫。
@@ -1016,17 +1016,17 @@ class _FluxDownAppState extends State<FluxDownApp>
 
   @override
   void onWindowBlur() {
-    logInfo('FluxDownApp', 'onWindowBlur');
+    logInfo('RinaDownApp', 'onWindowBlur');
   }
 
   @override
   void onWindowRestore() {
-    logInfo('FluxDownApp', 'onWindowRestore');
+    logInfo('RinaDownApp', 'onWindowRestore');
   }
 
   @override
   void onWindowMinimize() {
-    logInfo('FluxDownApp', 'onWindowMinimize');
+    logInfo('RinaDownApp', 'onWindowMinimize');
   }
 
   @override
@@ -1157,9 +1157,9 @@ class _FluxDownAppState extends State<FluxDownApp>
   List<PlatformMenuItem> _buildMacMenus() {
     final s = _localeNotifier.s;
     return [
-      // ── FluxDown (应用菜单) ──
+      // ── RinaDown (应用菜单) ──
       PlatformMenu(
-        label: 'FluxDown',
+        label: 'RinaDown',
         menus: [
           // About + Check for Updates
           // About 不用 PlatformProvidedMenuItemType.about（系统标准 About 面板，
@@ -1202,7 +1202,7 @@ class _FluxDownAppState extends State<FluxDownApp>
           // 不用 PlatformProvidedMenuItem：其 label 由 engine 硬编码英文无法
           // 本地化（flutter/flutter#120097），且 macOS 26 会给标准 selector
           // 自动配图标，与自定义项混排导致图标/语言不统一。以下经
-          // com.fluxdown/window 通道调用等效 AppKit API。
+          // com.rinadown/window 通道调用等效 AppKit API。
           PlatformMenuItemGroup(
             members: [
               PlatformMenuItem(
@@ -1359,7 +1359,7 @@ class _FluxDownAppState extends State<FluxDownApp>
         menus: [
           PlatformMenuItem(
             label: s.menuWebsite,
-            onSelected: () => launchUrl(Uri.parse('https://fluxdown.zerx.dev')),
+            onSelected: () => launchUrl(Uri.parse('https://rinadown.zerx.dev')),
           ),
           PlatformMenuItem(
             label: s.menuFeedback,

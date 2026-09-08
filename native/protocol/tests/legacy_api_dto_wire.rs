@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use fluxdown_protocol::daemon::{
+use rinadown_protocol::daemon::{
     ComponentInstallParams, ComponentKind, CreateTaskRequest, DownloadRequest, QueueDto,
     RequestBody, TaskDto,
 };

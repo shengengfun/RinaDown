@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use fluxdown_protocol::{AgentSnapshot, ServiceEvent};
+use rinadown_protocol::{AgentSnapshot, ServiceEvent};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::sync::CancellationToken;
 
@@ -25,7 +25,7 @@ pub async fn run(
     initialize_device_identity(&mut state, &store).await?;
 
     // 先绑定 UI Gateway：实际端口进入状态与快照，后续 Doctor/兼容 API 都据此探测。
-    let override_bind = std::env::var("FLUXDOWN_AGENT_BIND").ok();
+    let override_bind = std::env::var("RINADOWN_AGENT_BIND").ok();
     let listener = TcpListener::bind(gateway_bind_address(
         state.gateway.lan_enabled,
         override_bind.as_deref(),
@@ -36,7 +36,7 @@ pub async fn run(
         state.gateway.port = bound.port();
         store.save(&state).await?;
     }
-    tracing::info!(address = %bound, "fluxdown-agent gateway listening");
+    tracing::info!(address = %bound, "rinadown-agent gateway listening");
 
     let supervisor = Arc::new(DaemonSupervisor::new());
     let daemon_bearer = load_daemon_bearer(&paths, &supervisor).await?;
@@ -88,7 +88,7 @@ pub async fn run(
     crate::link::migrate_legacy_state(&daemon, &shared_state, &store, &events).await?;
     let (api_config, api_switches, api_token) = {
         let state = shared_state.lock().await;
-        let switches = Arc::new(fluxdown_api::server::ApiRuntimeSwitches::new(
+        let switches = Arc::new(rinadown_api::server::ApiRuntimeSwitches::new(
             state.gateway.takeover_enabled,
             state.gateway.jsonrpc_enabled,
             state.gateway.api_enabled,
@@ -172,7 +172,7 @@ pub async fn run(
     let api_host = Arc::new(AgentApiHost::new(daemon, events, capture));
     let bearer = load_or_create_bearer(
         store.data_dir(),
-        std::env::var_os("FLUXDOWN_AGENT_TOKEN_FILE")
+        std::env::var_os("RINADOWN_AGENT_TOKEN_FILE")
             .as_deref()
             .map(Path::new),
     )
@@ -223,7 +223,7 @@ fn spawn_daemon_projection(
                         DaemonClientEvent::Snapshot(snapshot) => {
                             events.replace_daemon_snapshot(snapshot);
                             events.publish(
-                                fluxdown_protocol::AgentEvent::DaemonConnectionChanged(true),
+                                rinadown_protocol::AgentEvent::DaemonConnectionChanged(true),
                             );
                         }
                         DaemonClientEvent::Event(frame) => {
@@ -232,7 +232,7 @@ fn spawn_daemon_projection(
                             }
                         }
                         DaemonClientEvent::Stale => {
-                            events.publish(fluxdown_protocol::AgentEvent::DaemonConnectionChanged(
+                            events.publish(rinadown_protocol::AgentEvent::DaemonConnectionChanged(
                                 false,
                             ));
                             tracing::warn!("daemon connection is stale; commands are read-only until snapshot replacement");
@@ -240,7 +240,7 @@ fn spawn_daemon_projection(
                         DaemonClientEvent::Fatal(error) => {
                             tracing::error!(code = ?error.code, "fatal daemon connection error");
                             cancel.cancel();
-                            events.publish(fluxdown_protocol::AgentEvent::DaemonConnectionChanged(
+                            events.publish(rinadown_protocol::AgentEvent::DaemonConnectionChanged(
                                 false,
                             ));
                             break;
@@ -272,7 +272,7 @@ async fn initialize_device_identity(
         state.device_name = std::env::var("HOSTNAME")
             .ok()
             .filter(|name| (1..=64).contains(&name.trim().chars().count()))
-            .unwrap_or_else(|| "FluxDown".to_owned());
+            .unwrap_or_else(|| "RinaDown".to_owned());
         changed = true;
     }
     if state.platform.is_empty() {
@@ -323,7 +323,7 @@ async fn load_daemon_bearer(
     Err("daemon token file was not created after supervised launch".into())
 }
 
-fn compatibility_api_config(state: &AgentState) -> fluxdown_api::server::ApiServerConfig {
+fn compatibility_api_config(state: &AgentState) -> rinadown_api::server::ApiServerConfig {
     let config = HashMap::from([
         ("local_server_enabled".to_owned(), "true".to_owned()),
         (
@@ -359,10 +359,10 @@ fn compatibility_api_config(state: &AgentState) -> fluxdown_api::server::ApiServ
             state.gateway.port.to_string(),
         ),
     ]);
-    fluxdown_api::server::ApiServerConfig::from_config_map(&config, env!("CARGO_PKG_VERSION"))
+    rinadown_api::server::ApiServerConfig::from_config_map(&config, env!("CARGO_PKG_VERSION"))
 }
 
-/// UI Gateway 监听地址：`FLUXDOWN_AGENT_BIND` 覆盖时必须是回环；否则按持久化的
+/// UI Gateway 监听地址：`RINADOWN_AGENT_BIND` 覆盖时必须是回环；否则按持久化的
 /// `lan_enabled` 选择 `0.0.0.0` / `127.0.0.1`，端口固定 17800。
 fn gateway_bind_address(
     lan_enabled: bool,
@@ -371,7 +371,7 @@ fn gateway_bind_address(
     if let Some(value) = override_bind {
         let bind = value.parse::<std::net::SocketAddr>()?;
         if !bind.ip().is_loopback() {
-            return Err("FLUXDOWN_AGENT_BIND must be loopback".into());
+            return Err("RINADOWN_AGENT_BIND must be loopback".into());
         }
         return Ok(bind);
     }
@@ -393,25 +393,25 @@ struct AgentPaths {
 
 impl AgentPaths {
     fn resolve() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        let project = directories::ProjectDirs::from("dev", "zerx", "FluxDown")
+        let project = directories::ProjectDirs::from("dev", "zerx", "RinaDown")
             .ok_or("could not resolve application data directory")?;
-        let root = std::env::var_os("FLUXDOWN_DATA_DIR")
+        let root = std::env::var_os("RINADOWN_DATA_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|| project.data_dir().to_owned());
-        let agent_data_dir = std::env::var_os("FLUXDOWN_AGENT_DATA_DIR")
+        let agent_data_dir = std::env::var_os("RINADOWN_AGENT_DATA_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|| root.join("agent"));
-        // daemon 的 bearer 落在 engine 数据目录（`fluxdown_engine::data_dir::resolve_data_dir`），
+        // daemon 的 bearer 落在 engine 数据目录（`rinadown_engine::data_dir::resolve_data_dir`），
         // 与 agent 自己的 ProjectDirs 根不同；未显式指定时必须按同一规则推导，否则永远等不到 token。
-        let daemon_token_file = std::env::var_os("FLUXDOWN_DAEMON_TOKEN_FILE")
+        let daemon_token_file = std::env::var_os("RINADOWN_DAEMON_TOKEN_FILE")
             .map(PathBuf::from)
             .unwrap_or_else(|| {
-                std::env::var_os("FLUXDOWN_DATA_DIR")
+                std::env::var_os("RINADOWN_DATA_DIR")
                     .map(PathBuf::from)
                     .unwrap_or_else(engine_data_dir)
                     .join("daemon.token")
             });
-        let daemon_rpc_url = std::env::var("FLUXDOWN_DAEMON_URL")
+        let daemon_rpc_url = std::env::var("RINADOWN_DAEMON_URL")
             .unwrap_or_else(|_| "ws://127.0.0.1:17801/rpc".to_owned());
         Ok(Self {
             agent_data_dir,
@@ -421,7 +421,7 @@ impl AgentPaths {
     }
 }
 
-/// 镜像 `fluxdown_engine::data_dir::resolve_data_dir_inner` 的默认目录（agent 不依赖 engine）。
+/// 镜像 `rinadown_engine::data_dir::resolve_data_dir_inner` 的默认目录（agent 不依赖 engine）。
 fn engine_data_dir() -> PathBuf {
     #[cfg(target_os = "linux")]
     {
@@ -431,7 +431,7 @@ fn engine_data_dir() -> PathBuf {
                 let home = std::env::var_os("HOME").unwrap_or_else(|| ".".into());
                 PathBuf::from(home).join(".local").join("share")
             });
-        base.join("fluxdown")
+        base.join("rinadown")
     }
     #[cfg(target_os = "macos")]
     {
@@ -439,7 +439,7 @@ fn engine_data_dir() -> PathBuf {
         PathBuf::from(home)
             .join("Library")
             .join("Application Support")
-            .join("fluxdown")
+            .join("rinadown")
     }
     #[cfg(target_os = "windows")]
     {
@@ -451,10 +451,10 @@ fn engine_data_dir() -> PathBuf {
             return exe_dir.join("portable_data");
         }
         if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-            return PathBuf::from(local).join("FluxDown");
+            return PathBuf::from(local).join("RinaDown");
         }
         if let Some(appdata) = std::env::var_os("APPDATA") {
-            return PathBuf::from(appdata).join("FluxDown");
+            return PathBuf::from(appdata).join("RinaDown");
         }
         exe_dir
     }

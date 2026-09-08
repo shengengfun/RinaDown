@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/services/ico_codec.dart';
+import 'package:rina_down/src/services/ico_codec.dart';
 
 /// Builds a minimal fake "PNG" blob: real PNG magic (8 bytes) followed by a
 /// trailing [marker] byte so blobs from different entries are distinguishable

@@ -83,9 +83,9 @@ const SAMPLE_VARS: Record<string, string> = {
   '{event.title}': 'Download completed',
   '{event.summary}': 'ubuntu-24.04.2-desktop-amd64.iso · 6.0 GB',
   '{timestamp}': '2026-07-17T12:34:56Z',
-  '{instance.app}': 'fluxdown',
+  '{instance.app}': 'rinadown',
   '{instance.version}': '0.1.44',
-  '{instance.host}': 'fluxdown',
+  '{instance.host}': 'rinadown',
   '{task.id}': '00000000-0000-4000-8000-000000000000',
   '{task.fileName}': 'ubuntu-24.04.2-desktop-amd64.iso',
   '{task.url}': 'https://releases.ubuntu.com/24.04/ubuntu.iso',
@@ -131,7 +131,7 @@ const ENVELOPE_SAMPLE = {
   event: 'task.completed',
   deliveryId: '5f2a91c7-8b3e-4d10-a6f4-c2d90b7e13aa',
   timestamp: '2026-07-17T12:34:56Z',
-  instance: { app: 'fluxdown', version: '0.1.44', host: 'fluxdown' },
+  instance: { app: 'rinadown', version: '0.1.44', host: 'rinadown' },
   queue: { id: 'main', name: 'Main' },
   task: {
     id: '00000000-0000-4000-8000-000000000000',
@@ -270,9 +270,9 @@ export function WebhookEndpointDialog({
   const previewHead = [
     `POST ${url.trim() || preset?.urlPlaceholder || ''}`,
     `Content-Type: ${preset?.contentType ?? 'application/json'}`,
-    `X-FluxDown-Event: ${firstEvent}`,
-    'X-FluxDown-Delivery: 5f2a91c7-…',
-    ...(signOn ? ['X-FluxDown-Signature: t=1789647128,v1=9c41f2…'] : []),
+    `X-RinaDown-Event: ${firstEvent}`,
+    'X-RinaDown-Delivery: 5f2a91c7-…',
+    ...(signOn ? ['X-RinaDown-Signature: t=1789647128,v1=9c41f2…'] : []),
   ].join('\n')
 
   return (

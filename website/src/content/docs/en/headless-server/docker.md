@@ -1,13 +1,13 @@
 ---
 title: Docker & NAS
-description: Run the headless FluxDown server from the prebuilt Docker image, with Docker Compose, CasaOS/ZimaOS, Unraid, and native Synology DSM packages.
+description: Run the headless RinaDown server from the prebuilt Docker image, with Docker Compose, CasaOS/ZimaOS, Unraid, and native Synology DSM packages.
 section: headless-server
 order: 2
 ---
 
 The fastest way to run the headless server is the prebuilt Docker image — no Cargo build, no separate Web UI build step. The image bundles the server binary and the Web UI, exposes everything on one port (`17800`), and persists its database, logs, and access key to a volume.
 
-Image: `ghcr.io/zerx-lab/fluxdown-server` (tags: a specific version like `0.1.54`, or `latest`).
+Image: `ghcr.io/zerx-lab/rinadown-server` (tags: a specific version like `0.1.54`, or `latest`).
 
 > Prefer a pinned version tag over `latest` for reproducible deployments.
 
@@ -15,12 +15,12 @@ Image: `ghcr.io/zerx-lab/fluxdown-server` (tags: a specific version like `0.1.54
 
 ```bash
 docker run -d \
-  --name fluxdown-server \
+  --name rinadown-server \
   --restart unless-stopped \
   -p 17800:17800 \
-  -v fluxdown-data:/data \
+  -v rinadown-data:/data \
   -v /path/to/downloads:/root/Downloads \
-  ghcr.io/zerx-lab/fluxdown-server:latest
+  ghcr.io/zerx-lab/rinadown-server:latest
 ```
 
 - `/data` holds the database, logs, and the access key — keep it on a persistent volume.
@@ -28,50 +28,50 @@ docker run -d \
 
 On first visit to `http://<host>:17800/`, the Web UI opens an initialization wizard where you set the access key yourself (at least 8 characters, must include both letters and digits). Use that key to sign in to the Web UI and to authenticate the management API and MCP endpoint (`Authorization: Bearer <token>`).
 
-For docker-compose or other orchestration, you can pre-set the key with `FLUXDOWN_TOKEN` and skip the wizard. It only takes effect when the instance has not set a key yet:
+For docker-compose or other orchestration, you can pre-set the key with `RINADOWN_TOKEN` and skip the wizard. It only takes effect when the instance has not set a key yet:
 
 ```bash
 docker run -d \
-  --name fluxdown-server \
+  --name rinadown-server \
   --restart unless-stopped \
   -p 17800:17800 \
-  -e FLUXDOWN_TOKEN=your-secure-key-here \
-  -v fluxdown-data:/data \
+  -e RINADOWN_TOKEN=your-secure-key-here \
+  -v rinadown-data:/data \
   -v /path/to/downloads:/root/Downloads \
-  ghcr.io/zerx-lab/fluxdown-server:latest
+  ghcr.io/zerx-lab/rinadown-server:latest
 ```
 
 ## Docker Compose
 
 ```yaml
 services:
-  fluxdown-server:
-    image: ghcr.io/zerx-lab/fluxdown-server:latest
-    container_name: fluxdown-server
+  rinadown-server:
+    image: ghcr.io/zerx-lab/rinadown-server:latest
+    container_name: rinadown-server
     restart: unless-stopped
     ports:
       - "17800:17800"
     volumes:
-      - fluxdown-data:/data
+      - rinadown-data:/data
       - ./downloads:/root/Downloads
     # environment:
-    #   FLUXDOWN_TOKEN: your-secure-key-here   # optional: preset access key, skips the init wizard
-    #   FLUXDOWN_LANG: zh
-    #   FLUXDOWN_DATABASE_URL: postgres://user:pass@host:5432/fluxdown
+    #   RINADOWN_TOKEN: your-secure-key-here   # optional: preset access key, skips the init wizard
+    #   RINADOWN_LANG: zh
+    #   RINADOWN_DATABASE_URL: postgres://user:pass@host:5432/rinadown
 
 volumes:
-  fluxdown-data:
+  rinadown-data:
 ```
 
 ```bash
 docker compose up -d
 ```
 
-All environment variables from [Server Setup](/docs/en/headless-server/setup/) apply — most usefully `FLUXDOWN_LANG` (default Web UI language, `en`/`zh`) and `FLUXDOWN_DATABASE_URL` (point at an external PostgreSQL instead of the bundled SQLite).
+All environment variables from [Server Setup](/docs/en/headless-server/setup/) apply — most usefully `RINADOWN_LANG` (default Web UI language, `en`/`zh`) and `RINADOWN_DATABASE_URL` (point at an external PostgreSQL instead of the bundled SQLite).
 
 ## CasaOS / ZimaOS
 
-FluxDown is published as a third-party CasaOS / ZimaOS app store, so you can install it with one click.
+RinaDown is published as a third-party CasaOS / ZimaOS app store, so you can install it with one click.
 
 In CasaOS / ZimaOS: **App Store → Sources → Add**, then enter:
 
@@ -79,7 +79,7 @@ In CasaOS / ZimaOS: **App Store → Sources → Add**, then enter:
 https://cdn.jsdelivr.net/gh/zerx-lab/casaos-appstore@gh-pages
 ```
 
-Then install **FluxDown** from the store. Store source: [zerx-lab/casaos-appstore](https://github.com/zerx-lab/casaos-appstore).
+Then install **RinaDown** from the store. Store source: [zerx-lab/casaos-appstore](https://github.com/zerx-lab/casaos-appstore).
 
 ## Unraid
 
@@ -91,10 +91,10 @@ Every Server release ships native DSM packages — no Docker required. Four pack
 
 | Package | DSM version | CPU |
 |---|---|---|
-| `FluxDown-Server-<ver>-synology-dsm7-x64.spk` | DSM 7.0 or later | Intel / AMD (x86_64) |
-| `FluxDown-Server-<ver>-synology-dsm7-arm64.spk` | DSM 7.0 or later | ARM64 (rtd1296, rtd1619b, armada37xx, …) |
-| `FluxDown-Server-<ver>-synology-dsm6-x64.spk` | DSM 6.0 – 6.2 | Intel / AMD (x86_64) |
-| `FluxDown-Server-<ver>-synology-dsm6-arm64.spk` | DSM 6.0 – 6.2 | ARM64 |
+| `RinaDown-Server-<ver>-synology-dsm7-x64.spk` | DSM 7.0 or later | Intel / AMD (x86_64) |
+| `RinaDown-Server-<ver>-synology-dsm7-arm64.spk` | DSM 7.0 or later | ARM64 (rtd1296, rtd1619b, armada37xx, …) |
+| `RinaDown-Server-<ver>-synology-dsm6-x64.spk` | DSM 6.0 – 6.2 | Intel / AMD (x86_64) |
+| `RinaDown-Server-<ver>-synology-dsm6-arm64.spk` | DSM 6.0 – 6.2 | ARM64 |
 
 Not sure which CPU family your model uses? Check the "Package Arch" column for your model in [Synology's CPU list](https://kb.synology.com/en-us/DSM/tutorial/What_kind_of_CPU_does_my_NAS_have): `x86_64` family → x64 package, `armv8` family → arm64 package. Older `armv7`/`i686` models are not supported.
 
@@ -111,8 +111,8 @@ On first open of the Web UI (`http://<NAS-IP>:17800`), the initialization wizard
 ### Permissions and data locations
 
 - On **DSM 7** the service runs as a dedicated low-privilege package user (a DSM 7 platform requirement — packages may no longer run as root). On **DSM 6** it runs as root.
-- Database, logs, and the access key live in `/var/packages/FluxDown/var`; downloads default to the same directory.
-- To download into a shared folder on DSM 7, grant the package user write access first: **Control Panel → Shared Folder → Edit → Permissions**, switch the user dropdown to **System internal user**, and give **FluxDown** Read/Write. DSM 6 needs no grant (root).
+- Database, logs, and the access key live in `/var/packages/RinaDown/var`; downloads default to the same directory.
+- To download into a shared folder on DSM 7, grant the package user write access first: **Control Panel → Shared Folder → Edit → Permissions**, switch the user dropdown to **System internal user**, and give **RinaDown** Read/Write. DSM 6 needs no grant (root).
 
 ### Upgrade and uninstall
 

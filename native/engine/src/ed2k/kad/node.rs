@@ -68,7 +68,7 @@ impl Candidate {
 ///
 /// ```
 /// # async fn run() {
-/// use fluxdown_engine::ed2k::kad::node::find_sources_kad;
+/// use rinadown_engine::ed2k::kad::node::find_sources_kad;
 /// use std::time::Duration;
 /// use tokio_util::sync::CancellationToken;
 ///

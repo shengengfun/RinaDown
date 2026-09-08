@@ -17,11 +17,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::download_manager::NewTaskSpec;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::site_auth;
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::download_manager::NewTaskSpec;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::site_auth;
+use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
 
 fn uniq() -> String {
     let n = std::time::SystemTime::now()
@@ -66,7 +66,7 @@ async fn task_headers(engine: &Engine, id: &str) -> HashMap<String, String> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn explicit_credentials_are_injected_saved_and_auto_applied() {
-    let work = std::env::temp_dir().join(format!("fluxdown-siteauth-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-siteauth-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let mut engine = make_engine(&work).await;
     let save_dir = work.to_string_lossy().into_owned();
@@ -168,7 +168,7 @@ async fn explicit_credentials_are_injected_saved_and_auto_applied() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn explicit_user_agent_is_snapshotted_without_overriding_captured_header() {
-    let work = std::env::temp_dir().join(format!("fluxdown-task-ua-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-task-ua-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let mut engine = make_engine(&work).await;
     let save_dir = work.to_string_lossy().into_owned();

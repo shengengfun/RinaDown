@@ -27,8 +27,8 @@ class OpenFileException implements Exception {
   String toString() => 'OpenFileException($error): $message';
 }
 
-/// 与 MainActivity.kt / AppDelegate.swift 的 `com.fluxdown/storage` 通道对应。
-const _storageChannel = MethodChannel('com.fluxdown/storage');
+/// 与 MainActivity.kt / AppDelegate.swift 的 `com.rinadown/storage` 通道对应。
+const _storageChannel = MethodChannel('com.rinadown/storage');
 
 /// 在文件管理器中打开文件所在目录（尽可能选中文件）或目录本身。
 ///
@@ -65,7 +65,7 @@ Future<void> openFolder(String filePath) async {
 /// 激活 UWP 关联应用，导致这类文件"点开没反应"。实现见 native/hub/src/reveal_file.rs。
 ///
 /// **移动平台（Android/iOS）实现**：
-/// 经 `com.fluxdown/storage` MethodChannel 走原生实现：
+/// 经 `com.rinadown/storage` MethodChannel 走原生实现：
 /// - **Android**（MainActivity.kt `openFile`）：FileProvider 生成 content:// URI +
 ///   ACTION_VIEW（targetSdk ≥ 24 禁止 file:// 出应用）；按扩展名解析 MIME 交给
 ///   默认关联应用，无关联时回退系统选择器（chooser）让用户自选。

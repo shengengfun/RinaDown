@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     ApplicationErrorCode, RpcErrorData, RpcErrorObject, RpcRequest, RpcResponse, ServiceRole,
     validate_first_request,
 };
@@ -69,7 +69,7 @@ impl RpcSession {
                 became_ready: false,
             };
         }
-        if request.method == fluxdown_protocol::method::SYSTEM_HELLO {
+        if request.method == rinadown_protocol::method::SYSTEM_HELLO {
             return SessionReply {
                 response: RpcResponse::failure(
                     id,
@@ -101,7 +101,7 @@ impl RpcSession {
             Ok(hello) => match serde_json::to_value(self.service.hello()) {
                 Ok(result) => {
                     self.ready = true;
-                    self.is_local_agent = hello.client_name == "fluxdown-agent";
+                    self.is_local_agent = hello.client_name == "rinadown-agent";
                     SessionReply {
                         response: RpcResponse::success(id, result),
                         became_ready: true,

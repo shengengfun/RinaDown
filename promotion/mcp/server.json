@@ -1,11 +1,11 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.zerx-lab/fluxdown",
-  "title": "FluxDown",
-  "description": "Control the FluxDown download manager: add, list, pause, resume and remove downloads, browse named queues, and manage RSS subscriptions.",
-  "websiteUrl": "https://fluxdown.zerx.dev",
+  "name": "io.github.zerx-lab/rinadown",
+  "title": "RinaDown",
+  "description": "Control the RinaDown download manager: add, list, pause, resume and remove downloads, browse named queues, and manage RSS subscriptions.",
+  "websiteUrl": "https://rinadown.zerx.dev",
   "repository": {
-    "url": "https://github.com/zerx-lab/FluxDown",
+    "url": "https://github.com/zerx-lab/RinaDown",
     "source": "github"
   },
   "version": "0.1.54",
@@ -16,7 +16,7 @@
       "headers": [
         {
           "name": "Authorization",
-          "description": "Bearer <admin token>. Enable the MCP endpoint in FluxDown settings (local_server_mcp_enabled) and copy the admin token; on the headless server it is printed once in the container log at first launch.",
+          "description": "Bearer <admin token>. Enable the MCP endpoint in RinaDown settings (local_server_mcp_enabled) and copy the admin token; on the headless server it is printed once in the container log at first launch.",
           "isRequired": true,
           "isSecret": true
         }

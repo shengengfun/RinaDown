@@ -202,7 +202,7 @@ fn apply_full_path_env(_cmd: &mut Command) {}
 ///
 /// ```
 /// use std::net::IpAddr;
-/// use fluxdown_engine::plugin::bridge::is_globally_routable_unicast;
+/// use rinadown_engine::plugin::bridge::is_globally_routable_unicast;
 ///
 /// assert!(is_globally_routable_unicast("8.8.8.8".parse::<IpAddr>().unwrap()));
 /// assert!(!is_globally_routable_unicast("127.0.0.1".parse::<IpAddr>().unwrap()));

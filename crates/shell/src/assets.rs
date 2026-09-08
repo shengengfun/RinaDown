@@ -2,9 +2,9 @@ use std::borrow::Cow;
 
 use gpui::{AssetSource, Result, SharedString};
 
-/// FluxDown 品牌图标路径。
-pub const APP_LOGO_PATH: &str = "fluxdown/logo.png";
-const APP_LOGO: &[u8] = include_bytes!("../../../assets/logo/fluxdown_logo.png");
+/// RinaDown 品牌图标路径。
+pub const APP_LOGO_PATH: &str = "rinadown/logo.png";
+const APP_LOGO: &[u8] = include_bytes!("../../../assets/logo/rinadown_logo.png");
 
 /// 窗口 shell 拥有的嵌入资源。
 pub struct ShellAssets;

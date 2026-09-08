@@ -90,7 +90,7 @@ pub(crate) async fn fetch_github_json(
 ) -> Result<serde_json::Value, ComponentError> {
     let resp = client
         .get(url)
-        .header("User-Agent", "FluxDown")
+        .header("User-Agent", "RinaDown")
         .header("Accept", "application/vnd.github+json")
         .send()
         .await
@@ -110,7 +110,7 @@ pub(crate) async fn fetch_github_json(
 /// 24h 缓存，规避 GitHub 匿名 API 每 IP 60/h 限流与直连 api.github.com 的
 /// 网络问题），失败回退直连 GitHub。
 #[cfg(feature = "components")]
-const MIRROR_BASE: &str = "https://fluxdown.zerx.dev/api/components";
+const MIRROR_BASE: &str = "https://rinadown.zerx.dev/api/components";
 
 /// 版本列表专用：优先经官网镜像 `MIRROR_BASE/<component>` 拉取（返回原样
 /// GitHub JSON），任何失败都回退直连 `github_url`。二进制下载不走此路径。
@@ -141,7 +141,7 @@ pub(crate) async fn download_to_file(
 
     let resp = client
         .get(url)
-        .header("User-Agent", "FluxDown")
+        .header("User-Agent", "RinaDown")
         .send()
         .await
         .map_err(|e| ComponentError::Http(e.to_string()))?;

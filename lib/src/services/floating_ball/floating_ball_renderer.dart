@@ -57,7 +57,7 @@ Future<void> ensureBallLogoLoaded() async {
     } else {
       final asset = iconSvc.isBolt
           ? AppIconService.builtinBoltAsset
-          : 'assets/logo/fluxdown_logo.png';
+          : 'assets/logo/rinadown_logo.png';
       final data = await rootBundle.load(asset);
       bytes = data.buffer.asUint8List();
     }

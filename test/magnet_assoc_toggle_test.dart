@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 
-import 'package:flux_down/src/bindings/bindings.dart';
-import 'package:flux_down/src/models/settings_provider.dart';
+import 'package:rina_down/src/bindings/bindings.dart';
+import 'package:rina_down/src/models/settings_provider.dart';
 
 /// The "Take over magnet links" toggle mirrors the ed2k opt-out mechanism
 /// (see ed2k_assoc_toggle_test.dart), with one difference in defaults: the
@@ -20,7 +20,7 @@ void main() {
   // SettingsProvider's constructor syncs auto-startup state over the
   // `launch_at_startup` method channel; mock it so the async sync completes.
   launchAtStartup.setup(
-    appName: 'FluxDownTest',
+    appName: 'RinaDownTest',
     appPath: Platform.resolvedExecutable,
   );
   binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -57,7 +57,7 @@ void main() {
       settings.magnetProtocolAssociated,
       isFalse,
       reason: 'a user-requested OFF must not be clobbered by a live query '
-          'that resolves back to FluxDown',
+          'that resolves back to RinaDown',
     );
   });
 

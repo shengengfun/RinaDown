@@ -17,7 +17,7 @@ namespace {
 
 // Property name storing the original WndProc of the Flutter view child
 // window (set when subclassing for top-edge hit-test forwarding).
-constexpr const wchar_t kChildOriginalProcProp[] = L"FluxDownChildProc";
+constexpr const wchar_t kChildOriginalProcProp[] = L"RinaDownChildProc";
 
 // True while the custom frame is active: WS_THICKFRAME present, not
 // maximized (fullscreen strips the resize frame).
@@ -100,7 +100,7 @@ bool FlutterWindow::OnCreate() {
   single_instance_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(),
-          "com.fluxdown/single_instance",
+          "com.rinadown/single_instance",
           &flutter::StandardMethodCodec::GetInstance());
 
   // Floating ball channel (plan A6): handles registerDropTarget /
@@ -108,7 +108,7 @@ bool FlutterWindow::OnCreate() {
   floating_ball_channel_ =
       std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
           flutter_controller_->engine()->messenger(),
-          "com.fluxdown/floating_ball",
+          "com.rinadown/floating_ball",
           &flutter::StandardMethodCodec::GetInstance());
   floating_ball_channel_->SetMethodCallHandler(
       [this](const flutter::MethodCall<flutter::EncodableValue>& call,
@@ -152,7 +152,7 @@ bool FlutterWindow::OnCreate() {
         }
       });
 
-  // 外部唤起独立快速下载小窗宿主 — 注册 fluxdown/popup_host 通道。
+  // 外部唤起独立快速下载小窗宿主 — 注册 rinadown/popup_host 通道。
   // 弹窗窗口与第二引擎在首次 show 时才懒创建。
   popup_host_ = std::make_unique<PopupWindowHost>(
       flutter_controller_->engine()->messenger());

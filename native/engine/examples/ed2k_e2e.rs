@@ -4,16 +4,16 @@
 //!
 //! 运行（可选参数 1 = nodes.dat 路径，默认 `%TEMP%\nodes.dat`）：
 //! ```text
-//! cargo run -p fluxdown_engine --example ed2k_e2e
+//! cargo run -p rinadown_engine --example ed2k_e2e
 //! ```
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use base64::Engine as _;
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
 
 const ED2K_LINK: &str = "ed2k://|file|eMule0.50a.zip|2907254|E8C636D0C0486378BF61E6A3000D0FB7|h=S5ZFHA4PBCMYAWGVAPPPK4ISNXVHUUGY|/";
 
@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::fs::read(&nodes_path).map_err(|e| format!("read nodes.dat at {nodes_path}: {e}"))?;
     println!("nodes.dat: {} bytes", nodes_dat.len());
 
-    let work_dir = std::env::temp_dir().join(format!("fluxdown-ed2k-e2e-{}", std::process::id()));
+    let work_dir = std::env::temp_dir().join(format!("rinadown-ed2k-e2e-{}", std::process::id()));
     tokio::fs::create_dir_all(&work_dir).await?;
 
     let mut engine = Engine::new(
@@ -65,7 +65,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     engine
         .manager
-        .create_task(fluxdown_engine::download_manager::NewTaskSpec {
+        .create_task(rinadown_engine::download_manager::NewTaskSpec {
             url: ED2K_LINK.to_string(),
             save_dir: work_dir.to_string_lossy().into_owned(),
             ..Default::default()

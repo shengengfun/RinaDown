@@ -20,10 +20,10 @@ const RECOVERY_WAIT: Duration = Duration::from_secs(15);
 type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-#[ignore = "requires FLUXDOWN_TEST_DAEMON_BIN=<absolute fluxdownd path>"]
+#[ignore = "requires RINADOWN_TEST_DAEMON_BIN=<absolute rinadownd path>"]
 async fn client_observes_daemon_stale_recovery_and_agent_restart_state_restoration() {
     let daemon_binary = PathBuf::from(
-        std::env::var_os("FLUXDOWN_TEST_DAEMON_BIN").expect("FLUXDOWN_TEST_DAEMON_BIN is required"),
+        std::env::var_os("RINADOWN_TEST_DAEMON_BIN").expect("RINADOWN_TEST_DAEMON_BIN is required"),
     );
     assert!(
         daemon_binary.is_absolute(),
@@ -32,7 +32,7 @@ async fn client_observes_daemon_stale_recovery_and_agent_restart_state_restorati
     assert!(daemon_binary.is_file(), "daemon test binary does not exist");
 
     let root = std::env::temp_dir().join(format!(
-        "fluxdown-local-stack-recovery-{}-{}",
+        "rinadown-local-stack-recovery-{}-{}",
         std::process::id(),
         uuid::Uuid::new_v4()
     ));
@@ -79,7 +79,7 @@ async fn client_observes_daemon_stale_recovery_and_agent_restart_state_restorati
     let patched = rpc_call(
         &mut client,
         30,
-        fluxdown_protocol::method::DAEMON_CONFIG_PATCH,
+        rinadown_protocol::method::DAEMON_CONFIG_PATCH,
         Some(json!({
             "expectedRevision": revision,
             "values": {"max_concurrent_tasks": "9"}
@@ -167,7 +167,7 @@ impl Drop for StackGuard {
 }
 
 fn create_daemon_wrapper(root: &Path, daemon: &Path, pid_file: &Path) -> PathBuf {
-    let wrapper = root.join("fluxdownd-test-wrapper.sh");
+    let wrapper = root.join("rinadownd-test-wrapper.sh");
     let script = format!(
         "#!/bin/sh\nprintf '%s\\n' \"$$\" > '{}'\nexec '{}' \"$@\"\n",
         pid_file.display(),
@@ -189,22 +189,22 @@ fn spawn_agent(
     agent_address: std::net::SocketAddr,
     agent_token_file: &Path,
 ) -> Child {
-    Command::new(env!("CARGO_BIN_EXE_fluxdown-agent"))
-        .env("FLUXDOWN_DATA_DIR", root)
-        .env("FLUXDOWN_AGENT_DATA_DIR", root.join("agent"))
-        .env("FLUXDOWN_AGENT_TOKEN_FILE", agent_token_file)
-        .env("FLUXDOWN_DAEMON_TOKEN_FILE", root.join("daemon.token"))
-        .env("FLUXDOWN_DAEMON_BIN", daemon_wrapper)
-        .env("FLUXDOWN_DAEMON_BIND", daemon_address.to_string())
-        .env("FLUXDOWN_DAEMON_URL", format!("ws://{daemon_address}/rpc"))
-        .env("FLUXDOWN_AGENT_BIND", agent_address.to_string())
+    Command::new(env!("CARGO_BIN_EXE_rinadown-agent"))
+        .env("RINADOWN_DATA_DIR", root)
+        .env("RINADOWN_AGENT_DATA_DIR", root.join("agent"))
+        .env("RINADOWN_AGENT_TOKEN_FILE", agent_token_file)
+        .env("RINADOWN_DAEMON_TOKEN_FILE", root.join("daemon.token"))
+        .env("RINADOWN_DAEMON_BIN", daemon_wrapper)
+        .env("RINADOWN_DAEMON_BIND", daemon_address.to_string())
+        .env("RINADOWN_DAEMON_URL", format!("ws://{daemon_address}/rpc"))
+        .env("RINADOWN_AGENT_BIND", agent_address.to_string())
         .env("FLUXCLOUD_BASE_URL", "http://127.0.0.1:1")
-        .env_remove("FLUXDOWN_DATABASE_URL")
+        .env_remove("RINADOWN_DATABASE_URL")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::inherit())
         .spawn()
-        .expect("spawn fluxdown-agent")
+        .expect("spawn rinadown-agent")
 }
 
 fn reserve_address() -> std::net::SocketAddr {
@@ -269,14 +269,14 @@ async fn hello(socket: &mut Socket, id: i64) {
     let response = rpc_call(
         socket,
         id,
-        fluxdown_protocol::method::SYSTEM_HELLO,
+        rinadown_protocol::method::SYSTEM_HELLO,
         Some(json!({
             "clientName": "local-stack-recovery-test",
             "clientVersion": "test",
-            "minProtocolVersion": fluxdown_protocol::MIN_PROTOCOL_VERSION,
-            "maxProtocolVersion": fluxdown_protocol::PROTOCOL_VERSION,
+            "minProtocolVersion": rinadown_protocol::MIN_PROTOCOL_VERSION,
+            "maxProtocolVersion": rinadown_protocol::PROTOCOL_VERSION,
             "requestedRole": "agent",
-            "capabilities": [fluxdown_protocol::method::CAPABILITY_CLIENT_SELECTIONS]
+            "capabilities": [rinadown_protocol::method::CAPABILITY_CLIENT_SELECTIONS]
         })),
     )
     .await;
@@ -291,7 +291,7 @@ async fn wait_snapshot(
 ) -> Value {
     let deadline = Instant::now() + timeout;
     loop {
-        let response = rpc_call(socket, id, fluxdown_protocol::method::SYSTEM_SNAPSHOT, None).await;
+        let response = rpc_call(socket, id, rinadown_protocol::method::SYSTEM_SNAPSHOT, None).await;
         let snapshot = &response["result"];
         if predicate(snapshot) {
             return snapshot.clone();

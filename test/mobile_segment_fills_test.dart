@@ -6,8 +6,8 @@
 // 注释的约定）。
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/mobile/mobile_ui.dart';
-import 'package:flux_down/src/models/download_task.dart';
+import 'package:rina_down/src/mobile/mobile_ui.dart';
+import 'package:rina_down/src/models/download_task.dart';
 
 const _tolerance = 1e-9;
 

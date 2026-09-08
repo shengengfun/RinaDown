@@ -62,7 +62,7 @@ class AppMenuCallbacks {
 class HomePage extends StatefulWidget {
   const HomePage({super.key, required this.settingsProvider});
 
-  /// 由 [FluxDownApp] 持有并与应用级服务共享，HomePage 不负责释放。
+  /// 由 [RinaDownApp] 持有并与应用级服务共享，HomePage 不负责释放。
   final SettingsProvider settingsProvider;
 
   @override
@@ -113,7 +113,7 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _settingsProvider = widget.settingsProvider;
     logInfo('HomePage', 'initState');
-    // 配置请求由持有共享 SettingsProvider 的 FluxDownApp 统一发送一次。
+    // 配置请求由持有共享 SettingsProvider 的 RinaDownApp 统一发送一次。
     // 请求插件列表 + 订阅熔断器自动禁用通知（弹 toast）
     _pluginProvider.requestPlugins();
     _pluginProvider.addListener(_onPluginProviderChanged);
@@ -150,7 +150,7 @@ class _HomePageState extends State<HomePage> {
     unawaited(
       ConfigSyncService.instance.attach(
         settings: _settingsProvider,
-        theme: FluxDownApp.of(context),
+        theme: RinaDownApp.of(context),
         locale: localeNotifier,
       ),
     );

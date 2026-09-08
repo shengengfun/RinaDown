@@ -1,8 +1,8 @@
 //! Doctor：环境自检报告与就地修复。检查项 `id`/`hint`/`repair.action` 由 agent 给出。
 
-use fluxdown_protocol::{DiagnosticLevel, DiagnosticRepairParams, method};
-use fluxdown_ui_components::{ButtonVariant, button};
-use fluxdown_ui_theme::active_theme;
+use rinadown_protocol::{DiagnosticLevel, DiagnosticRepairParams, method};
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_theme::active_theme;
 use gpui::{App, ClipboardItem, IntoElement as _, ParentElement, SharedString, Styled, div};
 use gpui_component::{
     Icon, IconName, h_flex,
@@ -215,12 +215,12 @@ fn run_repair(
 
 /// 纯文本报告（供复制到反馈）。
 fn render_report(
-    report: &fluxdown_protocol::DiagnosticsReportDto,
-    translator: &fluxdown_ui_i18n::Translator,
+    report: &rinadown_protocol::DiagnosticsReportDto,
+    translator: &rinadown_ui_i18n::Translator,
 ) -> String {
     let mut out = String::new();
     out.push_str(&format!(
-        "FluxDown {} · {} · {}\nagent data dir: {}\ndaemon connected: {}\n\n",
+        "RinaDown {} · {} · {}\nagent data dir: {}\ndaemon connected: {}\n\n",
         report.app_version,
         report.platform,
         report.generated_at_unix_ms,

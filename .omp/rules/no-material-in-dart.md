@@ -12,7 +12,7 @@ repeatMode: after-gap
 repeatGap: 3
 ---
 
-FluxDown 桌面端全程使用 shadcn_ui，禁止原生 Material/Cupertino 组件。替换对照：
+RinaDown 桌面端全程使用 shadcn_ui，禁止原生 Material/Cupertino 组件。替换对照：
 
 - `showDialog()` → `showShadDialog()`
 - `MaterialApp` → `ShadApp`

@@ -1,4 +1,4 @@
-//! `fluxdown-desktop` 的薄入口；应用装配集中在本 crate。
+//! `rinadown-desktop` 的薄入口；应用装配集中在本 crate。
 
 mod account_port;
 mod agent_client;
@@ -16,7 +16,7 @@ fn main() -> ExitCode {
     match app::run() {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
-            eprintln!("failed to start FluxDown desktop client: {error:#}");
+            eprintln!("failed to start RinaDown desktop client: {error:#}");
             ExitCode::FAILURE
         }
     }

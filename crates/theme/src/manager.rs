@@ -344,7 +344,7 @@ mod tests {
 
     #[test]
     fn scale_tokens_scales_sizes_and_keeps_colors() {
-        let definition = FluxThemeDefinition::fluxdown_default();
+        let definition = FluxThemeDefinition::rinadown_default();
         let mut tokens = definition.light.clone();
         scale_tokens(&mut tokens, 1.5);
 

@@ -37,7 +37,7 @@ pub const MD4_EMPTY: [u8; 16] = [
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::hash::part_count;
+/// use rinadown_engine::ed2k::hash::part_count;
 /// assert_eq!(part_count(0, 100), 1);
 /// assert_eq!(part_count(1, 100), 1);
 /// assert_eq!(part_count(100, 100), 1);
@@ -58,7 +58,7 @@ pub fn part_count(total_size: u64, part_size: u64) -> u64 {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::hash::part_span;
+/// use rinadown_engine::ed2k::hash::part_span;
 /// assert_eq!(part_span(0, 250, 100), (0, 100));
 /// assert_eq!(part_span(2, 250, 100), (200, 250)); // 末块不满
 /// ```
@@ -74,7 +74,7 @@ pub fn part_span(index: u64, total_size: u64, part_size: u64) -> (u64, u64) {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::hash::is_phantom_tail;
+/// use rinadown_engine::ed2k::hash::is_phantom_tail;
 /// assert!(is_phantom_tail(200, 100));
 /// assert!(!is_phantom_tail(0, 100));   // 0 字节不追加
 /// assert!(!is_phantom_tail(150, 100));
@@ -89,7 +89,7 @@ pub fn is_phantom_tail(total_size: u64, part_size: u64) -> bool {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::hash::{hash_part, MD4_EMPTY};
+/// use rinadown_engine::ed2k::hash::{hash_part, MD4_EMPTY};
 /// assert_eq!(hash_part(b""), MD4_EMPTY);
 /// ```
 #[must_use]
@@ -108,7 +108,7 @@ pub fn hash_part(data: &[u8]) -> [u8; 16] {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::hash::{compute_root, hash_part};
+/// use rinadown_engine::ed2k::hash::{compute_root, hash_part};
 /// let h = hash_part(b"abc");
 /// assert_eq!(compute_root(&[h]), h); // 单块 root == 块哈希本身
 /// ```
@@ -134,7 +134,7 @@ pub fn compute_root(part_hashes: &[[u8; 16]]) -> [u8; 16] {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::hash::{build_root_input, MD4_EMPTY};
+/// use rinadown_engine::ed2k::hash::{build_root_input, MD4_EMPTY};
 /// let net = vec![[1u8; 16], [2u8; 16]];
 /// // total=200, ps=100 → phantom tail，追加空块
 /// let input = build_root_input(&net, 200, 100);
@@ -161,7 +161,7 @@ pub fn build_root_input(net_hashes: &[[u8; 16]], total_size: u64, part_size: u64
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::ed2k::hash::{build_root_input, compute_root, hash_part, verify_hashset_root};
+/// use rinadown_engine::ed2k::hash::{build_root_input, compute_root, hash_part, verify_hashset_root};
 /// // total = ps = 100 → 单个真实块 + phantom 空尾块
 /// let block = vec![0u8; 100];
 /// let net = vec![hash_part(&block)];

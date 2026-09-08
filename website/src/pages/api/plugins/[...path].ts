@@ -1,5 +1,5 @@
 /**
- * GET /api/plugins/:path — fluxdown-plugin-index 仓库静态资源同源代理。
+ * GET /api/plugins/:path — rinadown-plugin-index 仓库静态资源同源代理。
  *
  * 插件市场页需加载插件索引仓库的 index.json（及可选的 per-version 分片），
  * 直连 raw.githubusercontent.com 在大陆访问极慢。改为经本站服务端中转：
@@ -14,7 +14,7 @@ import type { APIRoute } from "astro";
 
 export const prerender = false;
 
-const RAW_BASE = "https://raw.githubusercontent.com/zerx-lab/fluxdown-plugin-index/main";
+const RAW_BASE = "https://raw.githubusercontent.com/zerx-lab/rinadown-plugin-index/main";
 
 /** 仅允许 index.json 或 plugins/<pluginId>/<version>.json（pluginId 形如 author@name） */
 const ALLOWED_PATH = /^(index\.json|plugins\/[\w.@-]+\/[\w.-]+\.json)$/;

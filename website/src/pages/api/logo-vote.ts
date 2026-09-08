@@ -62,7 +62,7 @@ const BUILTIN_LOGOS: BuiltinLogo[] = [
 
 // All votes (builtin + submission) are stored as comments in ONE issue.
 // This means GET only needs 2 GitHub API calls: list issues + list comments.
-const VOTES_ISSUE_TITLE = "[FluxDown] Logo Vote Records";
+const VOTES_ISSUE_TITLE = "[RinaDown] Logo Vote Records";
 const SUBMISSION_TITLE_PREFIX = "[Logo]";
 
 const BUILTIN_UPLOAD_DATE = "2025-01-01T00:00:00.000Z";
@@ -187,7 +187,7 @@ async function findOrCreateVotesIssue(): Promise<number> {
       body: JSON.stringify({
         title: VOTES_ISSUE_TITLE,
         body: [
-          "## FluxDown Logo Vote Records",
+          "## RinaDown Logo Vote Records",
           "",
           "This issue stores all logo vote comments.",
           "Each comment is a JSON record: `{ logoId, ip, action, date }`.",

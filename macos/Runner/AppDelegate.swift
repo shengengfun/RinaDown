@@ -11,7 +11,7 @@ class AppDelegate: FlutterAppDelegate, UNUserNotificationCenterDelegate {
     // shell/platform/darwin/macos/framework/Source/FlutterAppDelegate.mm）。
     // Swift 允许写 super 是因为该方法是 NSApplicationDelegate 的 optional 协议
     // 要求，运行时 objc_msgSendSuper 落空 → NSInvalidArgumentException：
-    //   -[FluxDown.AppDelegate applicationDidFinishLaunching:]: unrecognized selector
+    //   -[RinaDown.AppDelegate applicationDidFinishLaunching:]: unrecognized selector
     // 异常会从 -[NSApplication _postDidFinishNotification] 一路抛穿
     // _handleAEOpenEvent:，使排在本 delegate 之后注册的
     // NSApplicationDidFinishLaunchingNotification 观察者全部收不到通知，
@@ -42,7 +42,7 @@ class AppDelegate: FlutterAppDelegate, UNUserNotificationCenterDelegate {
   /// 可靠地把主窗口从「关闭到托盘」(orderOut) 或最小化恢复并置于前台。
   ///
   /// 供 Dock 点击 (applicationShouldHandleReopen) 与托盘/悬浮球点击
-  /// (MethodChannel `com.fluxdown/window` → restore) 共用。
+  /// (MethodChannel `com.rinadown/window` → restore) 共用。
   ///
   /// 先恢复 regular 策略，确保 Dock 与应用菜单在窗口出现前完成恢复。
   /// 不走 window_manager 的 show()/focus()：其 focus() 使用
@@ -71,14 +71,14 @@ class AppDelegate: FlutterAppDelegate, UNUserNotificationCenterDelegate {
     return true
   }
 
-  // MARK: - fluxdown:// URL scheme
+  // MARK: - rinadown:// URL scheme
 
   /// 冷启动时暂存的协议 URL：URL open 事件可能早于 Dart 侧
-  /// `com.fluxdown/single_instance` 的 handler 注册，先缓冲再重试投递。
+  /// `com.rinadown/single_instance` 的 handler 注册，先缓冲再重试投递。
   private var pendingUrls: [String] = []
   private var deliverRetryCount = 0
 
-  /// 系统派发 `fluxdown://` URL（CFBundleURLTypes 注册）：与 Windows 的
+  /// 系统派发 `rinadown://` URL（CFBundleURLTypes 注册）：与 Windows 的
   /// WM_COPYDATA / Linux 的 GApplication::open 同构 —— 把 URL 字符串按
   /// `onSecondInstance` 参数格式转发给 Dart（main.dart 复用同一条
   /// 启动参数解析链），并把主窗口带到前台。
@@ -103,7 +103,7 @@ class AppDelegate: FlutterAppDelegate, UNUserNotificationCenterDelegate {
       return
     }
     let channel = FlutterMethodChannel(
-      name: "com.fluxdown/single_instance",
+      name: "com.rinadown/single_instance",
       binaryMessenger: controller.engine.binaryMessenger
     )
     let args = pendingUrls

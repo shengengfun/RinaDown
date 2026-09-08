@@ -2,9 +2,9 @@
 // - 语言集合由 web/src/lib/locales/*.json 自动发现（import.meta.glob，见 locales/index.ts）；
 //   社区经 Weblate 新增 <lang>.json 后无需改代码即出现在语言下拉框。en.json 为源语言/模板，
 //   缺失或空串的键按键级回退到英文。
-// - 解析顺序：localStorage `fluxdown.locale`（用户显式选择）→ 服务器默认语言
+// - 解析顺序：localStorage `rinadown.locale`（用户显式选择）→ 服务器默认语言
 //   （无鉴权 `/ping` 的 language，实时求值：设置页保存的 `web_language` 优先，
-//   未保存时回退部署环境 FLUXDOWN_LANG；登录页同样生效）→ 浏览器语言 → en。
+//   未保存时回退部署环境 RINADOWN_LANG；登录页同样生效）→ 浏览器语言 → en。
 // - 持久化：仅设置页的显式切换写 localStorage 并写穿服务器 config `web_language`
 //   （PUT /api/v1/config）；采用服务器/浏览器默认值不落盘，服务器侧变更随时可生效。
 // - 后端返回：wire message 是稳定英文契约（CLI/客户端字符串匹配），不按语言变体；
@@ -18,7 +18,7 @@ import type enJson from './locales/en.json'
 /** locale 代码（"en"、"zh"…），可用集合由 locales/*.json 自动发现 */
 export type Locale = string
 
-const LOCALE_KEY = 'fluxdown.locale'
+const LOCALE_KEY = 'rinadown.locale'
 /** 服务器 config 表中的语言键（设置页写穿）。 */
 export const LANGUAGE_CONFIG_KEY = 'web_language'
 
@@ -35,7 +35,7 @@ const BACKEND_KEYS: Record<string, I18nKey> = {
   'unknown endpoint': 'backend.unknownEndpoint',
   'app shutting down': 'backend.appShuttingDown',
   'invalid or missing token': 'backend.invalidOrMissingToken',
-  'missing X-FluxDown-Client header': 'backend.missingClientHeader',
+  'missing X-RinaDown-Client header': 'backend.missingClientHeader',
   'management API requires a token; set one in Settings > API Service': 'backend.managementApiRequiresToken',
   // 首次运行 / 密钥策略（Rust: native/server/src/config.rs::validate_access_key）
   'setup already completed': 'backend.setupAlreadyCompleted',

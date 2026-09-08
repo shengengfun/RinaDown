@@ -514,7 +514,7 @@ class ConfigSyncService extends ChangeNotifier {
 
   /// 解析 `data: {...}` 行：无 `kind` 字段沿用既有 per-user sync revision
   /// 处理；`kind: "cdn_config"` 是合入本流的全局 CDN 配置变更事件（P2 §九，
-  /// FluxDownCloud 管理端保存 CDN 设置后 bump），与本账号 sync revision 是
+  /// RinaDownCloud 管理端保存 CDN 设置后 bump），与本账号 sync revision 是
   /// 两套独立计数——不参与水位线比较，只触发 [CdnConfigService] 立即重拉。
   /// `:` 开头的注释心跳与空行仅用于喂看门狗。
   void _onSseLine(String line) {

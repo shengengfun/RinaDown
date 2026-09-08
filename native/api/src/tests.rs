@@ -3,7 +3,7 @@
 //!
 //! 覆盖语义迁移自旧 `native/hub/src/http_takeover.rs` 测试套件（见
 //! `git show HEAD:native/hub/src/http_takeover.rs`），改为对新
-//! `fluxdown_api`（axum 0.8 + [`ApiHost`] 抽象）的端到端验证：不再手写 HTTP 解析，
+//! `rinadown_api`（axum 0.8 + [`ApiHost`] 抽象）的端到端验证：不再手写 HTTP 解析，
 //! 而是用最小的原始 TCP 客户端发真实请求、按 `Content-Length` 精确读取响应体
 //! （不依赖 `Connection: close`，与 keep-alive 无关，杜绝读取挂死）。WS 部分用
 //! 真实 `tokio-tungstenite` 客户端握手 + 收发帧，同样是黑盒端到端验证。
@@ -29,7 +29,7 @@ use crate::server::{self, ApiRuntimeSwitches, ApiServerConfig};
 use crate::service::{
     ApiError, ApiHost, LiveSpeed, TaskEvent, TaskEventKind, UNKNOWN_ENDPOINT_MESSAGE,
 };
-use fluxdown_protocol::daemon::{
+use rinadown_protocol::daemon::{
     CreateGroupRequest, CreateTaskRequest, DownloadRequest, GroupDto, QueueDto,
     ResolvePreviewRequest, ResolvePreviewResponse, TaskDto,
 };
@@ -582,7 +582,7 @@ async fn ping_returns_200_without_auth() {
     let resp = server.send(&request("GET", routes::PING, &[], "")).await;
     assert_eq!(resp.status, 200);
     let json = resp.json();
-    assert_eq!(json["app"], "FluxDown");
+    assert_eq!(json["app"], "RinaDown");
     assert_eq!(json["version"], "9.9.9-test");
     assert_eq!(json["message"], "pong");
     // 宿主未提供 Web 语言时省略该字段
@@ -635,7 +635,7 @@ async fn download_with_client_header_submits_without_token() {
             "POST",
             routes::DOWNLOAD,
             &[
-                ("X-FluxDown-Client", "userscript"),
+                ("X-RinaDown-Client", "userscript"),
                 ("Content-Type", "application/json"),
             ],
             &body,
@@ -658,8 +658,8 @@ async fn download_wrong_token_returns_401() {
             "POST",
             routes::DOWNLOAD,
             &[
-                ("X-FluxDown-Client", "userscript"),
-                ("X-FluxDown-Token", "wrong"),
+                ("X-RinaDown-Client", "userscript"),
+                ("X-RinaDown-Token", "wrong"),
             ],
             &body,
         ))
@@ -680,7 +680,7 @@ async fn download_batch_joins_urls_and_submits() {
         .send(&request(
             "POST",
             routes::DOWNLOAD_BATCH,
-            &[("X-FluxDown-Client", "userscript")],
+            &[("X-RinaDown-Client", "userscript")],
             &body,
         ))
         .await;
@@ -1181,7 +1181,7 @@ async fn management_api_returns_403_when_token_unset() {
 }
 
 #[tokio::test]
-async fn management_api_accepts_bearer_or_x_fluxdown_token_header() {
+async fn management_api_accepts_bearer_or_x_rinadown_token_header() {
     let server = TestServer::start(MockHost::new(), |c| {
         c.token.set("M-TOKEN");
         c.management_enabled = true;
@@ -1202,7 +1202,7 @@ async fn management_api_accepts_bearer_or_x_fluxdown_token_header() {
         .send(&request(
             "GET",
             routes::API_TASKS,
-            &[("X-FluxDown-Token", "M-TOKEN")],
+            &[("X-RinaDown-Token", "M-TOKEN")],
             "",
         ))
         .await;
@@ -1212,7 +1212,7 @@ async fn management_api_accepts_bearer_or_x_fluxdown_token_header() {
         .send(&request(
             "GET",
             routes::API_TASKS,
-            &[("X-FluxDown-Token", "wrong")],
+            &[("X-RinaDown-Token", "wrong")],
             "",
         ))
         .await;
@@ -1231,7 +1231,7 @@ async fn list_tasks_returns_camel_case_json_from_host() {
         .send(&request(
             "GET",
             routes::API_TASKS,
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1260,7 +1260,7 @@ async fn list_tasks_filters_by_status_query() {
         .send(&request(
             "GET",
             &format!("{}?status=1", routes::API_TASKS),
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1286,7 +1286,7 @@ async fn create_task_returns_task_id_from_host() {
         .send(&request(
             "POST",
             routes::API_TASKS,
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             &body,
         ))
         .await;
@@ -1310,7 +1310,7 @@ async fn create_task_empty_url_returns_400() {
         .send(&request(
             "POST",
             routes::API_TASKS,
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             &body,
         ))
         .await;
@@ -1329,7 +1329,7 @@ async fn get_task_not_found_returns_404() {
         .send(&request(
             "GET",
             &routes::task_path("missing"),
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1348,7 +1348,7 @@ async fn delete_task_passes_delete_files_flag_to_host() {
         .send(&request(
             "DELETE",
             &format!("{}?deleteFiles=true", routes::task_path("t1")),
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1367,7 +1367,7 @@ async fn pause_continue_single_task_by_id() {
         .send(&request(
             "PUT",
             &routes::task_pause_path("t1"),
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1376,7 +1376,7 @@ async fn pause_continue_single_task_by_id() {
         .send(&request(
             "PUT",
             &routes::task_continue_path("t1"),
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1396,7 +1396,7 @@ async fn pause_continue_all_static_route_not_swallowed_by_id_route() {
         .send(&request(
             "PUT",
             routes::API_TASKS_PAUSE,
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1405,7 +1405,7 @@ async fn pause_continue_all_static_route_not_swallowed_by_id_route() {
         .send(&request(
             "PUT",
             routes::API_TASKS_CONTINUE,
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1430,7 +1430,7 @@ async fn rename_task_forwards_camel_case_body_to_host() {
         .send(&request(
             "POST",
             &routes::task_rename_path("t1"),
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             &body,
         ))
         .await;
@@ -1479,7 +1479,7 @@ async fn rename_task_maps_engine_error_codes_to_status_and_passes_message_throug
             .send(&request(
                 "POST",
                 &routes::task_rename_path("t1"),
-                &[("X-FluxDown-Token", "T")],
+                &[("X-RinaDown-Token", "T")],
                 &body,
             ))
             .await;
@@ -1510,7 +1510,7 @@ async fn rename_task_without_token_returns_401_and_bad_payload_returns_400() {
         .send(&request(
             "POST",
             &routes::task_rename_path("t1"),
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "{}",
         ))
         .await;
@@ -1534,7 +1534,7 @@ async fn list_groups_returns_camel_case_json_from_host() {
         .send(&request(
             "GET",
             routes::API_GROUPS,
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1566,7 +1566,7 @@ async fn create_group_returns_group_id_and_forwards_items() {
         .send(&request(
             "POST",
             routes::API_GROUPS,
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             &body,
         ))
         .await;
@@ -1590,7 +1590,7 @@ async fn create_group_empty_items_returns_400() {
         .send(&request(
             "POST",
             routes::API_GROUPS,
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             &body,
         ))
         .await;
@@ -1610,7 +1610,7 @@ async fn group_pause_continue_and_delete_by_id() {
         .send(&request(
             "PUT",
             &routes::group_pause_path("g1"),
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1619,7 +1619,7 @@ async fn group_pause_continue_and_delete_by_id() {
         .send(&request(
             "PUT",
             &routes::group_continue_path("g1"),
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1628,7 +1628,7 @@ async fn group_pause_continue_and_delete_by_id() {
         .send(&request(
             "DELETE",
             &format!("{}?deleteFiles=true", routes::group_path("g1")),
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1649,7 +1649,7 @@ async fn group_action_on_unknown_id_returns_404() {
         .send(&request(
             "PUT",
             &routes::group_pause_path("missing"),
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1658,7 +1658,7 @@ async fn group_action_on_unknown_id_returns_404() {
         .send(&request(
             "DELETE",
             &routes::group_path("missing"),
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1683,7 +1683,7 @@ async fn resolve_preview_forwards_request_and_returns_host_response() {
         .send(&request(
             "POST",
             routes::API_RESOLVE_PREVIEW,
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             &body,
         ))
         .await;
@@ -1707,7 +1707,7 @@ async fn resolve_preview_empty_url_returns_400() {
         .send(&request(
             "POST",
             routes::API_RESOLVE_PREVIEW,
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             &body,
         ))
         .await;
@@ -1749,7 +1749,7 @@ async fn rss_validate_static_route_not_swallowed_by_id_route() {
     })
     .await;
     let json_headers: &[(&str, &str)] = &[
-        ("X-FluxDown-Token", "T"),
+        ("X-RinaDown-Token", "T"),
         ("Content-Type", "application/json"),
     ];
 
@@ -1757,7 +1757,7 @@ async fn rss_validate_static_route_not_swallowed_by_id_route() {
         .send(&request(
             "GET",
             routes::API_RSS,
-            &[("X-FluxDown-Token", "T")],
+            &[("X-RinaDown-Token", "T")],
             "",
         ))
         .await;
@@ -1804,7 +1804,7 @@ async fn takeover_disabled_returns_404_but_ping_still_ok() {
         .send(&request(
             "POST",
             routes::DOWNLOAD,
-            &[("X-FluxDown-Client", "userscript")],
+            &[("X-RinaDown-Client", "userscript")],
             "{}",
         ))
         .await;
@@ -1840,7 +1840,7 @@ async fn runtime_switches_hot_toggle_routes_and_cors_without_rebinding() {
         .send(&request(
             "POST",
             routes::DOWNLOAD,
-            &[("X-FluxDown-Client", "userscript")],
+            &[("X-RinaDown-Client", "userscript")],
             r#"{"url":"https://example.com/a"}"#,
         ))
         .await;
@@ -1861,9 +1861,9 @@ async fn runtime_switches_hot_toggle_routes_and_cors_without_rebinding() {
             "POST",
             routes::DOWNLOAD,
             &[
-                ("X-FluxDown-Client", "userscript"),
+                ("X-RinaDown-Client", "userscript"),
                 ("Origin", "https://example.com"),
-                ("X-FluxDown-Token", "dynamic-token"),
+                ("X-RinaDown-Token", "dynamic-token"),
             ],
             r#"{"url":"https://example.com/a"}"#,
         ))
@@ -1916,7 +1916,7 @@ async fn options_preflight_returns_204_without_cors_header() {
 }
 
 /// `cors_allow_all` 开启后预检回全套 CORS 头（含 Chrome 私有网络访问放行），
-/// 且 `Allow-Headers` 原样回显请求头清单——否则自定义头（`X-FluxDown-Client`
+/// 且 `Allow-Headers` 原样回显请求头清单——否则自定义头（`X-RinaDown-Client`
 /// 等）过不了检，接管入口对浏览器仍然不可用。
 #[tokio::test]
 async fn cors_allow_all_preflight_returns_cors_headers() {

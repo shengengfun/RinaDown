@@ -29,7 +29,7 @@ import { bustApiCaches } from "../../../lib/api-cache";
 export const prerender = false;
 
 const WEBHOOK_SECRET = GITHUB_WEBHOOK_SECRET ?? "";
-const SITE_URL = "https://fluxdown.zerx.dev";
+const SITE_URL = "https://rinadown.zerx.dev";
 
 // ── 签名验证 ──
 
@@ -116,7 +116,7 @@ async function sendNotificationEmail(
   const feedbackUrl = `${SITE_URL}/feedback`;
 
   await transporter.sendMail({
-    from: `"FluxDown" <${SMTP_USER}>`,
+    from: `"RinaDown" <${SMTP_USER}>`,
     to,
     subject: `Your feedback "${cleanTitle}" has a new reply`,
     html: `
@@ -127,7 +127,7 @@ async function sendNotificationEmail(
   <div style="max-width:560px;margin:0 auto;padding:32px 20px;">
     <!-- Header -->
     <div style="text-align:center;margin-bottom:28px;">
-      <h1 style="color:#e4e4e7;font-size:20px;font-weight:700;margin:0;">FluxDown</h1>
+      <h1 style="color:#e4e4e7;font-size:20px;font-weight:700;margin:0;">RinaDown</h1>
       <p style="color:#71717a;font-size:12px;margin:4px 0 0;">Feedback Notification</p>
     </div>
 
@@ -150,13 +150,13 @@ async function sendNotificationEmail(
 
       <!-- CTA -->
       <div style="padding:0 20px 20px;text-align:center;">
-        <a href="${feedbackUrl}" style="display:inline-block;padding:10px 24px;background:#3b82f6;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:500;">View on FluxDown</a>
+        <a href="${feedbackUrl}" style="display:inline-block;padding:10px 24px;background:#3b82f6;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:500;">View on RinaDown</a>
       </div>
     </div>
 
     <!-- Footer -->
     <p style="color:#52525b;font-size:11px;text-align:center;margin:20px 0 0;line-height:1.5;">
-      You received this email because you submitted feedback on FluxDown.<br>
+      You received this email because you submitted feedback on RinaDown.<br>
       If you didn't submit any feedback, please ignore this email.
     </p>
   </div>

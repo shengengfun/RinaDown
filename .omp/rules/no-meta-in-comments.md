@@ -8,7 +8,7 @@ globs:
   - native/**/*.rs
   - lib/**/*.dart
   - web/src/**/*.{ts,tsx}
-  - fluxDown/**/*.ts
+  - rinaDown/**/*.ts
 repeatMode: after-gap
 repeatGap: 3
 ---

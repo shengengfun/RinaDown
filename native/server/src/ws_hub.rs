@@ -5,7 +5,7 @@
 //!   同时维护任务前态表（`task_id` → 最近一次已知 status），按统一规则
 //!   （[`task_event_for_transition`] / [`reconcile_snapshot_states`]）把
 //!   状态迁移映射为 aria2 兼容层 WS 通知源
-//!   [`TaskEvent`](fluxdown_api::service::TaskEvent)（经
+//!   [`TaskEvent`](rinadown_api::service::TaskEvent)（经
 //!   `ApiHost::subscribe_task_events` 由 jsonrpc 层订阅并转译为
 //!   `aria2.onDownloadXxx` 通知帧）。
 //! - [`WsHostSelection`]：HLS/BT 选择请求经 WS 广播给全部客户端，用
@@ -27,14 +27,14 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::time::Duration;
 
-use fluxdown_api::service::{LiveSpeed, TaskEvent, TaskEventKind, task_event_for_transition};
-use fluxdown_engine::events::{EngineEvent, EventSink};
-use fluxdown_engine::log_info;
-use fluxdown_engine::model::{BtFileEntry, HlsQualityOption, ResolveVariantOption, TaskInfo};
-use fluxdown_engine::selection::{HostSelection, SelectionOutcome};
+use rinadown_api::service::{LiveSpeed, TaskEvent, TaskEventKind, task_event_for_transition};
+use rinadown_engine::events::{EngineEvent, EventSink};
+use rinadown_engine::log_info;
+use rinadown_engine::model::{BtFileEntry, HlsQualityOption, ResolveVariantOption, TaskInfo};
+use rinadown_engine::selection::{HostSelection, SelectionOutcome};
 use tokio::sync::{broadcast, oneshot};
 
-use fluxdown_protocol::daemon::{FileMissingUpdateDto, WsServerMsg};
+use rinadown_protocol::daemon::{FileMissingUpdateDto, WsServerMsg};
 
 /// 无客户端应答时 BT 文件选择的兜底超时（与桌面端常量一致）。
 const BT_SELECTION_TIMEOUT: Duration = Duration::from_secs(60);
@@ -94,7 +94,7 @@ impl WsHub {
     }
 
     /// 订阅任务生命周期事件（aria2 `/jsonrpc` WS 通知源）。见
-    /// [`fluxdown_api::service::ApiHost::subscribe_task_events`]。
+    /// [`rinadown_api::service::ApiHost::subscribe_task_events`]。
     pub fn subscribe_task_events(&self) -> broadcast::Receiver<TaskEvent> {
         self.task_events.subscribe()
     }
@@ -254,7 +254,7 @@ impl EventSink for EngineEventSink {
                 WsServerMsg::TasksSnapshot {
                     tasks: tasks
                         .into_iter()
-                        .map(fluxdown_engine_protocol::task_info_to_dto)
+                        .map(rinadown_engine_protocol::task_info_to_dto)
                         .collect(),
                 }
             }
@@ -269,7 +269,7 @@ impl EventSink for EngineEventSink {
                 segment_count,
                 segments: segments
                     .into_iter()
-                    .map(fluxdown_engine_protocol::segment_detail_to_dto)
+                    .map(rinadown_engine_protocol::segment_detail_to_dto)
                     .collect(),
             },
             EngineEvent::TaskMetaProbed {
@@ -284,13 +284,13 @@ impl EventSink for EngineEventSink {
             EngineEvent::QueuePositionsChanged(positions) => WsServerMsg::QueuePositionsChanged {
                 positions: positions
                     .into_iter()
-                    .map(fluxdown_engine_protocol::queue_position_to_dto)
+                    .map(rinadown_engine_protocol::queue_position_to_dto)
                     .collect(),
             },
             EngineEvent::QueuesChanged(queues) => WsServerMsg::QueuesChanged {
                 queues: queues
                     .into_iter()
-                    .map(fluxdown_engine_protocol::queue_info_to_dto)
+                    .map(rinadown_engine_protocol::queue_info_to_dto)
                     .collect(),
             },
             EngineEvent::TaskQueueChanged { task_id, queue_id } => {
@@ -343,7 +343,7 @@ impl EventSink for EngineEventSink {
                 host,
                 nodes: nodes
                     .into_iter()
-                    .map(fluxdown_engine_protocol::cdn_node_info_to_dto)
+                    .map(rinadown_engine_protocol::cdn_node_info_to_dto)
                     .collect(),
                 ip,
                 reason,
@@ -389,14 +389,14 @@ impl EventSink for EngineEventSink {
             EngineEvent::GroupsChanged(groups) => WsServerMsg::GroupsChanged {
                 groups: groups
                     .into_iter()
-                    .map(fluxdown_engine_protocol::group_info_to_dto)
+                    .map(rinadown_engine_protocol::group_info_to_dto)
                     .collect(),
             },
             // RSS 订阅表全量推（增删改 / 抓取状态 / 未读 badge）。
             EngineEvent::RssSourcesChanged(sources) => WsServerMsg::RssSourcesChanged {
                 sources: sources
                     .into_iter()
-                    .map(fluxdown_engine_protocol::rss_source_info_to_dto)
+                    .map(rinadown_engine_protocol::rss_source_info_to_dto)
                     .collect(),
             },
             // 条目流快照 + 本轮自动建任务的标题；后者由客户端弹一条合批
@@ -409,7 +409,7 @@ impl EventSink for EngineEventSink {
                 source_id,
                 items: items
                     .into_iter()
-                    .map(fluxdown_engine_protocol::rss_item_info_to_dto)
+                    .map(rinadown_engine_protocol::rss_item_info_to_dto)
                     .collect(),
                 notify_titles,
             },
@@ -427,7 +427,7 @@ impl EventSink for EngineEventSink {
                 feed_title,
                 items: items
                     .into_iter()
-                    .map(fluxdown_engine_protocol::rss_item_info_to_dto)
+                    .map(rinadown_engine_protocol::rss_item_info_to_dto)
                     .collect(),
                 error,
             },
@@ -436,7 +436,7 @@ impl EventSink for EngineEventSink {
                 WsServerMsg::WebhookDeliveriesChanged {
                     deliveries: entries
                         .into_iter()
-                        .map(fluxdown_engine_protocol::webhook_delivery_to_dto)
+                        .map(rinadown_engine_protocol::webhook_delivery_to_dto)
                         .collect(),
                 }
             }
@@ -485,7 +485,7 @@ impl HostSelection for WsHostSelection {
             options: options
                 .iter()
                 .cloned()
-                .map(fluxdown_engine_protocol::hls_quality_option_to_dto)
+                .map(rinadown_engine_protocol::hls_quality_option_to_dto)
                 .collect(),
         });
 
@@ -518,7 +518,7 @@ impl HostSelection for WsHostSelection {
             files: files
                 .iter()
                 .cloned()
-                .map(fluxdown_engine_protocol::bt_file_entry_to_dto)
+                .map(rinadown_engine_protocol::bt_file_entry_to_dto)
                 .collect(),
         });
 
@@ -554,7 +554,7 @@ impl HostSelection for WsHostSelection {
             options: options
                 .iter()
                 .cloned()
-                .map(fluxdown_engine_protocol::resolve_variant_option_to_dto)
+                .map(rinadown_engine_protocol::resolve_variant_option_to_dto)
                 .collect(),
         });
 
@@ -739,7 +739,7 @@ mod tests {
 
     #[tokio::test]
     async fn engine_event_sink_maps_queues_changed_to_camel_case_json() {
-        use fluxdown_engine::model::QueueInfo;
+        use rinadown_engine::model::QueueInfo;
 
         let hub = Arc::new(WsHub::new(16));
         let mut rx = hub.events.subscribe();
@@ -772,7 +772,7 @@ mod tests {
 
     #[tokio::test]
     async fn engine_event_sink_maps_groups_changed_to_camel_case_json() {
-        use fluxdown_engine::model::GroupInfo;
+        use rinadown_engine::model::GroupInfo;
 
         let hub = Arc::new(WsHub::new(16));
         let mut rx = hub.events.subscribe();
@@ -795,7 +795,7 @@ mod tests {
 
     #[tokio::test]
     async fn engine_event_sink_maps_rss_sources_changed_to_camel_case_json() {
-        use fluxdown_engine::rss::model::RssSourceInfo;
+        use rinadown_engine::rss::model::RssSourceInfo;
 
         let hub = Arc::new(WsHub::new(16));
         let mut rx = hub.events.subscribe();
@@ -820,7 +820,7 @@ mod tests {
 
     #[tokio::test]
     async fn engine_event_sink_maps_rss_items_changed_to_camel_case_json() {
-        use fluxdown_engine::rss::model::{RssItemInfo, RssItemStatus};
+        use rinadown_engine::rss::model::{RssItemInfo, RssItemStatus};
 
         let hub = Arc::new(WsHub::new(16));
         let mut rx = hub.events.subscribe();

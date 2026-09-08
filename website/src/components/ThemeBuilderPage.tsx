@@ -1278,7 +1278,7 @@ function SettingsPreview({
           <SettingsCard theme={theme} title={t("mockup.settingsDownload")} description={t("mockup.settingsDownloadHint")}>
             <input
               readOnly
-              value="D:\\Downloads\\FluxDown"
+              value="D:\\Downloads\\RinaDown"
               className="w-full px-2.5 text-[11px] outline-none"
               style={{
                 height: numberFromTheme(theme, "metrics.button.heightMd"),

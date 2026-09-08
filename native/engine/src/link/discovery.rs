@@ -1,7 +1,7 @@
 //! 发现层：mDNS 局域网自动发现（广播 + 浏览）+ 手动地址 `/ping` 探测。
 //!
 //! # 两个职责（设计文档 §6.5）
-//! 1. **发现设备以加入名册**（免账号本地配对入口）：浏览 `_fluxdown._tcp.local.`。
+//! 1. **发现设备以加入名册**（免账号本地配对入口）：浏览 `_rinadown._tcp.local.`。
 //! 2. **为已知设备找最快连接路径**：mDNS 得到的 `ip:port` 即 Direct 候选。
 //!
 //! **扩展点**：发现方式是可替换策略；未来可加其他发现源（如账户名册回填、二维码
@@ -11,7 +11,7 @@
 //! # 隐私权衡（可发现性的固有取舍，非编码缺陷）
 //! 广播的 TXT 记录明文携带 `fp`（长期身份指纹）/`name`（设备名）/`plat`/
 //! `ver`（平台/版本）：局域网内任何主机都能被动监听或主动查询
-//! `_fluxdown._tcp.local.` 枚举出这些信息，完全不需要任何配对码。这是
+//! `_rinadown._tcp.local.` 枚举出这些信息，完全不需要任何配对码。这是
 //! 「让本机可被发现」这一功能自身的代价，仅凭这些信息也拼不出配对所需的
 //! 临时密钥/共享密钥，无法完成配对。缓解手段：只在确实需要被添加时才开启
 //! 广播，配对完成或暂不需要被发现时调用 `LinkManager::stop_advertising`
@@ -26,8 +26,8 @@ use tokio::sync::mpsc;
 use super::error::{LinkError, LinkResult};
 use super::types::{DiscoveredPeer, DiscoveryKind};
 
-/// FluxDown 局域网服务类型（DNS-SD）。
-pub const SERVICE_TYPE: &str = "_fluxdown._tcp.local.";
+/// RinaDown 局域网服务类型（DNS-SD）。
+pub const SERVICE_TYPE: &str = "_rinadown._tcp.local.";
 
 /// TXT 记录键。
 const TXT_FINGERPRINT: &str = "fp";
@@ -39,14 +39,14 @@ fn map_mdns_err(e: mdns_sd::Error) -> LinkError {
     LinkError::Io(e.to_string())
 }
 
-/// mDNS 广播器：向局域网通告本设备的 fluxdown 服务（供其他设备发现并配对）。
+/// mDNS 广播器：向局域网通告本设备的 rinadown 服务（供其他设备发现并配对）。
 /// 持有 daemon 句柄，`Drop` 时优雅关闭。
 pub struct MdnsAdvertiser {
     daemon: ServiceDaemon,
 }
 
 impl MdnsAdvertiser {
-    /// 开始广播。`port` 为本机 fluxdown API 端口；TXT 携带身份指纹/名称/平台/版本。
+    /// 开始广播。`port` 为本机 rinadown API 端口；TXT 携带身份指纹/名称/平台/版本。
     pub fn start(
         port: u16,
         fingerprint: &str,
@@ -79,7 +79,7 @@ impl Drop for MdnsAdvertiser {
     }
 }
 
-/// mDNS 浏览器：发现局域网内的 fluxdown 设备，解析后经 `sink` 汇出
+/// mDNS 浏览器：发现局域网内的 rinadown 设备，解析后经 `sink` 汇出
 /// [`DiscoveredPeer`]。持有 daemon 句柄，`Drop` 时优雅关闭。
 pub struct MdnsBrowser {
     daemon: ServiceDaemon,
@@ -223,7 +223,7 @@ pub async fn probe(client: &reqwest::Client, host: &str, port: u16) -> LinkResul
 }
 
 /// 计算本机朝向 `peer_host` 的出站本地 IP（UDP connect 技巧，不真正发包），
-/// 拼成 Direct 候选 `ip:port`（`api_port` = 本机 fluxdown API 端口）。
+/// 拼成 Direct 候选 `ip:port`（`api_port` = 本机 rinadown API 端口）。
 ///
 /// 供配对时向对端自报可达地址（对端存为回连候选）。探测失败返回空列表。
 #[must_use]

@@ -1,4 +1,4 @@
-use fluxdown_protocol::ApplicationErrorCode;
+use rinadown_protocol::ApplicationErrorCode;
 use serde_json::json;
 
 #[test]

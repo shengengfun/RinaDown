@@ -8,7 +8,7 @@ import type { StatusTab } from './filters'
 
 export type DetailTab = 'general' | 'segments' | 'queue' | 'log' | 'advanced'
 
-const DEVICE_FILTER_KEY = 'fluxdown.tasks.deviceFilter'
+const DEVICE_FILTER_KEY = 'rinadown.tasks.deviceFilter'
 
 interface TasksUiState {
   /** 分类筛选：`ALL_CATEGORY` = 不筛选，其余为分类 id（见 lib/categories.ts）。 */

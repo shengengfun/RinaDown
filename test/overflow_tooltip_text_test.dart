@@ -1,14 +1,14 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/i18n/locale_provider.dart';
-import 'package:flux_down/src/theme/app_theme.dart';
-import 'package:flux_down/src/theme/flux_theme_tokens.dart';
-import 'package:flux_down/src/widgets/overflow_tooltip_text.dart';
+import 'package:rina_down/src/i18n/locale_provider.dart';
+import 'package:rina_down/src/theme/app_theme.dart';
+import 'package:rina_down/src/theme/flux_theme_tokens.dart';
+import 'package:rina_down/src/widgets/overflow_tooltip_text.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 const _longName =
-    'FluxDown-0.2.2-checksums-windows-x64-portable-signed-release.zip';
+    'RinaDown-0.2.2-checksums-windows-x64-portable-signed-release.zip';
 const _shortName = 'a.zip';
 
 Widget _wrap(Widget child, {double width = 160}) {

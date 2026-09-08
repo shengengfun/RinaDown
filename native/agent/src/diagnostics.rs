@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     DiagnosticCheckDto, DiagnosticLevel, DiagnosticRepairParams, DiagnosticsReportDto,
     LogExportParams, LogExportResult, LogPathsDto, PlatformIntegrationDto,
 };
@@ -49,7 +49,7 @@ pub const ACTION_REFRESH_ED2K_SERVERS: &str = "refreshEd2kServers";
 /// `register` 动作的 `.torrent` 关联目标。
 pub const TARGET_TORRENT: &str = "torrent";
 
-const URL_SCHEMES: [&str; 3] = ["fluxdown", "magnet", "ed2k"];
+const URL_SCHEMES: [&str; 3] = ["rinadown", "magnet", "ed2k"];
 
 /// 回环/IPC 探测超时：慢回答本身就是结论。
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
@@ -63,7 +63,7 @@ pub struct DiagnosticsService {
     events: AgentEventHub,
     state: Arc<Mutex<AgentState>>,
     store: Arc<StateStore>,
-    api_switches: Arc<fluxdown_api::server::ApiRuntimeSwitches>,
+    api_switches: Arc<rinadown_api::server::ApiRuntimeSwitches>,
 }
 
 impl DiagnosticsService {
@@ -74,7 +74,7 @@ impl DiagnosticsService {
         events: AgentEventHub,
         state: Arc<Mutex<AgentState>>,
         store: Arc<StateStore>,
-        api_switches: Arc<fluxdown_api::server::ApiRuntimeSwitches>,
+        api_switches: Arc<rinadown_api::server::ApiRuntimeSwitches>,
     ) -> Self {
         Self {
             daemon,
@@ -157,11 +157,11 @@ impl DiagnosticsService {
                 Ok(json!({ "ok": true }))
             }
             ACTION_REFRESH_TRACKERS => {
-                self.daemon_call(fluxdown_protocol::method::DAEMON_BT_TRACKER_SUBSCRIPTION_REFRESH)
+                self.daemon_call(rinadown_protocol::method::DAEMON_BT_TRACKER_SUBSCRIPTION_REFRESH)
                     .await
             }
             ACTION_REFRESH_ED2K_SERVERS => {
-                self.daemon_call(fluxdown_protocol::method::DAEMON_ED2K_SERVER_SUBSCRIPTION_REFRESH)
+                self.daemon_call(rinadown_protocol::method::DAEMON_ED2K_SERVER_SUBSCRIPTION_REFRESH)
                     .await
             }
             other => Err(DiagnosticsError::InvalidAction(other.to_owned())),
@@ -224,7 +224,7 @@ impl DiagnosticsService {
         if let Some(path) = crate::log_export::nmh_relay_log_path()
             && let Some(bytes) = crate::log_export::read_tail(&path, NMH_LOG_EXPORT_BYTES).await
         {
-            zip.add("nmh/fluxdown_nmh.log", &bytes);
+            zip.add("nmh/rinadown_nmh.log", &bytes);
         }
 
         let bytes = zip.finish();
@@ -242,7 +242,7 @@ impl DiagnosticsService {
         tokio::time::timeout(
             DAEMON_TIMEOUT,
             self.daemon
-                .call::<Value, Value>(fluxdown_protocol::method::DAEMON_DIAGNOSTICS_DESCRIBE, None),
+                .call::<Value, Value>(rinadown_protocol::method::DAEMON_DIAGNOSTICS_DESCRIBE, None),
         )
         .await
         .ok()
@@ -254,7 +254,7 @@ impl DiagnosticsService {
         let ping = tokio::time::timeout(
             DAEMON_TIMEOUT,
             self.daemon
-                .call::<Value, Value>(fluxdown_protocol::method::SYSTEM_PING, None),
+                .call::<Value, Value>(rinadown_protocol::method::SYSTEM_PING, None),
         )
         .await;
         match ping {
@@ -318,7 +318,7 @@ impl DiagnosticsService {
             gateway.cors_enabled,
         );
         self.events
-            .publish(fluxdown_protocol::AgentEvent::GatewayChanged(gateway));
+            .publish(rinadown_protocol::AgentEvent::GatewayChanged(gateway));
         Ok(())
     }
 
@@ -348,7 +348,7 @@ impl DiagnosticsService {
         let prepared = tokio::time::timeout(
             DAEMON_TIMEOUT,
             self.daemon.call::<Value, Value>(
-                fluxdown_protocol::method::DAEMON_DIAGNOSTICS_PREPARE_LOG_EXPORT,
+                rinadown_protocol::method::DAEMON_DIAGNOSTICS_PREPARE_LOG_EXPORT,
                 None,
             ),
         )
@@ -516,7 +516,7 @@ fn manifest_check(chromium: &str, firefox: &str) -> DiagnosticCheckDto {
 
 /// `url_protocol`×3 与 `torrent_association`。
 ///
-/// `fluxdown://` 是深链入口，缺失报 warn；`magnet`/`ed2k`/`.torrent` 是可选项，只报 info，
+/// `rinadown://` 是深链入口，缺失报 warn；`magnet`/`ed2k`/`.torrent` 是可选项，只报 info，
 /// 否则用户会习惯性忽略整页。
 fn shell_checks(integration: &PlatformIntegrationDto) -> Vec<DiagnosticCheckDto> {
     let mut checks = Vec::with_capacity(URL_SCHEMES.len() + 1);
@@ -540,7 +540,7 @@ fn shell_checks(integration: &PlatformIntegrationDto) -> Vec<DiagnosticCheckDto>
                 "",
                 None,
             )
-        } else if scheme == "fluxdown" {
+        } else if scheme == "rinadown" {
             (
                 DiagnosticLevel::Warn,
                 "not registered".to_owned(),
@@ -578,7 +578,7 @@ fn shell_checks(integration: &PlatformIntegrationDto) -> Vec<DiagnosticCheckDto>
             CHECK_TORRENT_ASSOCIATION,
             "",
             DiagnosticLevel::Ok,
-            ".torrent opens with FluxDown".to_owned(),
+            ".torrent opens with RinaDown".to_owned(),
             "",
             None,
         )
@@ -688,7 +688,7 @@ async fn probe_listener(port: u16) -> DiagnosticCheckDto {
 }
 
 /// 兼容 HTTP API：任一功能开关打开才算启用，然后探活 `/ping`。
-async fn probe_local_server(gateway: &fluxdown_protocol::GatewayStatusDto) -> DiagnosticCheckDto {
+async fn probe_local_server(gateway: &rinadown_protocol::GatewayStatusDto) -> DiagnosticCheckDto {
     let enabled = gateway.api_enabled
         || gateway.takeover_enabled
         || gateway.jsonrpc_enabled
@@ -706,7 +706,7 @@ async fn probe_local_server(gateway: &fluxdown_protocol::GatewayStatusDto) -> Di
     let url = format!(
         "http://127.0.0.1:{}{}",
         gateway.port,
-        fluxdown_api::routes::PING
+        rinadown_api::routes::PING
     );
     // `.no_proxy()`：系统代理会吞掉回环探测，把健康的服务误报为不可达。
     let client = match reqwest::Client::builder()
@@ -828,7 +828,7 @@ pub enum DiagnosticsError {
     #[error("invalid diagnostic repair: {0}")]
     InvalidAction(String),
     #[error("daemon diagnostic RPC failed: {0:?}")]
-    Daemon(fluxdown_protocol::RpcErrorData),
+    Daemon(rinadown_protocol::RpcErrorData),
     #[error(transparent)]
     State(#[from] crate::state::StateError),
     #[error("diagnostic I/O failed: {0}")]
@@ -843,7 +843,7 @@ pub enum DiagnosticsError {
 mod tests {
     use std::collections::BTreeMap;
 
-    use fluxdown_protocol::{DiagnosticLevel, PlatformIntegrationDto};
+    use rinadown_protocol::{DiagnosticLevel, PlatformIntegrationDto};
 
     use super::{
         ACTION_ENABLE_SERVICE, ACTION_OPEN_LOG_DIR, ACTION_REGISTER, ACTION_REREGISTER,
@@ -870,7 +870,7 @@ mod tests {
     #[test]
     fn nmh_checks_map_levels_hints_and_repairs() {
         let diagnosis = NmhDiagnosis {
-            exe_path: "/app/fluxdown_nmh".to_owned(),
+            exe_path: "/app/rinadown_nmh".to_owned(),
             exe_error: String::new(),
             chromium_manifest: "/missing/chromium.json".to_owned(),
             firefox_manifest: "/missing/firefox.json".to_owned(),
@@ -907,14 +907,14 @@ mod tests {
     #[test]
     fn missing_relay_binary_is_an_error_with_reinstall_hint() {
         let diagnosis = NmhDiagnosis {
-            exe_error: "fluxdown_nmh not found".to_owned(),
+            exe_error: "rinadown_nmh not found".to_owned(),
             ..NmhDiagnosis::default()
         };
         let checks = nmh_checks(&diagnosis);
         assert_eq!(checks.len(), 2);
         assert_eq!(checks[0].level, DiagnosticLevel::Error);
         assert_eq!(checks[0].hint, HINT_REINSTALL_APP);
-        assert_eq!(checks[0].detail, "fluxdown_nmh not found");
+        assert_eq!(checks[0].detail, "rinadown_nmh not found");
         let ok = manifest_check("", "");
         assert_eq!(ok.level, DiagnosticLevel::Error);
     }
@@ -925,24 +925,24 @@ mod tests {
             url_protocol_supported: true,
             file_association_supported: true,
             url_protocols: BTreeMap::from([
-                ("fluxdown".to_owned(), false),
+                ("rinadown".to_owned(), false),
                 ("magnet".to_owned(), true),
             ]),
             ..PlatformIntegrationDto::default()
         };
         let checks = shell_checks(&integration);
         assert_eq!(checks.len(), 4);
-        let fluxdown = &checks[0];
-        assert_eq!(fluxdown.id, "url_protocol");
-        assert_eq!(fluxdown.target, "fluxdown");
-        assert_eq!(fluxdown.level, DiagnosticLevel::Warn);
-        assert_eq!(fluxdown.hint, HINT_ENABLE_PROTOCOL);
+        let rinadown = &checks[0];
+        assert_eq!(rinadown.id, "url_protocol");
+        assert_eq!(rinadown.target, "rinadown");
+        assert_eq!(rinadown.level, DiagnosticLevel::Warn);
+        assert_eq!(rinadown.hint, HINT_ENABLE_PROTOCOL);
         assert_eq!(
-            fluxdown
+            rinadown
                 .repair
                 .as_ref()
                 .map(|r| (r.action.as_str(), r.target.as_str())),
-            Some((ACTION_REGISTER, "fluxdown"))
+            Some((ACTION_REGISTER, "rinadown"))
         );
         assert_eq!(checks[1].target, "magnet");
         assert_eq!(checks[1].level, DiagnosticLevel::Ok);
@@ -971,7 +971,7 @@ mod tests {
     #[test]
     fn log_dir_probe_reports_writability() {
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_doctor_{}_{}",
+            "rinadown_doctor_{}_{}",
             std::process::id(),
             uuid::Uuid::new_v4()
         ));
@@ -993,7 +993,7 @@ mod tests {
 
     #[tokio::test]
     async fn disabled_local_server_offers_enable_repair() {
-        let gateway = fluxdown_protocol::GatewayStatusDto::default();
+        let gateway = rinadown_protocol::GatewayStatusDto::default();
         let check = probe_local_server(&gateway).await;
         assert_eq!(check.level, DiagnosticLevel::Info);
         assert_eq!(check.hint, HINT_ENABLE_LOCAL_SERVER);

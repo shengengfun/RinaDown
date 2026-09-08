@@ -2,17 +2,17 @@
 //!
 //! Registry structure (matches the Inno Setup installer):
 //! ```text
-//! HKCU\Software\Classes\.torrent                               → "FluxDown.TorrentFile"
-//! HKCU\Software\Classes\FluxDown.TorrentFile                   → "BitTorrent File"
-//! HKCU\Software\Classes\FluxDown.TorrentFile\DefaultIcon       → "<exe>,0"
-//! HKCU\Software\Classes\FluxDown.TorrentFile\shell\open\command → "\"<exe>\" \"%1\""
+//! HKCU\Software\Classes\.torrent                               → "RinaDown.TorrentFile"
+//! HKCU\Software\Classes\RinaDown.TorrentFile                   → "BitTorrent File"
+//! HKCU\Software\Classes\RinaDown.TorrentFile\DefaultIcon       → "<exe>,0"
+//! HKCU\Software\Classes\RinaDown.TorrentFile\shell\open\command → "\"<exe>\" \"%1\""
 //! ```
 //!
 //! All operations target `HKEY_CURRENT_USER` — no admin elevation required.
 //!
 //! When toggled from settings, these keys are written directly via winreg at
 //! runtime and sit outside the Windows installer's [Registry] tracking, so
-//! `installer/windows/setup.iss` removes any FluxDown-owned leftovers
+//! `installer/windows/setup.iss` removes any RinaDown-owned leftovers
 //! explicitly on uninstall (`RemoveTorrentAssociation`) — keep both in sync.
 
 #[cfg(target_os = "windows")]
@@ -22,7 +22,7 @@ mod inner {
     use winreg::RegKey;
     use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
 
-    const PROG_ID: &str = "FluxDown.TorrentFile";
+    const PROG_ID: &str = "RinaDown.TorrentFile";
     const PROG_DESC: &str = "BitTorrent File";
     const EXT: &str = ".torrent";
 
@@ -41,18 +41,18 @@ mod inner {
         Ok(s.strip_prefix(r"\\?\").unwrap_or(&s).to_string())
     }
 
-    /// Check whether `.torrent` files are currently associated with FluxDown.
+    /// Check whether `.torrent` files are currently associated with RinaDown.
     ///
     /// Returns `true` if `HKCU\Software\Classes\.torrent` default value
-    /// equals `"FluxDown.TorrentFile"`. We intentionally do NOT compare the
+    /// equals `"RinaDown.TorrentFile"`. We intentionally do NOT compare the
     /// exe path in the command, because path representations can differ
     /// between the installer and the running process (UNC prefix, casing,
     /// short names, etc.). Checking the ProgID alone is sufficient to
-    /// confirm FluxDown owns the association.
+    /// confirm RinaDown owns the association.
     pub fn is_associated() -> bool {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
-        // Check .torrent → FluxDown.TorrentFile
+        // Check .torrent → RinaDown.TorrentFile
         let ext_key =
             match hkcu.open_subkey_with_flags(format!("Software\\Classes\\{EXT}"), KEY_READ) {
                 Ok(k) => k,
@@ -65,17 +65,17 @@ mod inner {
         prog_id == PROG_ID
     }
 
-    /// Register `.torrent` file association with FluxDown.
+    /// Register `.torrent` file association with RinaDown.
     pub fn associate() -> Result<(), io::Error> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
         let exe = exe_path()?;
 
-        // 1. .torrent → FluxDown.TorrentFile
+        // 1. .torrent → RinaDown.TorrentFile
         let (ext_key, _) =
             hkcu.create_subkey_with_flags(format!("Software\\Classes\\{EXT}"), KEY_WRITE)?;
         ext_key.set_value("", &PROG_ID)?;
 
-        // 2. FluxDown.TorrentFile description
+        // 2. RinaDown.TorrentFile description
         let (prog_key, _) =
             hkcu.create_subkey_with_flags(format!("Software\\Classes\\{PROG_ID}"), KEY_WRITE)?;
         prog_key.set_value("", &PROG_DESC)?;
@@ -97,17 +97,17 @@ mod inner {
         // Notify the shell about the change
         notify_shell();
 
-        log_info!("[file_assoc] associated .torrent with FluxDown (exe={exe})");
+        log_info!("[file_assoc] associated .torrent with RinaDown (exe={exe})");
         Ok(())
     }
 
-    /// Remove `.torrent` file association for FluxDown.
+    /// Remove `.torrent` file association for RinaDown.
     pub fn disassociate() -> Result<(), io::Error> {
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
 
         // Only remove if currently associated to us (don't break other app's association)
         if !is_associated() {
-            log_info!("[file_assoc] not associated to FluxDown, skipping removal");
+            log_info!("[file_assoc] not associated to RinaDown, skipping removal");
             return Ok(());
         }
 
@@ -115,7 +115,7 @@ mod inner {
         let classes = hkcu.open_subkey_with_flags("Software\\Classes", KEY_WRITE)?;
         let _ = classes.delete_subkey_all(EXT);
 
-        // Remove FluxDown.TorrentFile tree
+        // Remove RinaDown.TorrentFile tree
         let _ = classes.delete_subkey_all(PROG_ID);
 
         // Notify the shell about the change
@@ -151,10 +151,10 @@ mod inner {
 mod inner {
     use std::io;
 
-    /// Check whether `.torrent` files are currently associated with FluxDown.
+    /// Check whether `.torrent` files are currently associated with RinaDown.
     ///
     /// Queries `xdg-mime query default application/x-bittorrent` and checks
-    /// whether the returned .desktop name contains "fluxdown".
+    /// whether the returned .desktop name contains "rinadown".
     pub fn is_associated() -> bool {
         let Ok(output) = std::process::Command::new("xdg-mime")
             .args(["query", "default", "application/x-bittorrent"])
@@ -163,29 +163,29 @@ mod inner {
             return false;
         };
         let stdout = String::from_utf8_lossy(&output.stdout);
-        stdout.to_lowercase().contains("fluxdown")
+        stdout.to_lowercase().contains("rinadown")
     }
 
-    /// Register FluxDown as the default handler for `.torrent` files.
+    /// Register RinaDown as the default handler for `.torrent` files.
     ///
-    /// Requires that `com.fluxdown.app.desktop` is already installed in an
+    /// Requires that `com.rinadown.app.desktop` is already installed in an
     /// XDG applications directory (handled by the package installer).
     pub fn associate() -> Result<(), io::Error> {
         std::process::Command::new("xdg-mime")
             .args([
                 "default",
-                "com.fluxdown.app.desktop",
+                "com.rinadown.app.desktop",
                 "application/x-bittorrent",
             ])
             .status()
             .map(|_| ())
     }
 
-    /// Remove FluxDown as the default handler for `.torrent` files by
+    /// Remove RinaDown as the default handler for `.torrent` files by
     /// delegating back to the system default (empty the user override).
     ///
     /// xdg-mime has no "unset" command, so we edit `mimeapps.list` directly:
-    /// remove the `application/x-bittorrent=com.fluxdown.app.desktop` line
+    /// remove the `application/x-bittorrent=com.rinadown.app.desktop` line
     /// from the `[Default Applications]` section.
     pub fn disassociate() -> Result<(), io::Error> {
         use std::io::{BufRead, Write};
@@ -211,7 +211,7 @@ mod inner {
             .iter()
             .filter(|l| {
                 let lower = l.to_lowercase();
-                !(lower.starts_with("application/x-bittorrent=") && lower.contains("fluxdown"))
+                !(lower.starts_with("application/x-bittorrent=") && lower.contains("rinadown"))
             })
             .map(|l| l.as_str())
             .collect();
@@ -251,7 +251,7 @@ mod inner {
         ) -> i32;
     }
 
-    /// Check whether `.torrent` files are currently associated with FluxDown.
+    /// Check whether `.torrent` files are currently associated with RinaDown.
     ///
     /// Queries the default role handler for the torrent UTI and compares its
     /// bundle id (case-insensitively) with this app's bundle id.
@@ -273,7 +273,7 @@ mod inner {
         }
     }
 
-    /// Register FluxDown as the default handler for `.torrent` files.
+    /// Register RinaDown as the default handler for `.torrent` files.
     ///
     /// The app must already be registered with Launch Services (which happens
     /// automatically the first time the bundle — declaring the UTI in
@@ -292,18 +292,18 @@ mod inner {
                 "LSSetDefaultRoleHandlerForContentType failed (OSStatus={status})"
             )));
         }
-        log_info!("[file_assoc] associated .torrent with FluxDown (bundle={bundle_id})");
+        log_info!("[file_assoc] associated .torrent with RinaDown (bundle={bundle_id})");
         Ok(())
     }
 
-    /// Remove FluxDown as the default handler for `.torrent` files.
+    /// Remove RinaDown as the default handler for `.torrent` files.
     ///
     /// Launch Services has no "unset" primitive; setting the handler to an empty
     /// bundle id hands the type back to the system default. Only acts if we
     /// currently own the association (don't clobber another app's choice).
     pub fn disassociate() -> Result<(), io::Error> {
         if !is_associated() {
-            log_info!("[file_assoc] not associated to FluxDown, skipping removal");
+            log_info!("[file_assoc] not associated to RinaDown, skipping removal");
             return Ok(());
         }
         let uti = cf_string(TORRENT_UTI)?;

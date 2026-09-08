@@ -13,8 +13,8 @@ export const ACCENT_PRESETS = [
   { nameKey: 'set.appearance.accentRose', light: '#e11d48', dark: '#f43f5e' },
 ] as const
 
-const MODE_KEY = 'fluxdown.theme'
-const ACCENT_KEY = 'fluxdown.accent'
+const MODE_KEY = 'rinadown.theme'
+const ACCENT_KEY = 'rinadown.accent'
 
 interface ThemeCtx {
   mode: ThemeMode

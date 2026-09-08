@@ -1,4 +1,4 @@
-//! B 模式：内嵌 [`fluxdown_engine::Engine`] 的一次性独立下载（`fluxdown add --local`）。
+//! B 模式：内嵌 [`rinadown_engine::Engine`] 的一次性独立下载（`rinadown add --local`）。
 //!
 //! 不连接运行中的 App/headless server，在本进程内构造引擎、创建任务、阻塞等待至
 //! 终态后退出。与 A 模式共享同一数据目录/SQLite（安装模式），任务对 App/server 可见。
@@ -11,15 +11,15 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 
-use fluxdown_cli::client::ClientError;
-use fluxdown_cli::exit::ExitCode;
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::data_dir::resolve_data_dir;
-use fluxdown_engine::db::Db;
-use fluxdown_engine::download_manager::{NewTaskSpec, progress_reporter};
-use fluxdown_engine::events::EventSink;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+use rinadown_cli::client::ClientError;
+use rinadown_cli::exit::ExitCode;
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::data_dir::resolve_data_dir;
+use rinadown_engine::db::Db;
+use rinadown_engine::download_manager::{NewTaskSpec, progress_reporter};
+use rinadown_engine::events::EventSink;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
 
 use crate::AddArgs;
 
@@ -110,7 +110,7 @@ pub async fn run_add_local(args: AddArgs, json: bool) -> Result<(), ClientError>
         match id {
             Some(id) => created_ids.push(id),
             None => {
-                eprintln!("fluxdown: failed to create task for {url}");
+                eprintln!("rinadown: failed to create task for {url}");
                 if first_err.is_none() {
                     first_err = Some(ClientError::new(
                         format!("failed to create task for {url}"),

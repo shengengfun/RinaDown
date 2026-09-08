@@ -1,9 +1,9 @@
 //! 外观：语言、明暗模式、内置主题、强调色、界面缩放。
 //!
 //! 每个控件同时写入偏好（走 `agent.preferences.patch`）并立即通过主题 crate 生效；
-//! 偏好快照回流时 app 调用 `fluxdown_ui_theme::apply_appearance_preferences` 幂等对齐。
+//! 偏好快照回流时 app 调用 `rinadown_ui_theme::apply_appearance_preferences` 幂等对齐。
 
-use fluxdown_ui_theme::{
+use rinadown_ui_theme::{
     AccentScheme, AppearancePreferences, BuiltinThemeId, COLOR_SCHEME_KEY, CUSTOM_COLOR_KEY,
     DARK_THEME_KEY, LIGHT_THEME_KEY, THEME_MODE_KEY, ThemePreference, UI_SCALE_KEY,
     UI_SCALE_PERCENTS, active_theme, argb_color, color_argb, foreground_for, set_appearance,
@@ -195,7 +195,7 @@ fn theme_card(
     label: SharedString,
     selected: bool,
     disabled: bool,
-    tokens: &fluxdown_ui_theme::SemanticThemeTokens,
+    tokens: &rinadown_ui_theme::SemanticThemeTokens,
     store: Entity<SettingsStore>,
 ) -> impl gpui::IntoElement {
     let colors = tokens.colors;
@@ -353,7 +353,7 @@ fn color_dot(
     label: SharedString,
     appearance: AppearancePreferences,
     disabled: bool,
-    tokens: &fluxdown_ui_theme::SemanticThemeTokens,
+    tokens: &rinadown_ui_theme::SemanticThemeTokens,
     store: Entity<SettingsStore>,
 ) -> impl gpui::IntoElement {
     let colors = tokens.colors;

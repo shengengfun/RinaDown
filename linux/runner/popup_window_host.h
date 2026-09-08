@@ -10,11 +10,11 @@ G_BEGIN_DECLS
 // 引擎渲染快速下载表单）。
 //
 // 职责：
-// - 在主引擎 messenger 上注册 fluxdown/popup_host 通道，响应
+// - 在主引擎 messenger 上注册 rinadown/popup_host 通道，响应
 //   show/close/relay，并把 onResult/onClosed/onRelay 中继回主引擎 Dart。
 // - 懒创建承载第二个 Flutter 引擎（--quick-popup 入口、零插件注册、不初
 //   始化 Rust）的无边框 GTK 顶层窗口，并在该引擎自己的 messenger 上注册
-//   fluxdown/popup_child 通道，响应 ready/submit/cancel/pickFolder/
+//   rinadown/popup_child 通道，响应 ready/submit/cancel/pickFolder/
 //   startDrag/resize/relay（resize 支持可选 width），并把 setPayload/
 //   onRelay 投递给弹窗 Dart。
 // - 窗口与引擎一旦创建即常驻复用：之后的每次外部请求都只 hide/show，绝不
@@ -26,7 +26,7 @@ G_BEGIN_DECLS
 typedef struct _PopupWindowHost PopupWindowHost;
 
 // 创建控制器并在 |main_messenger|（主引擎的 FlBinaryMessenger）上安装
-// fluxdown/popup_host 的 method call handler。弹窗窗口/弹窗引擎本身在首次
+// rinadown/popup_host 的 method call handler。弹窗窗口/弹窗引擎本身在首次
 // 收到 show 请求时才懒创建。
 PopupWindowHost* popup_window_host_new(FlBinaryMessenger* main_messenger);
 

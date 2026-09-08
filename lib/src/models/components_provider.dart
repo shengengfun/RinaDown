@@ -14,11 +14,11 @@ import '../bindings/bindings.dart';
 import '../services/log_service.dart';
 
 /// config 键：手动指定的 ffmpeg 路径。须与 Rust 端
-/// `fluxdown_engine::components::CONFIG_FFMPEG_PATH` 保持一致。
+/// `rinadown_engine::components::CONFIG_FFMPEG_PATH` 保持一致。
 const kFfmpegManualPathConfigKey = 'component.ffmpeg.path';
 
 /// config 键：手动指定的 yt-dlp 路径。须与 Rust 端
-/// `fluxdown_engine::components::CONFIG_YTDLP_PATH` 保持一致。
+/// `rinadown_engine::components::CONFIG_YTDLP_PATH` 保持一致。
 const kYtdlpManualPathConfigKey = 'component.ytdlp.path';
 
 /// 组件（ffmpeg/yt-dlp 等）状态管理的公共基类。
@@ -400,7 +400,7 @@ class FfmpegController extends ComponentController {
 
 /// yt-dlp 组件状态管理，用法与 [FfmpegController] 完全对称。
 ///
-/// yt-dlp 从 1000+ 站点提取媒体直链，供 FluxDown 插件使用；全平台
+/// yt-dlp 从 1000+ 站点提取媒体直链，供 RinaDown 插件使用；全平台
 /// （含 macOS）均支持托管安装。
 class YtdlpController extends ComponentController {
   StreamSubscription<RustSignalPack<YtdlpStatusReport>>? _statusSub;

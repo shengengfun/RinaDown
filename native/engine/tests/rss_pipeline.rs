@@ -23,10 +23,10 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::rss::model::{RssItemStatus, RssSourceInfo};
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::rss::model::{RssItemStatus, RssSourceInfo};
+use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
 
 /// 首轮 feed：两个历史条目。
 const FEED_ROUND1: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -178,7 +178,7 @@ async fn make_engine(work: &std::path::Path) -> Engine {
 /// 宿主 actor 里这一段就是 `Some(ev) = rss_rx.recv() => on_rss_event(ev).await`。
 async fn drain_one_rss_event(
     engine: &mut Engine,
-    rx: &mut tokio::sync::mpsc::UnboundedReceiver<fluxdown_engine::rss::RssEvent>,
+    rx: &mut tokio::sync::mpsc::UnboundedReceiver<rinadown_engine::rss::RssEvent>,
 ) {
     let ev = tokio::time::timeout(Duration::from_secs(15), rx.recv())
         .await
@@ -189,7 +189,7 @@ async fn drain_one_rss_event(
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn rss_pipeline_seeds_then_downloads_only_matching_new_items() {
-    let work = std::env::temp_dir().join(format!("fluxdown-rss-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-rss-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let (port, feed_hits) = spawn_feed_server(|host| {
         vec![
@@ -325,7 +325,7 @@ async fn rss_pipeline_seeds_then_downloads_only_matching_new_items() {
 /// 而不是等下一次分钟级 tick，更不该逼用户自己再按一次「立即抓取」。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn subscribing_fetches_immediately_without_waiting_for_a_tick() {
-    let work = std::env::temp_dir().join(format!("fluxdown-rss-now-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-rss-now-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let (port, feed_hits) = spawn_feed_server(|host| vec![FEED_ROUND1.replace("HOST", host)]);
     let mut engine = make_engine(&work).await;
@@ -372,7 +372,7 @@ async fn subscribing_fetches_immediately_without_waiting_for_a_tick() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn rss_fetch_failure_is_recorded_and_backs_off_without_disabling() {
-    let work = std::env::temp_dir().join(format!("fluxdown-rss-err-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-rss-err-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     let mut engine = make_engine(&work).await;
     let mut rss_rx = engine.manager.rss.take_event_rx().expect("rss receiver");
@@ -407,7 +407,7 @@ async fn rss_fetch_failure_is_recorded_and_backs_off_without_disabling() {
     assert!(source.enabled, "a failed fetch must not disable the feed");
     assert!(!source.seeded, "a failed first round stays unseeded");
     // 退避生效：30min × 2^1 = 1h，此刻绝不该再次到期。
-    assert_eq!(fluxdown_engine::rss::effective_interval_secs(&source), 3600);
+    assert_eq!(rinadown_engine::rss::effective_interval_secs(&source), 3600);
     engine.manager.tick_rss_sources();
     assert!(
         tokio::time::timeout(Duration::from_millis(300), rss_rx.recv())
@@ -429,7 +429,7 @@ async fn rss_fetch_failure_is_recorded_and_backs_off_without_disabling() {
 ///    站点误学成「只支持 2 连接」污染 24h 的域名策略缓存。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn torrent_enclosures_become_real_bt_tasks_without_a_bogus_size_hint() {
-    let work = std::env::temp_dir().join(format!("fluxdown-rss-bt-{}", uniq()));
+    let work = std::env::temp_dir().join(format!("rinadown-rss-bt-{}", uniq()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir");
     // 首轮播种给空 feed，第二轮才放出 BT 条目。
     let (port, _hits) = spawn_feed_server(|host| {

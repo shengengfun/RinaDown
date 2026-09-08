@@ -16,7 +16,7 @@ import { dirname, join } from "node:path";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 const PREFIX = "[FeatureVote]";
-const VOTES_ISSUE_TITLE = "[FluxDown] Feature Vote Records";
+const VOTES_ISSUE_TITLE = "[RinaDown] Feature Vote Records";
 
 // ── env ──
 function loadDotEnv() {
@@ -61,11 +61,11 @@ async function listOpenIssues() {
   return all;
 }
 
-/** 从旧 body 提取描述与 meta（<!-- fluxdown:feature-meta {...} -->） */
+/** 从旧 body 提取描述与 meta（<!-- rinadown:feature-meta {...} -->） */
 function parseOldBody(body) {
   const raw = body ?? "";
   let meta = null;
-  const m = raw.match(/<!--\s*fluxdown:feature-meta\s*([\s\S]*?)-->/);
+  const m = raw.match(/<!--\s*rinadown:feature-meta\s*([\s\S]*?)-->/);
   if (m) {
     try {
       meta = JSON.parse(m[1]);
@@ -74,7 +74,7 @@ function parseOldBody(body) {
     }
   }
   const description = raw
-    .replace(/<!--\s*fluxdown:feature-meta[\s\S]*?-->/g, "")
+    .replace(/<!--\s*rinadown:feature-meta[\s\S]*?-->/g, "")
     .trim();
   return { description, meta };
 }

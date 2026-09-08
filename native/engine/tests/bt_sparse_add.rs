@@ -19,14 +19,14 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use fluxdown_engine::bt_downloader::{BtSelectionStrategy, build_add_torrent_options};
 use librqbit::{
     AddTorrent, AddTorrentResponse, CreateTorrentOptions, Session, SessionOptions, create_torrent,
 };
+use rinadown_engine::bt_downloader::{BtSelectionStrategy, build_add_torrent_options};
 
 fn unique_dir(tag: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "fluxdown_sparse_add_{tag}_{}_{}",
+        "rinadown_sparse_add_{tag}_{}_{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

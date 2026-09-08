@@ -1,27 +1,27 @@
-# FluxDown Server 部署（Web UI + REST API + WebSocket 实时推送）
+# RinaDown Server 部署（Web UI + REST API + WebSocket 实时推送）
 #
 # 启动：docker compose up -d
 # 首次访问 http://<宿主机>:17800/ 会进入初始化向导，自行设置访问密钥
-# （至少 8 位，必须同时包含字母和数字）。无人值守部署可用 FLUXDOWN_TOKEN 预置。
+# （至少 8 位，必须同时包含字母和数字）。无人值守部署可用 RINADOWN_TOKEN 预置。
 services:
-  fluxdown-server:
-    image: ghcr.io/zerx-lab/fluxdown-server:latest
+  rinadown-server:
+    image: ghcr.io/zerx-lab/rinadown-server:latest
     # 本地构建（替代 image 一行）：
     # build:
     #   context: ..
     #   dockerfile: docker/server.Dockerfile
-    container_name: fluxdown-server
+    container_name: rinadown-server
     restart: unless-stopped
     ports:
       - "17800:17800"
     volumes:
-      - fluxdown-data:/data # DB / 日志 / 访问密钥
+      - rinadown-data:/data # DB / 日志 / 访问密钥
       - ./downloads:/root/Downloads # 默认下载目录（容器内 HOME=/root）
     # environment:
-    #   FLUXDOWN_TOKEN: ChangeMe2026 # 预置访问密钥，跳过 Web 初始化向导；仅在尚未设置过密钥时生效
-    #   FLUXDOWN_LANG: zh # Web 界面默认语言（en/zh）；用户手动改过语言后以手动选择为准
-    #   FLUXDOWN_DEMO: "1" # 演示模式：仅允许下载内置演示文件
-    #   FLUXDOWN_DATABASE_URL: postgres://user:pass@host:5432/fluxdown # 外部数据库
+    #   RINADOWN_TOKEN: ChangeMe2026 # 预置访问密钥，跳过 Web 初始化向导；仅在尚未设置过密钥时生效
+    #   RINADOWN_LANG: zh # Web 界面默认语言（en/zh）；用户手动改过语言后以手动选择为准
+    #   RINADOWN_DEMO: "1" # 演示模式：仅允许下载内置演示文件
+    #   RINADOWN_DATABASE_URL: postgres://user:pass@host:5432/rinadown # 外部数据库
 
 volumes:
-  fluxdown-data:
+  rinadown-data:

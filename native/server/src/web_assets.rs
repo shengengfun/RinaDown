@@ -8,7 +8,7 @@
 //! - 未命中的路径一律回 `index.html`（HTTP 200），保持 SPA 前端路由可直接刷新，
 //!   与旧的 `ServeDir::fallback(ServeFile)` 行为一致。
 //!
-//! `FLUXDOWN_WEBROOT` 仍可把托管切回磁盘目录（见 `config`），本模块只负责内嵌路径。
+//! `RINADOWN_WEBROOT` 仍可把托管切回磁盘目录（见 `config`），本模块只负责内嵌路径。
 
 use std::borrow::Cow;
 
@@ -135,12 +135,12 @@ fn not_embedded() -> Response {
             CONTENT_TYPE,
             HeaderValue::from_static("text/plain; charset=utf-8"),
         )],
-        "FluxDown Server: Web UI is not embedded in this build.\n\
+        "RinaDown Server: Web UI is not embedded in this build.\n\
          Build it with `cd web && bun run build` then rebuild the server,\n\
-         or point FLUXDOWN_WEBROOT at an existing web build directory.\n\
+         or point RINADOWN_WEBROOT at an existing web build directory.\n\
          \n\
          本构建未嵌入 Web 界面：先在 web/ 执行 `bun run build` 再重新编译服务器，\n\
-         或用 FLUXDOWN_WEBROOT 指向已构建好的前端目录。\n\
+         或用 RINADOWN_WEBROOT 指向已构建好的前端目录。\n\
          \n\
          The REST API / WebSocket endpoints are unaffected.\n",
     )

@@ -4,13 +4,13 @@ condition: crates/**
 interruptMode: never
 ---
 
-你正在修改 FluxDown GPUI 客户端。目录结构必须表达职责边界，避免把迁移后的客户端重新堆成单一 UI crate。
+你正在修改 RinaDown GPUI 客户端。目录结构必须表达职责边界，避免把迁移后的客户端重新堆成单一 UI crate。
 
 ## 本机参考源码
 
 - `~/Desktop/code/github/gpui-component`：组件 API、主题 token、交互状态和组合示例的首选参考；写 GPUI 组件前先查这里，禁止凭印象猜接口。
 - `~/Desktop/code/github/zed`：GPUI 原语、窗口行为和大型应用架构的补充参考；仅在 gpui-component 没有对应模式时查阅。
-- 两个参考仓只读。FluxDown 的 `Cargo.toml`/`Cargo.lock` 锁定版本与实际编译结果优先；禁止照搬版本不匹配的 API。
+- 两个参考仓只读。RinaDown 的 `Cargo.toml`/`Cargo.lock` 锁定版本与实际编译结果优先；禁止照搬版本不匹配的 API。
 
 ## 固定分层
 
@@ -26,7 +26,7 @@ shell + capability crates + host adapters -> app
 - `crates/shell`：窗口 chrome、标题栏、活动栏、侧栏、内容槽位、路由和窗口级状态；不得实现下载、设置、RSS 等业务页面，不得依赖具体 capability crate。
 - capability crate（如 `downloads`、`settings`）：拥有该能力的页面、领域组件、视图状态、动作和宿主接口；一个能力可包含多个页面，不得一页一 crate。
 - `crates/app`：唯一 composition root；初始化 GPUI、资产、主题、i18n、宿主连接，创建各 feature Entity 并注入 shell。只有 app 可以知道全部 capability。
-- 官方 GPUI/WASM UI 默认只连接 `fluxdown-agent`；页面只依赖能力端口与 `fluxdown_protocol` wire，不直接依赖 `fluxdown_engine`、`fluxdown_daemon`、FluxCloud SDK 或具体 HTTP/WS/IPC 实现。完整服务边界见 `rule://local-service-architecture`。
+- 官方 GPUI/WASM UI 默认只连接 `rinadown-agent`；页面只依赖能力端口与 `rinadown_protocol` wire，不直接依赖 `rinadown_engine`、`rinadown_daemon`、FluxCloud SDK 或具体 HTTP/WS/IPC 实现。完整服务边界见 `rule://local-service-architecture`。
 
 ## capability 内部结构
 

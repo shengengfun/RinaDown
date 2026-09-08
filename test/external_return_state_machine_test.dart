@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/mobile/services/external_return_state_machine.dart';
+import 'package:rina_down/src/mobile/services/external_return_state_machine.dart';
 
 void main() {
   test('keeps the host transparent until a later resume', () {

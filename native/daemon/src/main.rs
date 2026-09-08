@@ -1,4 +1,4 @@
-//! `fluxdownd` 常驻下载核心进程。
+//! `rinadownd` 常驻下载核心进程。
 
 use tokio_util::sync::CancellationToken;
 
@@ -10,7 +10,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         shutdown_signal().await;
         signal_cancel.cancel();
     });
-    fluxdown_daemon::runtime::run(cancel).await
+    rinadown_daemon::runtime::run(cancel).await
 }
 
 #[cfg(unix)]

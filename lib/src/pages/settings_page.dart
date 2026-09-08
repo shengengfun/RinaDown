@@ -3070,9 +3070,9 @@ class _UiScaleSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tp = FluxDownApp.of(context);
+    final tp = RinaDownApp.of(context);
     final c = AppColors.of(context);
-    // FluxDownApp.of 走 findAncestorStateOfType，不建立响应式依赖；
+    // RinaDownApp.of 走 findAncestorStateOfType，不建立响应式依赖；
     // 本组件又以 const 挂载，父级重建会被 const 同一性跳过。
     // 必须显式监听 ThemeProvider，否则点击后高亮停留在上一次的值。
     return ListenableBuilder(
@@ -7277,7 +7277,7 @@ class _CopyUserscriptButton extends StatelessWidget {
   Future<void> _copy(BuildContext context) async {
     final s = LocaleScope.of(context);
     try {
-      final script = await rootBundle.loadString('userscript/fluxdown.user.js');
+      final script = await rootBundle.loadString('userscript/rinadown.user.js');
       await Clipboard.setData(ClipboardData(text: script));
       if (!context.mounted) return;
       FluxSonner.of(context).show(
@@ -9400,7 +9400,7 @@ class _ThemeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = FluxDownApp.of(context);
+    final provider = RinaDownApp.of(context);
     // ListenableBuilder 监听 ThemeProvider，确保导入/删除主题后立即 rebuild
     return ListenableBuilder(
       listenable: provider,
@@ -9463,7 +9463,7 @@ class _ThemeActions extends StatelessWidget {
   const _ThemeActions({required this.colors});
 
   Future<void> _importTheme(BuildContext context) async {
-    final provider = FluxDownApp.of(context);
+    final provider = RinaDownApp.of(context);
     final s = LocaleScope.of(context);
 
     List<XFile>? result;
@@ -9526,7 +9526,7 @@ class _ThemeActions extends StatelessWidget {
   }
 
   Future<void> _exportTheme(BuildContext context) async {
-    final provider = FluxDownApp.of(context);
+    final provider = RinaDownApp.of(context);
     final s = LocaleScope.of(context);
     final dark = provider.isDark(context);
     final tokens = provider.getExportableTokens(dark);
@@ -9601,7 +9601,7 @@ class _ThemeActions extends StatelessWidget {
           icon: LucideIcons.globe,
           label: s.themeMore,
           colors: c,
-          onTap: () => launchUrl(Uri.parse('https://fluxdown.zerx.dev/themes')),
+          onTap: () => launchUrl(Uri.parse('https://rinadown.zerx.dev/themes')),
         ),
       ],
     );
@@ -10181,8 +10181,8 @@ class _ThemeModeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = FluxDownApp.of(context);
-    // FluxDownApp.of 走 findAncestorStateOfType，不建立响应式依赖；
+    final provider = RinaDownApp.of(context);
+    // RinaDownApp.of 走 findAncestorStateOfType，不建立响应式依赖；
     // 本组件又以 const 挂载，父级重建会被 const 同一性跳过。当主题模式在
     // 视觉等价的档位间切换（如系统为亮色时 跟随系统 ↔ 亮色）时，AppColors/
     // ShadTheme 均无变化，没有任何 inherited 依赖会触发重建，高亮就停留在
@@ -10322,7 +10322,7 @@ class _ColorSchemeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = FluxDownApp.of(context);
+    final provider = RinaDownApp.of(context);
     final current = provider.colorScheme;
     final c = AppColors.of(context);
     final isCustom = current == AppColorScheme.custom;
@@ -10830,7 +10830,7 @@ class _AboutContent extends StatelessWidget {
           children: [
             // App info card
             _SettingCard(
-              label: 'FluxDown',
+              label: 'RinaDown',
               description: LocaleScope.of(context).appDescription,
               vertical: true,
               child: Column(
@@ -11179,7 +11179,7 @@ class _AboutContent extends StatelessWidget {
             MouseRegion(
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
-                onTap: () => launchUrl(Uri.parse('https://fluxdown.zerx.dev')),
+                onTap: () => launchUrl(Uri.parse('https://rinadown.zerx.dev')),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -11297,12 +11297,12 @@ class _ExtensionCard extends StatelessWidget {
   const _ExtensionCard({required this.colors});
 
   static const _chromeStoreUrl =
-      'https://chromewebstore.google.com/detail/fluxdown/meleenglfggcmcajknpeeeiobnpfmahc';
+      'https://chromewebstore.google.com/detail/rinadown/meleenglfggcmcajknpeeeiobnpfmahc';
   static const _firefoxStoreUrl =
-      'https://addons.mozilla.org/firefox/addon/fluxdown/';
+      'https://addons.mozilla.org/firefox/addon/rinadown/';
   static const _edgeStoreUrl =
-      'https://microsoftedge.microsoft.com/addons/detail/fluxdown/nglkkjbogjghekbhhcnccnpfedjbdhhd';
-  static const _offlinePackagesUrl = 'https://fluxdown.zerx.dev/#download';
+      'https://microsoftedge.microsoft.com/addons/detail/rinadown/nglkkjbogjghekbhhcnccnpfedjbdhhd';
+  static const _offlinePackagesUrl = 'https://rinadown.zerx.dev/#download';
 
   @override
   Widget build(BuildContext context) {
@@ -11401,7 +11401,7 @@ class _DonateCard extends StatelessWidget {
           ShadButton(
             size: ShadButtonSize.sm,
             onPressed: () =>
-                launchUrl(Uri.parse('https://fluxdown.zerx.dev/sponsor')),
+                launchUrl(Uri.parse('https://rinadown.zerx.dev/sponsor')),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -11446,7 +11446,7 @@ class _LogExportCardState extends State<_LogExportCard> {
           '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
       final result = await FilePickerService.saveFile(
         dialogTitle: s.logSelectExportDir,
-        fileName: 'fluxdown_logs_$datePart.zip',
+        fileName: 'rinadown_logs_$datePart.zip',
         allowedExtensions: ['zip'],
       );
       if (result == null || !mounted) {
@@ -12699,7 +12699,7 @@ void _showChangeEmailDialog(BuildContext context, String currentEmail) {
 void _showOriginIdEditDialog(BuildContext context, int? currentOriginId) {
   showShadDialog(
     context: context,
-    // FluxDown 弹出层无进出场动画（rule: shad-overlay-no-animation）。
+    // RinaDown 弹出层无进出场动画（rule: shad-overlay-no-animation）。
     animateIn: const [],
     animateOut: const [],
     builder: (_) => _OriginIdEditDialog(currentOriginId: currentOriginId),
@@ -12709,7 +12709,7 @@ void _showOriginIdEditDialog(BuildContext context, int? currentOriginId) {
 void _showNicknameEditDialog(BuildContext context, String currentNickname) {
   showShadDialog(
     context: context,
-    // FluxDown 弹出层无进出场动画（rule: shad-overlay-no-animation）。
+    // RinaDown 弹出层无进出场动画（rule: shad-overlay-no-animation）。
     animateIn: const [],
     animateOut: const [],
     builder: (_) => _NicknameEditDialog(currentNickname: currentNickname),

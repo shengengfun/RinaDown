@@ -17,7 +17,7 @@ interface FeatureListData {
   totalVotes: number;
 }
 
-const STORAGE_KEY = "fluxdown-feature-votes";
+const STORAGE_KEY = "rinadown-feature-votes";
 
 const RANK_COLORS = ["#F5C518", "#C0C4CC", "#CD8C5C"]; // gold / silver / bronze
 

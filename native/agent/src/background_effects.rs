@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use fluxdown_protocol::{AgentSnapshot, SnapshotBody};
+use rinadown_protocol::{AgentSnapshot, SnapshotBody};
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
@@ -47,7 +47,7 @@ impl BackgroundEffects {
     }
 }
 
-fn agent_snapshot(snapshot: fluxdown_protocol::Snapshot) -> AgentSnapshot {
+fn agent_snapshot(snapshot: rinadown_protocol::Snapshot) -> AgentSnapshot {
     match snapshot.body {
         SnapshotBody::Agent(snapshot) => *snapshot,
         SnapshotBody::Daemon(_) => AgentSnapshot::default(),
@@ -63,7 +63,7 @@ async fn notify_new_completions(snapshot: &AgentSnapshot, statuses: &mut HashMap
             let file_name = task.file_name.clone();
             tokio::task::spawn_blocking(move || {
                 let _ = notify_rust::Notification::new()
-                    .summary("FluxDown")
+                    .summary("RinaDown")
                     .body(&file_name)
                     .show();
             });
@@ -85,9 +85,9 @@ async fn reconcile_awake(snapshot: &AgentSnapshot, awake: &mut Option<keepawake:
             keepawake::Builder::default()
                 .idle(true)
                 .sleep(true)
-                .reason("FluxDown active download")
-                .app_name("FluxDown")
-                .app_reverse_domain("dev.zerx.fluxdown")
+                .reason("RinaDown active download")
+                .app_name("RinaDown")
+                .app_reverse_domain("dev.zerx.rinadown")
                 .create()
         })
         .await
@@ -112,7 +112,7 @@ fn preference_bool(snapshot: &AgentSnapshot, key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use fluxdown_protocol::{AgentPreferencesDto, AgentSnapshot};
+    use rinadown_protocol::{AgentPreferencesDto, AgentSnapshot};
     use serde_json::json;
 
     use super::preference_bool;

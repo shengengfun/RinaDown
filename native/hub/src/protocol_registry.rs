@@ -1,4 +1,4 @@
-//! URL protocol (scheme) handler registration for the app's own `fluxdown://`
+//! URL protocol (scheme) handler registration for the app's own `rinadown://`
 //! deep links and for `ed2k://` eDonkey2000 links.
 //!
 //! Windows — HKCU registry:
@@ -11,20 +11,20 @@
 //! All operations target `HKEY_CURRENT_USER` — no admin elevation required.
 //!
 //! Linux — the XDG `x-scheme-handler/<scheme>` MIME type, set via `xdg-mime`
-//! (the `.desktop` file must declare the handler; see `linux/com.fluxdown.app.desktop`).
+//! (the `.desktop` file must declare the handler; see `linux/com.rinadown.app.desktop`).
 //!
 //! macOS — Launch Services (`LSSetDefaultHandlerForURLScheme`); the scheme must
 //! be declared in `CFBundleURLTypes` (`macos/Runner/Info.plist`).
 //!
 //! `register`/`unregister` above run outside the Windows installer's
 //! tracking (written directly via winreg at runtime), so
-//! `installer/windows/setup.iss` removes any leftover `fluxdown`/`ed2k`/
+//! `installer/windows/setup.iss` removes any leftover `rinadown`/`ed2k`/
 //! `magnet` Windows registry keys explicitly on uninstall — keep both in sync.
 
 /// A URL scheme this app can claim as the system default handler for.
 #[derive(Clone, Copy)]
 pub struct UrlScheme {
-    /// Scheme token without `://` (e.g. `fluxdown`), lowercase.
+    /// Scheme token without `://` (e.g. `rinadown`), lowercase.
     pub scheme: &'static str,
     /// Windows shell description stored as the class key's default value.
     /// Unused on Linux/macOS, where the handler is named by the packaged
@@ -35,9 +35,9 @@ pub struct UrlScheme {
 
 /// The app's own deep-link scheme. Auto-registered on startup (Windows only,
 /// see `download_actor`); packaged declarations cover Linux/macOS.
-pub const FLUXDOWN: UrlScheme = UrlScheme {
-    scheme: "fluxdown",
-    desc: "URL:FluxDown Protocol",
+pub const RINADOWN: UrlScheme = UrlScheme {
+    scheme: "rinadown",
+    desc: "URL:RinaDown Protocol",
 };
 
 /// eDonkey2000 links (`ed2k://|file|…`). Opt-in from settings only — other
@@ -64,7 +64,7 @@ pub const MAGNET: UrlScheme = UrlScheme {
 /// arbitrary caller-supplied string.
 pub fn from_name(name: &str) -> Option<UrlScheme> {
     match name {
-        "fluxdown" => Some(FLUXDOWN),
+        "rinadown" => Some(RINADOWN),
         "ed2k" => Some(ED2K),
         "magnet" => Some(MAGNET),
         _ => None,
@@ -189,7 +189,7 @@ mod inner {
     /// Whether `proto` appears to be actively claimed by another application.
     ///
     /// Used by startup auto-registration to stay non-preemptive on contended
-    /// schemes (`magnet://`): FluxDown never silently steals a handler that a
+    /// schemes (`magnet://`): RinaDown never silently steals a handler that a
     /// competing client (qBittorrent, …) or the user has already established.
     /// The explicit settings toggle bypasses this check — `register()` always
     /// writes.
@@ -197,7 +197,7 @@ mod inner {
     /// Signals checked, mirroring Windows' own resolution order:
     /// 1. `UserChoice` pin (`HKCU\…\Shell\Associations\UrlAssociations\<scheme>`)
     ///    — a per-user default explicitly chosen in Windows Settings / the
-    ///    "open with" prompt. FluxDown never creates one for itself, so its
+    ///    "open with" prompt. RinaDown never creates one for itself, so its
     ///    presence (while we are not the registered handler) means someone
     ///    else won the scheme.
     /// 2. A foreign exe in `HKCU\Software\Classes\<scheme>\shell\open\command`.
@@ -282,7 +282,7 @@ mod inner {
         // Only remove if currently registered (don't break other app's registration)
         if !is_registered(proto) {
             log_info!(
-                "[protocol_registry] {scheme}:// not registered to FluxDown, skipping removal"
+                "[protocol_registry] {scheme}:// not registered to RinaDown, skipping removal"
             );
             return Ok(());
         }
@@ -324,16 +324,16 @@ mod inner {
     use super::UrlScheme;
     use std::io;
 
-    const DESKTOP_ENTRY: &str = "com.fluxdown.app.desktop";
+    const DESKTOP_ENTRY: &str = "com.rinadown.app.desktop";
 
     fn mime_type(proto: UrlScheme) -> String {
         format!("x-scheme-handler/{}", proto.scheme)
     }
 
-    /// Check whether FluxDown is the default handler for `proto`.
+    /// Check whether RinaDown is the default handler for `proto`.
     ///
     /// Queries `xdg-mime query default x-scheme-handler/<scheme>` and checks
-    /// whether the returned .desktop name contains "fluxdown".
+    /// whether the returned .desktop name contains "rinadown".
     pub fn is_registered(proto: UrlScheme) -> bool {
         let Ok(output) = std::process::Command::new("xdg-mime")
             .args(["query", "default", &mime_type(proto)])
@@ -342,12 +342,12 @@ mod inner {
             return false;
         };
         let stdout = String::from_utf8_lossy(&output.stdout);
-        stdout.to_lowercase().contains("fluxdown")
+        stdout.to_lowercase().contains("rinadown")
     }
 
-    /// Register FluxDown as the default handler for `proto`.
+    /// Register RinaDown as the default handler for `proto`.
     ///
-    /// Requires that `com.fluxdown.app.desktop` is installed in an XDG
+    /// Requires that `com.rinadown.app.desktop` is installed in an XDG
     /// applications directory and declares the scheme handler in `MimeType`.
     pub fn register(proto: UrlScheme) -> Result<(), io::Error> {
         std::process::Command::new("xdg-mime")
@@ -359,7 +359,7 @@ mod inner {
     /// Hand `proto` back to the system default by dropping the user override.
     ///
     /// xdg-mime has no "unset" command, so we edit `mimeapps.list` directly:
-    /// remove the `x-scheme-handler/<scheme>=com.fluxdown.app.desktop` line
+    /// remove the `x-scheme-handler/<scheme>=com.rinadown.app.desktop` line
     /// from the `[Default Applications]` section.
     pub fn unregister(proto: UrlScheme) -> Result<(), io::Error> {
         use std::io::{BufRead, Write};
@@ -385,7 +385,7 @@ mod inner {
             .iter()
             .filter(|l| {
                 let lower = l.to_lowercase();
-                !(lower.starts_with(&prefix) && lower.contains("fluxdown"))
+                !(lower.starts_with(&prefix) && lower.contains("rinadown"))
             })
             .map(|l| l.as_str())
             .collect();
@@ -463,7 +463,7 @@ mod inner {
     pub fn unregister(proto: UrlScheme) -> Result<(), io::Error> {
         if !is_registered(proto) {
             log_info!(
-                "[protocol_registry] {}:// not registered to FluxDown, skipping removal",
+                "[protocol_registry] {}:// not registered to RinaDown, skipping removal",
                 proto.scheme
             );
             return Ok(());
@@ -519,8 +519,8 @@ mod tests {
     /// handler (not in [`from_name`]'s allow-list either — tests reach the
     /// primitives directly).
     const SCRATCH: UrlScheme = UrlScheme {
-        scheme: "fluxdown-selftest",
-        desc: "URL:FluxDown Selftest Protocol",
+        scheme: "rinadown-selftest",
+        desc: "URL:RinaDown Selftest Protocol",
     };
 
     /// Drop the scratch key regardless of which exe last claimed it, so a
@@ -554,7 +554,7 @@ mod tests {
     #[test]
     fn from_name_only_resolves_known_schemes() {
         assert_eq!(from_name("ed2k").unwrap().scheme, "ed2k");
-        assert_eq!(from_name("fluxdown").unwrap().scheme, "fluxdown");
+        assert_eq!(from_name("rinadown").unwrap().scheme, "rinadown");
         assert_eq!(from_name("magnet").unwrap().scheme, "magnet");
         // Anything else must never reach the registry writers.
         assert!(from_name("file").is_none());
@@ -566,8 +566,8 @@ mod tests {
     /// `registry_roundtrip_is_observable_and_reversible` (tests run in
     /// parallel within the binary).
     const SCRATCH_CLAIM: UrlScheme = UrlScheme {
-        scheme: "fluxdown-selftest-claim",
-        desc: "URL:FluxDown Selftest Claim Protocol",
+        scheme: "rinadown-selftest-claim",
+        desc: "URL:RinaDown Selftest Claim Protocol",
     };
 
     fn purge(scheme: &str) {

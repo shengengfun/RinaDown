@@ -177,7 +177,7 @@ export function Sidebar() {
           </svg>
         </span>
         <div className="side-brand-text">
-          <b>FluxDown</b>
+          <b>RinaDown</b>
           <span>↓ {speed > 0 ? fmtSpeed(speed) : t('sidebar.idle')}</span>
         </div>
       </div>
@@ -404,7 +404,7 @@ export function Sidebar() {
             <LogOut size={13} />
           </button>
         </div>
-        <a className="side-feedback" href="https://github.com/zerx-lab/FluxDown/issues" target="_blank" rel="noreferrer">
+        <a className="side-feedback" href="https://github.com/zerx-lab/RinaDown/issues" target="_blank" rel="noreferrer">
           <MessageCircle size={14} />
           {t('sidebar.feedback')}
         </a>

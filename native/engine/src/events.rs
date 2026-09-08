@@ -282,7 +282,7 @@ pub trait EventSink: Send + Sync {
     /// # Examples
     ///
     /// ```
-    /// use fluxdown_engine::events::{EngineEvent, EventSink};
+    /// use rinadown_engine::events::{EngineEvent, EventSink};
     ///
     /// struct PrintSink;
     /// impl EventSink for PrintSink {

@@ -10,8 +10,8 @@
  * 用法:`buildGraph()` 生成首页/全站实体图;`buildSoftwareOffer()` 复用软件报价片段。
  */
 
-export const SITE_URL = "https://fluxdown.zerx.dev";
-export const SITE_NAME = "FluxDown";
+export const SITE_URL = "https://rinadown.zerx.dev";
+export const SITE_NAME = "RinaDown";
 
 /** 稳定的实体 @id 锚点(URI fragment 形式,全站唯一且不随页面变化)。 */
 export const ORG_ID = `${SITE_URL}/#organization`;
@@ -27,7 +27,7 @@ export const OG_IMAGE_HEIGHT = 630;
 export const TAGLINE =
   "The download manager, rebuilt in Rust — runtime dynamic segmentation, multi-protocol coverage from HTTP to BitTorrent, ED2K and HLS, and deep browser integration. Free and open source.";
 
-export const SAME_AS = ["https://github.com/zerx-lab/FluxDown"];
+export const SAME_AS = ["https://github.com/zerx-lab/RinaDown"];
 
 /**
  * 首页三语 meta 与 hreflang 簇的单一来源(HTML <link>、sitemap xhtml:link 共用)。
@@ -35,19 +35,19 @@ export const SAME_AS = ["https://github.com/zerx-lab/FluxDown"];
  */
 export const HOME_META = {
   en: {
-    title: "FluxDown — Multi-Protocol Download Manager, Rebuilt in Rust",
+    title: "RinaDown — Multi-Protocol Download Manager, Rebuilt in Rust",
     description:
-      "FluxDown rebuilds the download manager from the ground up: a Rust engine with runtime dynamic segmentation, HTTP/HTTPS/FTP/BitTorrent/ED2K/HLS support, and deep browser integration. Free and open source — no ads, no throttling.",
+      "RinaDown rebuilds the download manager from the ground up: a Rust engine with runtime dynamic segmentation, HTTP/HTTPS/FTP/BitTorrent/ED2K/HLS support, and deep browser integration. Free and open source — no ads, no throttling.",
   },
   zh: {
-    title: "FluxDown — Rust 重写的多协议下载管理器 | 免费开源下载工具",
+    title: "RinaDown — Rust 重写的多协议下载管理器 | 免费开源下载工具",
     description:
-      "FluxDown 用 Rust 从头重写下载管理器：运行时动态分段加速，支持 HTTP/HTTPS/FTP/BT 磁力/ED2K/HLS 流媒体，浏览器深度接管。免费开源，无广告，不限速。",
+      "RinaDown 用 Rust 从头重写下载管理器：运行时动态分段加速，支持 HTTP/HTTPS/FTP/BT 磁力/ED2K/HLS 流媒体，浏览器深度接管。免费开源，无广告，不限速。",
   },
   ja: {
-    title: "FluxDown — Rust 製マルチプロトコル・ダウンロードマネージャー | 無料・オープンソース",
+    title: "RinaDown — Rust 製マルチプロトコル・ダウンロードマネージャー | 無料・オープンソース",
     description:
-      "FluxDown は Rust でダウンロードマネージャーをゼロから再構築。実行時の動的セグメント分割、HTTP/HTTPS/FTP/BitTorrent/ED2K/HLS 対応、ブラウザとの深い連携。無料・オープンソース、広告なし、速度制限なし。",
+      "RinaDown は Rust でダウンロードマネージャーをゼロから再構築。実行時の動的セグメント分割、HTTP/HTTPS/FTP/BitTorrent/ED2K/HLS 対応、ブラウザとの深い連携。無料・オープンソース、広告なし、速度制限なし。",
   },
 } as const;
 
@@ -103,7 +103,7 @@ export function softwareNode(): JsonLdNode {
     "@type": "SoftwareApplication",
     "@id": SOFTWARE_ID,
     name: SITE_NAME,
-    alternateName: "FluxDown Download Manager",
+    alternateName: "RinaDown Download Manager",
     applicationCategory: "UtilitiesApplication",
     applicationSubCategory: "Download Manager",
     operatingSystem: "Windows 10+, Linux",

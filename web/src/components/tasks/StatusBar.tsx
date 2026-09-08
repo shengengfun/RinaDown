@@ -279,7 +279,7 @@ export function StatusBar() {
             : '—'}
         </span>
       </span>
-      <span className="sb-item sb-ver">FluxDown Server {stats?.serverVersion ?? '—'}</span>
+      <span className="sb-item sb-ver">RinaDown Server {stats?.serverVersion ?? '—'}</span>
     </footer>
   )
 }

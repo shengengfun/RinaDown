@@ -4,9 +4,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use fluxdown_api::service::{ApiError, ApiHost};
-use fluxdown_protocol::method;
-use fluxdown_protocol::{
+use rinadown_api::service::{ApiError, ApiHost};
+use rinadown_protocol::method;
+use rinadown_protocol::{
     CreateTaskRequest, DaemonConfigPatch, DaemonCreateTaskParams, DownloadRequest, QueueDto,
     TaskDto,
 };
@@ -45,11 +45,11 @@ impl AgentApiHost {
         Ok(())
     }
 
-    fn daemon_snapshot(&self) -> fluxdown_protocol::DaemonSnapshot {
+    fn daemon_snapshot(&self) -> rinadown_protocol::DaemonSnapshot {
         let snapshot = self.events.snapshot();
         match snapshot.body {
-            fluxdown_protocol::SnapshotBody::Agent(agent) => agent.daemon,
-            fluxdown_protocol::SnapshotBody::Daemon(_) => {
+            rinadown_protocol::SnapshotBody::Agent(agent) => agent.daemon,
+            rinadown_protocol::SnapshotBody::Daemon(_) => {
                 unreachable!("agent event hub returned daemon root snapshot")
             }
         }
@@ -157,18 +157,18 @@ impl ApiHost for AgentApiHost {
     }
 }
 
-fn api_error(error: fluxdown_protocol::RpcErrorData) -> ApiError {
+fn api_error(error: rinadown_protocol::RpcErrorData) -> ApiError {
     match error.code {
-        fluxdown_protocol::ApplicationErrorCode::Unauthorized => ApiError::Unauthorized,
-        fluxdown_protocol::ApplicationErrorCode::NotFound => ApiError::NotFound,
-        fluxdown_protocol::ApplicationErrorCode::Conflict => {
+        rinadown_protocol::ApplicationErrorCode::Unauthorized => ApiError::Unauthorized,
+        rinadown_protocol::ApplicationErrorCode::NotFound => ApiError::NotFound,
+        rinadown_protocol::ApplicationErrorCode::Conflict => {
             ApiError::Conflict("conflict".to_owned())
         }
-        fluxdown_protocol::ApplicationErrorCode::InvalidArgument => {
+        rinadown_protocol::ApplicationErrorCode::InvalidArgument => {
             ApiError::BadRequest("invalid argument".to_owned())
         }
-        fluxdown_protocol::ApplicationErrorCode::Unavailable
-        | fluxdown_protocol::ApplicationErrorCode::Timeout => ApiError::Unavailable,
+        rinadown_protocol::ApplicationErrorCode::Unavailable
+        | rinadown_protocol::ApplicationErrorCode::Timeout => ApiError::Unavailable,
         _ => ApiError::Internal("daemon RPC failed".to_owned()),
     }
 }

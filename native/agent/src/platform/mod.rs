@@ -2,8 +2,8 @@
 //! `.torrent` 关联与 URL scheme 注册。
 //!
 //! 所有注册的目标都是官方桌面程序而非 agent 自身：Windows 指向同级
-//! `fluxdown-desktop.exe`，macOS 指向 agent 所在的 `.app` bundle，Linux 指向
-//! 打包的 `com.fluxdown.app.desktop`。全部函数同步阻塞，RPC 侧需放入
+//! `rinadown-desktop.exe`，macOS 指向 agent 所在的 `.app` bundle，Linux 指向
+//! 打包的 `com.rinadown.app.desktop`。全部函数同步阻塞，RPC 侧需放入
 //! `spawn_blocking`。
 
 mod autostart;
@@ -16,14 +16,14 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use fluxdown_protocol::PlatformIntegrationDto;
+use rinadown_protocol::PlatformIntegrationDto;
 
 static DESKTOP_LAUNCHED: AtomicBool = AtomicBool::new(false);
 
 const DESKTOP_EXECUTABLE_NAME: &str = if cfg!(windows) {
-    "fluxdown-desktop.exe"
+    "rinadown-desktop.exe"
 } else {
-    "fluxdown-desktop"
+    "rinadown-desktop"
 };
 
 /// 与 agent 同目录的官方桌面程序；文件不存在时返回 `None`。
@@ -35,11 +35,11 @@ pub fn desktop_executable() -> Option<PathBuf> {
     path.is_file().then_some(path)
 }
 
-pub fn open_task(task: &fluxdown_protocol::TaskDto) -> Result<(), PlatformError> {
+pub fn open_task(task: &rinadown_protocol::TaskDto) -> Result<(), PlatformError> {
     launch_path(&PathBuf::from(&task.save_dir).join(&task.file_name), false)
 }
 
-pub fn reveal_task(task: &fluxdown_protocol::TaskDto) -> Result<(), PlatformError> {
+pub fn reveal_task(task: &rinadown_protocol::TaskDto) -> Result<(), PlatformError> {
     launch_path(&PathBuf::from(&task.save_dir).join(&task.file_name), true)
 }
 
@@ -54,7 +54,7 @@ pub fn launch_desktop_once() -> Result<(), PlatformError> {
         return Ok(());
     }
     let executable = desktop_executable().ok_or(PlatformError::Unsupported(
-        "fluxdown-desktop is not installed next to fluxdown-agent",
+        "rinadown-desktop is not installed next to rinadown-agent",
     ))?;
     let mut command = std::process::Command::new(executable);
     command
@@ -98,7 +98,7 @@ pub fn set_autostart(enabled: bool) -> Result<(), PlatformError> {
         return autostart::disable();
     }
     let desktop = desktop_executable().ok_or(PlatformError::Unsupported(
-        "fluxdown-desktop is not installed next to fluxdown-agent",
+        "rinadown-desktop is not installed next to rinadown-agent",
     ))?;
     autostart::enable(&desktop)
 }
@@ -111,7 +111,7 @@ pub fn set_file_association(enabled: bool) -> Result<(), PlatformError> {
     }
 }
 
-/// `scheme` 只接受 `magnet` / `ed2k` / `fluxdown`。
+/// `scheme` 只接受 `magnet` / `ed2k` / `rinadown`。
 pub fn set_url_protocol(scheme: &str, enabled: bool) -> Result<(), PlatformError> {
     let scheme = protocol_registry::from_name(scheme)
         .ok_or_else(|| PlatformError::InvalidScheme(scheme.to_owned()))?;
@@ -174,7 +174,7 @@ fn set_no_console_window(_command: &mut std::process::Command) {}
 #[cfg(windows)]
 fn registry_executable(desktop: Option<&Path>) -> Result<String, PlatformError> {
     let path = desktop.ok_or(PlatformError::Unsupported(
-        "fluxdown-desktop.exe is not installed next to fluxdown-agent",
+        "rinadown-desktop.exe is not installed next to rinadown-agent",
     ))?;
     let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
     let text = canonical.to_string_lossy();
@@ -210,11 +210,11 @@ mod xdg {
 
     use super::PlatformError;
 
-    /// 打包安装的桌面入口（`linux/com.fluxdown.app.desktop`）。
-    pub const DESKTOP_ENTRY: &str = "com.fluxdown.app.desktop";
+    /// 打包安装的桌面入口（`linux/com.rinadown.app.desktop`）。
+    pub const DESKTOP_ENTRY: &str = "com.rinadown.app.desktop";
 
-    /// `xdg-mime query default <mime>` 是否返回 FluxDown 的桌面入口。
-    pub fn query_default_is_fluxdown(mime: &str) -> bool {
+    /// `xdg-mime query default <mime>` 是否返回 RinaDown 的桌面入口。
+    pub fn query_default_is_rinadown(mime: &str) -> bool {
         let Ok(output) = std::process::Command::new("xdg-mime")
             .args(["query", "default", mime])
             .output()
@@ -223,10 +223,10 @@ mod xdg {
         };
         String::from_utf8_lossy(&output.stdout)
             .to_lowercase()
-            .contains("fluxdown")
+            .contains("rinadown")
     }
 
-    /// 从 `~/.config/mimeapps.list` 删除指向 FluxDown 的 `<mime>=…` 行。
+    /// 从 `~/.config/mimeapps.list` 删除指向 RinaDown 的 `<mime>=…` 行。
     ///
     /// xdg-mime 没有“取消默认”命令，只能直接编辑用户覆盖文件。
     pub fn remove_default(mime: &str) -> Result<(), PlatformError> {
@@ -244,7 +244,7 @@ mod xdg {
         let mut out = std::fs::File::create(&path)?;
         for line in lines {
             let lower = line.to_lowercase();
-            if lower.starts_with(&prefix) && lower.contains("fluxdown") {
+            if lower.starts_with(&prefix) && lower.contains("rinadown") {
                 continue;
             }
             writeln!(out, "{line}")?;
@@ -281,7 +281,7 @@ mod tests {
         let status = integration_status();
         assert_eq!(
             status.url_protocols.keys().cloned().collect::<Vec<_>>(),
-            ["ed2k", "fluxdown", "magnet"]
+            ["ed2k", "rinadown", "magnet"]
         );
         assert!(!status.autostart_supported || !status.desktop_executable.is_empty());
     }

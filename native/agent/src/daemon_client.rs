@@ -5,8 +5,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-use fluxdown_protocol::method;
-use fluxdown_protocol::{
+use rinadown_protocol::method;
+use rinadown_protocol::{
     ApplicationErrorCode, DaemonSnapshot, EventFrame, RequestId, RpcErrorData, RpcNotification,
     RpcRequest, RpcResponse, ServiceHello, ServiceRole, Snapshot, SnapshotBody,
 };
@@ -193,7 +193,7 @@ async fn run_client(
             }
             Err(ConnectError::Refused) => {
                 if let Err(error) = supervisor.ensure_running().await {
-                    tracing::warn!(error = %error, "could not supervise fluxdownd");
+                    tracing::warn!(error = %error, "could not supervise rinadownd");
                 }
             }
             Err(ConnectError::Fatal(error)) => {
@@ -233,10 +233,10 @@ async fn connect(config: &DaemonClientConfig) -> Result<(Socket, DaemonSnapshot)
         .await
         .map_err(classify_connect_error)?;
     let hello = serde_json::json!({
-        "clientName": "fluxdown-agent",
+        "clientName": "rinadown-agent",
         "clientVersion": env!("CARGO_PKG_VERSION"),
-        "minProtocolVersion": fluxdown_protocol::MIN_PROTOCOL_VERSION,
-        "maxProtocolVersion": fluxdown_protocol::PROTOCOL_VERSION,
+        "minProtocolVersion": rinadown_protocol::MIN_PROTOCOL_VERSION,
+        "maxProtocolVersion": rinadown_protocol::PROTOCOL_VERSION,
         "requestedRole": "daemon",
         "capabilities": []
     });
@@ -244,7 +244,7 @@ async fn connect(config: &DaemonClientConfig) -> Result<(Socket, DaemonSnapshot)
     let service = serde_json::from_value::<ServiceHello>(hello_value)
         .map_err(|_| ConnectError::Fatal(protocol_error()))?;
     if service.role != ServiceRole::Daemon
-        || service.protocol_version != fluxdown_protocol::PROTOCOL_VERSION
+        || service.protocol_version != rinadown_protocol::PROTOCOL_VERSION
     {
         return Err(ConnectError::Fatal(protocol_error()));
     }
@@ -398,7 +398,7 @@ fn invalid_argument(_message: String) -> RpcErrorData {
 
 #[cfg(test)]
 mod tests {
-    use fluxdown_protocol::ApplicationErrorCode;
+    use rinadown_protocol::ApplicationErrorCode;
 
     use super::DaemonClient;
 
@@ -407,7 +407,7 @@ mod tests {
         let client = DaemonClient::disconnected();
         let result = client
             .call::<serde_json::Value, serde_json::Value>(
-                fluxdown_protocol::method::DAEMON_TASK_CREATE,
+                rinadown_protocol::method::DAEMON_TASK_CREATE,
                 Some(serde_json::json!({})),
             )
             .await;

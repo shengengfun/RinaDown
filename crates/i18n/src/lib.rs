@@ -1,4 +1,4 @@
-//! FluxDown GPUI 客户端对 Flutter 翻译资源的零复制源复用层。
+//! RinaDown GPUI 客户端对 Flutter 翻译资源的零复制源复用层。
 //!
 //! `assets/i18n/*.json` 仍是唯一资源目录；构建脚本自动发现并嵌入语言文件。
 //! 查找语义与 Flutter `I18nStore` 一致：locale 精确匹配、主语言匹配、英文
@@ -302,8 +302,8 @@ mod tests {
         let translator = catalog.translator("zh-CN");
 
         assert_eq!(
-            translator.text_with("hello", &[("name", "FluxDown")]),
-            "你好，FluxDown"
+            translator.text_with("hello", &[("name", "RinaDown")]),
+            "你好，RinaDown"
         );
         assert_eq!(translator.text("fallback"), "Fallback");
         assert_eq!(translator.text("missing"), "missing");

@@ -1,8 +1,8 @@
 // 未确认文件名的占位展示契约：用任务 URL 顶替「未知文件」（对齐 Web SPA
 // 的 fileName || url），超长 URL 截断为 64 字符加省略号。
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/bindings/bindings.dart';
-import 'package:flux_down/src/models/download_task.dart';
+import 'package:rina_down/src/bindings/bindings.dart';
+import 'package:rina_down/src/models/download_task.dart';
 
 void main() {
   TaskInfo makeInfo({required String url, required String fileName}) =>

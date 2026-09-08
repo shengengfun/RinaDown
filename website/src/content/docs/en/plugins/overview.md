@@ -1,11 +1,11 @@
 ---
 title: Plugin System Overview
-description: What FluxDown plugins are, what they can do, how they run, and how to install them.
+description: What RinaDown plugins are, what they can do, how they run, and how to install them.
 section: plugins
 order: 1
 ---
 
-FluxDown plugins are small JavaScript programs that hook into the download pipeline. A plugin is a folder containing a `manifest.json` plus one or two `.js` files — no build step, no npm, no framework.
+RinaDown plugins are small JavaScript programs that hook into the download pipeline. A plugin is a folder containing a `manifest.json` plus one or two `.js` files — no build step, no npm, no framework.
 
 Plugins can do exactly two things:
 
@@ -18,13 +18,13 @@ Plugins **cannot** create tasks, read arbitrary files, or touch the UI. They tal
 
 The resolver design has three properties worth understanding before you write one:
 
-- **Lazy.** FluxDown stores only your plugin's ID with the task, never the resolved URL. `resolve(ctx)` runs again on *every* start and resume. This is deliberate: direct links from file hosts usually expire, so re-resolving on resume keeps old tasks downloadable.
+- **Lazy.** RinaDown stores only your plugin's ID with the task, never the resolved URL. `resolve(ctx)` runs again on *every* start and resume. This is deliberate: direct links from file hosts usually expire, so re-resolving on resume keeps old tasks downloadable.
 - **Off the main loop.** Resolution runs on a dedicated thread pool. A slow or hung script cannot freeze the app.
-- **Fail-closed.** If your script throws, times out, or returns garbage, the task goes to the *error* state with a `[插件]`-prefixed message. FluxDown never falls back to downloading the original page URL — that would save an HTML page as a video file. The user can explicitly bypass a broken plugin via the "ignore plugin retry" action on the failed task.
+- **Fail-closed.** If your script throws, times out, or returns garbage, the task goes to the *error* state with a `[插件]`-prefixed message. RinaDown never falls back to downloading the original page URL — that would save an HTML page as a video file. The user can explicitly bypass a broken plugin via the "ignore plugin retry" action on the failed task.
 
 When several enabled plugins match the same URL, the one with the lexicographically smallest `identity` wins.
 
-One consequence of lazy resolution: tasks handled by a resolver skip the normal metadata probe, so if the same plugin also subscribes to `onMetaProbed`, that hook never fires for its own tasks (FluxDown logs a warning about this at load time).
+One consequence of lazy resolution: tasks handled by a resolver skip the normal metadata probe, so if the same plugin also subscribes to `onMetaProbed`, that hook never fires for its own tasks (RinaDown logs a warning about this at load time).
 
 ## How hooks run
 
@@ -52,7 +52,7 @@ An auto-disabled plugin shows a notice in the app and can be re-enabled from the
 Open **Settings → Extensions → Plugins** in the desktop app. Three ways in:
 
 - **Zip upload** — a `.fxplug` file (which is just a zip of the plugin folder, see [Packaging](/docs/en/plugins/packaging/)).
-- **From a directory** — point at a local folder containing `manifest.json`. With **dev mode** on (the default for directory installs), FluxDown records the folder path instead of copying it, and re-reads your `.js` files on every invocation — edit, save, re-run, no reinstall. Manifest changes still require a reload (toggle the plugin off and on).
+- **From a directory** — point at a local folder containing `manifest.json`. With **dev mode** on (the default for directory installs), RinaDown records the folder path instead of copying it, and re-reads your `.js` files on every invocation — edit, save, re-run, no reinstall. Manifest changes still require a reload (toggle the plugin off and on).
 - **Plugin market** — browse and install published plugins straight from the in-app market.
 
 Installed plugins live under `<data dir>/plugins/<identity>/`. New installs are enabled by default.

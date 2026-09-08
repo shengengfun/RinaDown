@@ -10,26 +10,26 @@
 
 use std::path::{Path, PathBuf};
 
-use fluxdown_engine::db::Db;
-use fluxdown_engine::plugin::PluginBridge;
-use fluxdown_engine::plugin::bridge::EngineBridge;
-use fluxdown_engine::plugin::runtime::FfmpegSpec;
-use fluxdown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::db::Db;
+use rinadown_engine::plugin::PluginBridge;
+use rinadown_engine::plugin::bridge::EngineBridge;
+use rinadown_engine::plugin::runtime::FfmpegSpec;
+use rinadown_engine::proxy_config::ProxyConfig;
 
 fn unique_dir(tag: &str) -> PathBuf {
     static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let mut d = std::env::temp_dir();
-    d.push(format!("fluxdown_ff_{}_{}_{}", tag, std::process::id(), n));
+    d.push(format!("rinadown_ff_{}_{}_{}", tag, std::process::id(), n));
     std::fs::create_dir_all(&d).expect("mkdir temp");
     d
 }
 async fn make_bridge(data_dir: &Path) -> EngineBridge {
     let db = Db::open(data_dir).await.expect("open db");
-    // 测试用真实 ffmpeg：`FLUXDOWN_TEST_FFMPEG=<绝对路径>` 时经 config 手动指定，
+    // 测试用真实 ffmpeg：`RINADOWN_TEST_FFMPEG=<绝对路径>` 时经 config 手动指定，
     // 使 resolve_ffmpeg 命中（CI/本机无系统 ffmpeg 时的确定性执行入口）。
-    if let Ok(p) = std::env::var("FLUXDOWN_TEST_FFMPEG") {
-        db.set_config(fluxdown_engine::components::CONFIG_FFMPEG_PATH, &p)
+    if let Ok(p) = std::env::var("RINADOWN_TEST_FFMPEG") {
+        db.set_config(rinadown_engine::components::CONFIG_FFMPEG_PATH, &p)
             .await
             .expect("seed ffmpeg path");
     }

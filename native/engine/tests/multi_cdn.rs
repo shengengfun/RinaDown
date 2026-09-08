@@ -18,13 +18,13 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use fluxdown_engine::cdn::{ClientTemplate, NodePool};
-use fluxdown_engine::db::Db;
-use fluxdown_engine::downloader::{ProgressUpdate, RequestSpec, build_client};
-use fluxdown_engine::events::{EngineEvent, EventSink};
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::segment_coordinator::{ReportScope, run_coordinated_download};
-use fluxdown_engine::speed_limiter::SpeedLimiter;
+use rinadown_engine::cdn::{ClientTemplate, NodePool};
+use rinadown_engine::db::Db;
+use rinadown_engine::downloader::{ProgressUpdate, RequestSpec, build_client};
+use rinadown_engine::events::{EngineEvent, EventSink};
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::segment_coordinator::{ReportScope, run_coordinated_download};
+use rinadown_engine::speed_limiter::SpeedLimiter;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
@@ -183,13 +183,13 @@ async fn serve_conn(
 }
 
 fn work_dir(tag: &str) -> std::path::PathBuf {
-    let d = std::env::temp_dir().join(format!("fluxdown_mcdn_{}_{}", tag, std::process::id()));
+    let d = std::env::temp_dir().join(format!("rinadown_mcdn_{}_{}", tag, std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
     std::fs::create_dir_all(&d).expect("create work dir");
     d
 }
 
-const TEST_UA: &str = "FluxDownMultiCdnTest/1.0";
+const TEST_UA: &str = "RinaDownMultiCdnTest/1.0";
 
 /// 用注入的候选构建多节点池并跑 coordinator 到完成。
 async fn run_with_pool(
@@ -200,7 +200,7 @@ async fn run_with_pool(
     segments: i32,
     candidates: Vec<IpAddr>,
 ) -> (
-    Result<i64, fluxdown_engine::downloader::DownloadError>,
+    Result<i64, rinadown_engine::downloader::DownloadError>,
     std::path::PathBuf,
 ) {
     let dest = dir.join(format!("{task_id}.bin"));

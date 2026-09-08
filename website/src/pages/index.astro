@@ -31,7 +31,7 @@ const localizedMeta = {
         if (d) d.setAttribute("content", meta.description);
       }
       var loc = null;
-      try { loc = localStorage.getItem("fluxdown-locale"); } catch (e) {}
+      try { loc = localStorage.getItem("rinadown-locale"); } catch (e) {}
       if (!loc) {
         var langs = navigator.languages || [navigator.language];
         for (var i = 0; i < langs.length; i++) {

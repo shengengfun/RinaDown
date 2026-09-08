@@ -15,14 +15,14 @@ permissions:
 # 生产证书由 SignPath 审核 setup 并导入后，把 SIGNPATH_SIGNING_POLICY 改为 release-signing。
 env:
   SIGNPATH_ORGANIZATION_ID: 8e88ecd8-8099-49f5-9edf-e43053de7d3e
-  SIGNPATH_PROJECT_SLUG: FluxDown
+  SIGNPATH_PROJECT_SLUG: RinaDown
   SIGNPATH_SIGNING_POLICY: test-signing
   SIGNPATH_ARTIFACT_CONFIG: windows-exe-zip
 
 jobs:
   # ── 前置 Job: 检测上一个版本 tag → 当前 tag 之间哪些组件目录有变更 ──
   # 规则：
-  #   fluxDown/**            → 浏览器扩展（extension）
+  #   rinaDown/**            → 浏览器扩展（extension）
   #   web/**、native/server/** → headless 服务器（server，Docker 镜像 + 多平台二进制）
   #   native/engine/**       → 桌面客户端 + 服务器 + 移动端（共享下载引擎）
   #   docker/**              → 服务器（部署文件变更需重发镜像）
@@ -87,7 +87,7 @@ jobs:
             while IFS= read -r f; do
               [ -z "$f" ] && continue
               case "$f" in
-                fluxDown/*)          EXTENSION=true ;;
+                rinaDown/*)          EXTENSION=true ;;
                 web/*)               SERVER=true ;;
                 native/server/*)     SERVER=true ;;
                 native/cli/*)        CLI=true ;;
@@ -197,8 +197,8 @@ jobs:
       - name: Verify engine workspace
         if: needs.changes.outputs.engine == 'true'
         run: |
-          cargo check --locked -p fluxdown_engine
-          cargo test --locked -p fluxdown_engine
+          cargo check --locked -p rinadown_engine
+          cargo test --locked -p rinadown_engine
           cargo fmt --check
 
   # ── 并行 Job 1: 构建 Windows 安装包（x64 + ARM64）──
@@ -337,12 +337,12 @@ jobs:
         shell: bash
         run: |
           cargo build --release --locked \
-            -p fluxdown_ui_app -p fluxdown_agent -p fluxdown_daemon \
-            --features fluxdown_daemon/plugins,fluxdown_daemon/components
+            -p rinadown_ui_app -p rinadown_agent -p rinadown_daemon \
+            --features rinadown_daemon/plugins,rinadown_daemon/components
           RELEASE_DIR="build/windows/${{ matrix.arch }}/runner/Release"
-          cp target/release/fluxdown-desktop.exe "$RELEASE_DIR/"
-          cp target/release/fluxdown-agent.exe "$RELEASE_DIR/"
-          cp target/release/fluxdownd.exe "$RELEASE_DIR/"
+          cp target/release/rinadown-desktop.exe "$RELEASE_DIR/"
+          cp target/release/rinadown-agent.exe "$RELEASE_DIR/"
+          cp target/release/rinadownd.exe "$RELEASE_DIR/"
 
       # ── Bundle MSVC CRT runtime DLLs ──
       # Flutter 的 Windows 构建产物不含 VC 运行库；开发机普遍装有 VCRedist
@@ -350,13 +350,13 @@ jobs:
       # 所有 exe 直接 STATUS_DLL_NOT_FOUND (0xC0000135)。把 CRT DLL 随应用
       # 目录分发（Flutter 官方推荐的自包含发行方式），安装器与 portable zip
       # 同时受益，无需安装器额外拉 VCRedist。
-      # DLL 架构按 flux_down.exe 的 PE 头实测，而不是相信 matrix.arch
+      # DLL 架构按 rina_down.exe 的 PE 头实测，而不是相信 matrix.arch
       # （ARM64 job 里 Flutter 经 x64 仿真运行，产物实际架构以 PE 头为准）。
       - name: Bundle MSVC CRT runtime DLLs
         shell: pwsh
         run: |
           $release = "build\windows\${{ matrix.arch }}\runner\Release"
-          $bytes = [System.IO.File]::ReadAllBytes("$release\flux_down.exe")
+          $bytes = [System.IO.File]::ReadAllBytes("$release\rina_down.exe")
           $peOff = [BitConverter]::ToInt32($bytes, 0x3C)
           $machine = [BitConverter]::ToUInt16($bytes, $peOff + 4)
           $archDir = switch ($machine) {
@@ -364,7 +364,7 @@ jobs:
             0xAA64 { 'arm64' }
             default { throw ("Unexpected PE machine type: 0x{0:X4}" -f $machine) }
           }
-          Write-Host "flux_down.exe PE machine: $archDir"
+          Write-Host "rina_down.exe PE machine: $archDir"
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $vsRoot = & $vswhere -latest -products * -property installationPath
           if (-not $vsRoot) { throw "Visual Studio installation not found via vswhere" }
@@ -378,7 +378,7 @@ jobs:
           Get-ChildItem "$release\msvcp140*.dll", "$release\vcruntime140*.dll" |
             ForEach-Object { Write-Host "bundled $($_.Name) ($($_.Length) bytes)" }
 
-      # ── SignPath 签名 Round 1: 应用 exe（flux_down / fluxdown_nmh / fluxdown_updater）──
+      # ── SignPath 签名 Round 1: 应用 exe（rina_down / rinadown_nmh / rinadown_updater）──
       # 必须在 Inno Setup 打包与 portable zip 之前完成，
       # 保证安装器内嵌与便携版解压出的 exe 均已带签名。
       - name: Collect unsigned app executables
@@ -413,7 +413,7 @@ jobs:
           Copy-Item "build\signing\app-signed\*.exe" "build\windows\${{ matrix.arch }}\runner\Release\" -Force
 
       # ── Inno Setup installer ──
-      # NOTE: fluxdown_nmh.exe and fluxdown_updater.exe are built automatically
+      # NOTE: rinadown_nmh.exe and rinadown_updater.exe are built automatically
       # by CMake custom targets defined in windows/CMakeLists.txt during flutter build.
       - name: Ensure Inno Setup is installed
         if: matrix.arch == 'arm64'
@@ -442,7 +442,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-installer-${{ matrix.arch }}
-          path: build/installer/FluxDown-*.exe
+          path: build/installer/RinaDown-*.exe
 
       - name: Sign installer (SignPath)
         uses: signpath/github-action-submit-signing-request@v2
@@ -467,20 +467,20 @@ jobs:
         shell: pwsh
         run: |
           New-Item -Path "build\windows\${{ matrix.arch }}\runner\Release\portable" -ItemType File -Force | Out-Null
-          Compress-Archive -Path "build\windows\${{ matrix.arch }}\runner\Release\*" -DestinationPath "build\installer\FluxDown-${{ steps.version.outputs.VERSION }}-windows-${{ matrix.arch }}-portable.zip"
+          Compress-Archive -Path "build\windows\${{ matrix.arch }}\runner\Release\*" -DestinationPath "build\installer\RinaDown-${{ steps.version.outputs.VERSION }}-windows-${{ matrix.arch }}-portable.zip"
 
       # ── Upload artifacts（供 release job 使用）──
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer-${{ matrix.arch }}
-          path: build/installer/FluxDown-*.exe
+          path: build/installer/RinaDown-*.exe
 
       - name: Upload portable artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-portable-${{ matrix.arch }}
-          path: build/installer/FluxDown-*-portable.zip
+          path: build/installer/RinaDown-*-portable.zip
 
   # ── 并行 Job 2: 构建浏览器扩展 ──
   build-extension:
@@ -504,7 +504,7 @@ jobs:
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
       - name: Set extension version from tag
-        working-directory: fluxDown
+        working-directory: rinaDown
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
           sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
@@ -513,22 +513,22 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-        working-directory: fluxDown
+        working-directory: rinaDown
 
       - name: Build Chrome extension
         run: npm run build
-        working-directory: fluxDown
+        working-directory: rinaDown
 
       - name: Build Firefox extension
         run: npm run build:firefox
-        working-directory: fluxDown
+        working-directory: rinaDown
 
       - name: Package Chrome extension
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
           mkdir -p build/extension
-          cd fluxDown/.output
-          zip -r ../../build/extension/FluxDown-${VERSION}-chrome.zip chrome-mv3/
+          cd rinaDown/.output
+          zip -r ../../build/extension/RinaDown-${VERSION}-chrome.zip chrome-mv3/
           ls -la ../../build/extension/
 
       - name: Install web-ext
@@ -544,7 +544,7 @@ jobs:
         continue-on-error: true
         run: |
           web-ext sign \
-            --source-dir fluxDown/.output/firefox-mv2 \
+            --source-dir rinaDown/.output/firefox-mv2 \
             --channel=listed \
             --api-key=${{ secrets.AMO_JWT_ISSUER }} \
             --api-secret=${{ secrets.AMO_JWT_SECRET }} \
@@ -558,11 +558,11 @@ jobs:
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
           mkdir -p build/extension
-          python3 -c "import json;f='fluxDown/.output/firefox-mv2/manifest.json';m=json.load(open(f));m['version']='$VERSION.1';open(f,'w').write(json.dumps(m,indent=2))"
+          python3 -c "import json;f='rinaDown/.output/firefox-mv2/manifest.json';m=json.load(open(f));m['version']='$VERSION.1';open(f,'w').write(json.dumps(m,indent=2))"
           echo "Manifest version set to $VERSION.1 for unlisted signing"
 
           web-ext sign \
-            --source-dir fluxDown/.output/firefox-mv2 \
+            --source-dir rinaDown/.output/firefox-mv2 \
             --channel=unlisted \
             --api-key=${{ secrets.AMO_JWT_ISSUER }} \
             --api-secret=${{ secrets.AMO_JWT_SECRET }} \
@@ -581,7 +581,7 @@ jobs:
                 printf '%s.%s.%s' "$header" "$payload" "$sig"
               }
               VERS_DATA=$(curl -sf -H "Authorization: JWT $(_amo_jwt)" \
-                "https://addons.mozilla.org/api/v5/addons/addon/fluxdown%40fluxdown.app/versions/?filter=all_with_unlisted")
+                "https://addons.mozilla.org/api/v5/addons/addon/rinadown%40rinadown.app/versions/?filter=all_with_unlisted")
               XPI_URL=$(echo "$VERS_DATA" | python3 -c "import sys,json;d=json.load(sys.stdin);v=next((x for x in(d.get('results')or[])if x.get('version')=='$VERSION.1'),None);sys.exit('not found') if not(v and(v.get('file')or{}).get('url')) else print(v['file']['url'])")
               curl -sf -L -H "Authorization: JWT $(_amo_jwt)" \
                 -o "build/extension/${VERSION}.xpi" "$XPI_URL"
@@ -596,8 +596,8 @@ jobs:
 
           XPI_FILE=$(ls build/extension/*.xpi 2>/dev/null | head -1)
           if [ -n "$XPI_FILE" ]; then
-            mv "$XPI_FILE" "build/extension/FluxDown-${VERSION}-firefox.xpi"
-            echo "Firefox XPI ready: FluxDown-${VERSION}-firefox.xpi (internal version $VERSION.1)"
+            mv "$XPI_FILE" "build/extension/RinaDown-${VERSION}-firefox.xpi"
+            echo "Firefox XPI ready: RinaDown-${VERSION}-firefox.xpi (internal version $VERSION.1)"
           else
             echo "::error::No signed XPI found."
             exit 1
@@ -612,7 +612,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: browser-extension-chrome
-          path: build/extension/FluxDown-*-chrome.zip
+          path: build/extension/RinaDown-*-chrome.zip
           if-no-files-found: error
 
       # ── Chrome Web Store 自动发布（需 CHROME_CLIENT_ID / CHROME_CLIENT_SECRET / CHROME_REFRESH_TOKEN）──
@@ -626,7 +626,7 @@ jobs:
           CHROME_REFRESH_TOKEN: ${{ secrets.CHROME_REFRESH_TOKEN }}
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          ZIP_FILE="build/extension/FluxDown-${VERSION}-chrome.zip"
+          ZIP_FILE="build/extension/RinaDown-${VERSION}-chrome.zip"
           EXTENSION_ID="meleenglfggcmcajknpeeeiobnpfmahc"
 
           # 用 refresh_token 换取新的 access_token
@@ -677,7 +677,7 @@ jobs:
       # ── Edge Add-ons 商店自动发布（需 EDGE_CLIENT_ID / EDGE_API_KEY / EDGE_PRODUCT_ID）──
       # Edge 复用 Chrome MV3 构建（同为 MV3），但 Edge 商店拒绝 manifest 含 key 字段的包
       # （PackageValidationError: "The manifest shouldn't contain the key field"），
-      # 而 Chrome 侧载固定扩展 ID 依赖 key（见 fluxDown/wxt.config.ts），
+      # 而 Chrome 侧载固定扩展 ID 依赖 key（见 rinaDown/wxt.config.ts），
       # 因此上传前解包剔除 key 重新打一个 Edge 专用 zip。API v1.1：ApiKey 鉴权。
       # ⚠️  API key 每 72 天过期，过期后需在 Partner Center → Publish API 重新生成并更新 EDGE_API_KEY secret。
       - name: Publish Edge extension to Edge Add-ons
@@ -689,7 +689,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
           set -uo pipefail
-          CHROME_ZIP="build/extension/FluxDown-${VERSION}-chrome.zip"
+          CHROME_ZIP="build/extension/RinaDown-${VERSION}-chrome.zip"
           BASE="https://api.addons.microsoftedge.microsoft.com/v1/products/${EDGE_PRODUCT_ID}"
           AUTH=(-H "Authorization: ApiKey ${EDGE_API_KEY}" -H "X-ClientID: ${EDGE_CLIENT_ID}")
 
@@ -701,7 +701,7 @@ jobs:
             echo "::error::manifest.json not found in ${CHROME_ZIP}"; exit 1
           fi
           python3 -c "import json,sys;p=sys.argv[1];m=json.load(open(p));m.pop('key',None);open(p,'w').write(json.dumps(m,indent=2))" "$MANIFEST"
-          ZIP_FILE="$PWD/build/extension/FluxDown-${VERSION}-edge.zip"
+          ZIP_FILE="$PWD/build/extension/RinaDown-${VERSION}-edge.zip"
           (cd "$PKG_DIR" && zip -qr "$ZIP_FILE" .)
           echo "Edge package rebuilt without manifest key: $ZIP_FILE"
 
@@ -742,7 +742,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: browser-extension-firefox
-          path: build/extension/FluxDown-*-firefox.xpi
+          path: build/extension/RinaDown-*-firefox.xpi
           if-no-files-found: warn
 
   # ── 并行 Job 3: 构建 Linux AppImage + tar.gz（x64）──
@@ -845,27 +845,27 @@ jobs:
       - name: Build and bundle native desktop services
         run: |
           cargo build --release --locked \
-            -p fluxdown_ui_app -p fluxdown_agent -p fluxdown_daemon \
-            --features fluxdown_daemon/plugins,fluxdown_daemon/components
+            -p rinadown_ui_app -p rinadown_agent -p rinadown_daemon \
+            --features rinadown_daemon/plugins,rinadown_daemon/components
           BUNDLE_DIR="build/linux/x64/release/bundle"
-          cp target/release/fluxdown-desktop "$BUNDLE_DIR/"
-          cp target/release/fluxdown-agent "$BUNDLE_DIR/"
-          cp target/release/fluxdownd "$BUNDLE_DIR/"
-          chmod +x "$BUNDLE_DIR/fluxdown-desktop" "$BUNDLE_DIR/fluxdown-agent" "$BUNDLE_DIR/fluxdownd"
+          cp target/release/rinadown-desktop "$BUNDLE_DIR/"
+          cp target/release/rinadown-agent "$BUNDLE_DIR/"
+          cp target/release/rinadownd "$BUNDLE_DIR/"
+          chmod +x "$BUNDLE_DIR/rinadown-desktop" "$BUNDLE_DIR/rinadown-agent" "$BUNDLE_DIR/rinadownd"
 
-      # NOTE: fluxdown_nmh and fluxdown_updater are built automatically
+      # NOTE: rinadown_nmh and rinadown_updater are built automatically
       # by CMake custom targets defined in linux/CMakeLists.txt during flutter build.
 
-      # ── Package tar.gz（命名目录后压缩，解压得 FluxDown-x.y.z-linux-x64/）──
+      # ── Package tar.gz（命名目录后压缩，解压得 RinaDown-x.y.z-linux-x64/）──
       - name: Create portable tar.gz
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
           BUNDLE_DIR="build/linux/x64/release/bundle"
-          DIST_DIR="FluxDown-${VERSION}-linux-x64"
+          DIST_DIR="RinaDown-${VERSION}-linux-x64"
           mkdir -p build/installer
           mkdir -p "$DIST_DIR"
           cp -a "$BUNDLE_DIR/." "$DIST_DIR/"
-          tar -czf "build/installer/FluxDown-${VERSION}-linux-x64.tar.gz" "$DIST_DIR"
+          tar -czf "build/installer/RinaDown-${VERSION}-linux-x64.tar.gz" "$DIST_DIR"
           rm -rf "$DIST_DIR"
 
       # ── Package AppImage ──
@@ -880,34 +880,34 @@ jobs:
           VERSION=${{ steps.version.outputs.VERSION }}
           BUNDLE_DIR="build/linux/x64/release/bundle"
 
-          # 创建 AppDir，顶层即 bundle 内容（flux_down、data/、lib/ 都在根）
+          # 创建 AppDir，顶层即 bundle 内容（rina_down、data/、lib/ 都在根）
           mkdir -p AppDir
           cp -a "$BUNDLE_DIR/." AppDir/
 
           # .desktop 文件复制到 AppDir 根（AppImage 约定）
-          cp linux/com.fluxdown.app.desktop AppDir/
+          cp linux/com.rinadown.app.desktop AppDir/
 
           # 图标复制到 AppDir 根，文件名必须与 .desktop 中 Icon= 一致
-          cp assets/logo/fluxdown_logo.png AppDir/com.fluxdown.app.png
+          cp assets/logo/rinadown_logo.png AppDir/com.rinadown.app.png
 
-          # AppRun 入口：设置 LD_LIBRARY_PATH，让 flux_down 找到 lib/ 下的共享库
+          # AppRun 入口：设置 LD_LIBRARY_PATH，让 rina_down 找到 lib/ 下的共享库
           {
             echo '#!/bin/bash'
             echo 'HERE="$(dirname "$(readlink -f "${0}")")"'
             echo 'export LD_LIBRARY_PATH="${HERE}/lib:${LD_LIBRARY_PATH:-}"'
-            echo 'exec "${HERE}/flux_down" "$@"'
+            echo 'exec "${HERE}/rina_down" "$@"'
           } > AppDir/AppRun
           chmod +x AppDir/AppRun
 
           # 打包 AppImage（APPIMAGE_EXTRACT_AND_RUN=1 避免 CI 无 FUSE 时失败）
           ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 \
             ./appimagetool-x86_64.AppImage AppDir \
-            "build/installer/FluxDown-${VERSION}-linux-x64.AppImage"
+            "build/installer/RinaDown-${VERSION}-linux-x64.AppImage"
 
       # ── Package deb（Debian/Ubuntu）──
-      # 安装布局：Flutter bundle → /opt/fluxdown/，wrapper 脚本 → /usr/bin/flux_down
-      # 保持 RPATH=$ORIGIN/lib 正确（可执行文件在 /opt/fluxdown/，lib 在 /opt/fluxdown/lib/）
-      # Flutter 查找 data/ 目录时用 argv[0]=/opt/fluxdown/flux_down，找 /opt/fluxdown/data/ ✓
+      # 安装布局：Flutter bundle → /opt/rinadown/，wrapper 脚本 → /usr/bin/rina_down
+      # 保持 RPATH=$ORIGIN/lib 正确（可执行文件在 /opt/rinadown/，lib 在 /opt/rinadown/lib/）
+      # Flutter 查找 data/ 目录时用 argv[0]=/opt/rinadown/rina_down，找 /opt/rinadown/data/ ✓
       - name: Create deb package
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
@@ -916,25 +916,25 @@ jobs:
 
           # 创建目录结构
           mkdir -p "$PKG_DIR/DEBIAN"
-          mkdir -p "$PKG_DIR/opt/fluxdown"
+          mkdir -p "$PKG_DIR/opt/rinadown"
           mkdir -p "$PKG_DIR/usr/bin"
           mkdir -p "$PKG_DIR/usr/share/applications"
           mkdir -p "$PKG_DIR/usr/share/icons/hicolor/256x256/apps"
 
-          # 复制 Flutter bundle 到 /opt/fluxdown/（保持原有相对目录）
-          cp -a "$BUNDLE_DIR/." "$PKG_DIR/opt/fluxdown/"
+          # 复制 Flutter bundle 到 /opt/rinadown/（保持原有相对目录）
+          cp -a "$BUNDLE_DIR/." "$PKG_DIR/opt/rinadown/"
 
-          # /usr/bin/flux_down 是 wrapper 脚本，将启动 /opt/fluxdown/flux_down
+          # /usr/bin/rina_down 是 wrapper 脚本，将启动 /opt/rinadown/rina_down
           {
             echo '#!/bin/bash'
-            echo 'exec /opt/fluxdown/flux_down "$@"'
-          } > "$PKG_DIR/usr/bin/flux_down"
-          chmod 755 "$PKG_DIR/usr/bin/flux_down"
+            echo 'exec /opt/rinadown/rina_down "$@"'
+          } > "$PKG_DIR/usr/bin/rina_down"
+          chmod 755 "$PKG_DIR/usr/bin/rina_down"
 
           # 复制 .desktop 文件和图标到标准 XDG 路径
-          cp linux/com.fluxdown.app.desktop "$PKG_DIR/usr/share/applications/"
-          cp assets/logo/fluxdown_logo.png \
-            "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/com.fluxdown.app.png"
+          cp linux/com.rinadown.app.desktop "$PKG_DIR/usr/share/applications/"
+          cp assets/logo/rinadown_logo.png \
+            "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/com.rinadown.app.png"
 
           # 计算安装后总大小（KB，供 control 字段使用）
           INSTALLED_SIZE_KB=$(du -sk "$PKG_DIR/opt/" "$PKG_DIR/usr/" \
@@ -942,17 +942,17 @@ jobs:
 
           # 生成 DEBIAN/control
           {
-            echo "Package: fluxdown"
+            echo "Package: rinadown"
             echo "Version: ${VERSION}"
             echo "Architecture: amd64"
-            echo "Maintainer: FluxDown Team <contact@fluxdown.app>"
-            echo "Homepage: https://fluxdown.zerx.dev"
+            echo "Maintainer: RinaDown Team <contact@rinadown.app>"
+            echo "Homepage: https://rinadown.zerx.dev"
             echo "Section: net"
             echo "Priority: optional"
             echo "Installed-Size: ${INSTALLED_SIZE_KB}"
             echo "Depends: libgtk-3-0, libnotify4"
             echo "Description: Free IDM-alternative download manager"
-            echo " FluxDown is a Rust-powered, open-source download manager."
+            echo " RinaDown is a Rust-powered, open-source download manager."
             echo " Supports HTTP/HTTPS/FTP, BitTorrent magnetic links, and HLS/DASH streaming"
             echo " with multi-threaded acceleration and seamless browser integration."
           } > "$PKG_DIR/DEBIAN/control"
@@ -971,10 +971,10 @@ jobs:
           # 残留的 JSON 文件仅指向不存在的二进制，浏览器会静默忽略，无需主动清理。
           mkdir -p build/installer
           dpkg-deb --build --root-owner-group "$PKG_DIR" \
-            "build/installer/FluxDown-${VERSION}-linux-x64.deb"
+            "build/installer/RinaDown-${VERSION}-linux-x64.deb"
 
       # ── Package Arch（.pkg.tar.zst）──
-      # 与 deb 相同的安装布局：/opt/fluxdown/ + /usr/bin/ wrapper
+      # 与 deb 相同的安装布局：/opt/rinadown/ + /usr/bin/ wrapper
       - name: Create Arch package
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
@@ -982,25 +982,25 @@ jobs:
           PKG_DIR="arch_pkg"
 
           # 创建目录结构
-          mkdir -p "$PKG_DIR/opt/fluxdown"
+          mkdir -p "$PKG_DIR/opt/rinadown"
           mkdir -p "$PKG_DIR/usr/bin"
           mkdir -p "$PKG_DIR/usr/share/applications"
           mkdir -p "$PKG_DIR/usr/share/icons/hicolor/256x256/apps"
 
-          # 复制 Flutter bundle 到 /opt/fluxdown/
-          cp -a "$BUNDLE_DIR/." "$PKG_DIR/opt/fluxdown/"
+          # 复制 Flutter bundle 到 /opt/rinadown/
+          cp -a "$BUNDLE_DIR/." "$PKG_DIR/opt/rinadown/"
 
-          # /usr/bin/flux_down wrapper 脚本
+          # /usr/bin/rina_down wrapper 脚本
           {
             echo '#!/bin/bash'
-            echo 'exec /opt/fluxdown/flux_down "$@"'
-          } > "$PKG_DIR/usr/bin/flux_down"
-          chmod 755 "$PKG_DIR/usr/bin/flux_down"
+            echo 'exec /opt/rinadown/rina_down "$@"'
+          } > "$PKG_DIR/usr/bin/rina_down"
+          chmod 755 "$PKG_DIR/usr/bin/rina_down"
 
           # .desktop 和图标
-          cp linux/com.fluxdown.app.desktop "$PKG_DIR/usr/share/applications/"
-          cp assets/logo/fluxdown_logo.png \
-            "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/com.fluxdown.app.png"
+          cp linux/com.rinadown.app.desktop "$PKG_DIR/usr/share/applications/"
+          cp assets/logo/rinadown_logo.png \
+            "$PKG_DIR/usr/share/icons/hicolor/256x256/apps/com.rinadown.app.png"
 
           # 计算安装后总字节数（.PKGINFO 的 size 字段）
           INSTALLED_SIZE=$(du -sb "$PKG_DIR/opt/" "$PKG_DIR/usr/" \
@@ -1008,13 +1008,13 @@ jobs:
 
           # 生成 .PKGINFO（pacman 安装包元数据）
           {
-            echo "# Generated by FluxDown CI"
-            echo "pkgname = fluxdown"
+            echo "# Generated by RinaDown CI"
+            echo "pkgname = rinadown"
             echo "pkgver = ${VERSION}-1"
             echo "pkgdesc = Free IDM-alternative download manager"
-            echo "url = https://fluxdown.zerx.dev"
+            echo "url = https://rinadown.zerx.dev"
             echo "builddate = $(date +%s)"
-            echo "packager = FluxDown CI <ci@fluxdown.app>"
+            echo "packager = RinaDown CI <ci@rinadown.app>"
             echo "size = ${INSTALLED_SIZE}"
             echo "arch = x86_64"
             echo "license = custom"
@@ -1027,7 +1027,7 @@ jobs:
           mkdir -p build/installer
           cd "$PKG_DIR"
           tar --zstd --owner=0 --group=0 -cf \
-            "../build/installer/FluxDown-${VERSION}-linux-x64.pkg.tar.zst" \
+            "../build/installer/RinaDown-${VERSION}-linux-x64.pkg.tar.zst" \
             .PKGINFO opt/ usr/
           cd ..
 
@@ -1036,28 +1036,28 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: linux-appimage
-          path: build/installer/FluxDown-*-linux-x64.AppImage
+          path: build/installer/RinaDown-*-linux-x64.AppImage
           if-no-files-found: error
 
       - name: Upload Linux deb artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-deb
-          path: build/installer/FluxDown-*-linux-x64.deb
+          path: build/installer/RinaDown-*-linux-x64.deb
           if-no-files-found: error
 
       - name: Upload Linux Arch package artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-arch
-          path: build/installer/FluxDown-*-linux-x64.pkg.tar.zst
+          path: build/installer/RinaDown-*-linux-x64.pkg.tar.zst
           if-no-files-found: error
 
       - name: Upload Linux portable artifact
         uses: actions/upload-artifact@v4
         with:
           name: linux-portable
-          path: build/installer/FluxDown-*-linux-x64.tar.gz
+          path: build/installer/RinaDown-*-linux-x64.tar.gz
           if-no-files-found: error
 
   # ── 并行 Job 4: 构建 macOS DMG + tar.gz（Intel x64 + Apple Silicon arm64）──
@@ -1171,26 +1171,26 @@ jobs:
       - name: Build and bundle native desktop services
         run: |
           cargo build --release --locked \
-            -p fluxdown_ui_app -p fluxdown_agent -p fluxdown_daemon \
-            --features fluxdown_daemon/plugins,fluxdown_daemon/components
-          MACOS_DIR="build/macos/Build/Products/Release/FluxDown.app/Contents/MacOS"
-          cp target/release/fluxdown-desktop "$MACOS_DIR/"
-          cp target/release/fluxdown-agent "$MACOS_DIR/"
-          cp target/release/fluxdownd "$MACOS_DIR/"
-          chmod +x "$MACOS_DIR/fluxdown-desktop" "$MACOS_DIR/fluxdown-agent" "$MACOS_DIR/fluxdownd"
-      # NOTE: fluxdown_nmh and fluxdown_updater are built automatically
+            -p rinadown_ui_app -p rinadown_agent -p rinadown_daemon \
+            --features rinadown_daemon/plugins,rinadown_daemon/components
+          MACOS_DIR="build/macos/Build/Products/Release/RinaDown.app/Contents/MacOS"
+          cp target/release/rinadown-desktop "$MACOS_DIR/"
+          cp target/release/rinadown-agent "$MACOS_DIR/"
+          cp target/release/rinadownd "$MACOS_DIR/"
+          chmod +x "$MACOS_DIR/rinadown-desktop" "$MACOS_DIR/rinadown-agent" "$MACOS_DIR/rinadownd"
+      # NOTE: rinadown_nmh and rinadown_updater are built automatically
       # by Xcode shell script build phases defined in macos/Runner.xcodeproj during flutter build.
 
       # ── Package tar.gz portable ──
       - name: Create portable tar.gz
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          APP_PATH="build/macos/Build/Products/Release/FluxDown.app"
+          APP_PATH="build/macos/Build/Products/Release/RinaDown.app"
           mkdir -p build/installer
-          DIST_DIR="FluxDown-${VERSION}-macos-${{ matrix.arch }}"
+          DIST_DIR="RinaDown-${VERSION}-macos-${{ matrix.arch }}"
           mkdir -p "$DIST_DIR"
           cp -R "$APP_PATH" "$DIST_DIR/"
-          tar -czf "build/installer/FluxDown-${VERSION}-macos-${{ matrix.arch }}.tar.gz" "$DIST_DIR"
+          tar -czf "build/installer/RinaDown-${VERSION}-macos-${{ matrix.arch }}.tar.gz" "$DIST_DIR"
           rm -rf "$DIST_DIR"
 
       # ── Package DMG ──
@@ -1200,42 +1200,42 @@ jobs:
       - name: Create DMG
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          APP_PATH="build/macos/Build/Products/Release/FluxDown.app"
+          APP_PATH="build/macos/Build/Products/Release/RinaDown.app"
           mkdir -p build/installer
 
           mkdir -p dmg_src
           cp -R "$APP_PATH" dmg_src/
 
           create-dmg \
-            --volname "FluxDown ${VERSION}" \
+            --volname "RinaDown ${VERSION}" \
             --window-pos 200 120 \
             --window-size 660 400 \
             --icon-size 100 \
-            --icon "FluxDown.app" 160 185 \
-            --hide-extension "FluxDown.app" \
+            --icon "RinaDown.app" 160 185 \
+            --hide-extension "RinaDown.app" \
             --app-drop-link 500 185 \
             --no-internet-enable \
-            "build/installer/FluxDown-${VERSION}-macos-${{ matrix.arch }}.dmg" \
+            "build/installer/RinaDown-${VERSION}-macos-${{ matrix.arch }}.dmg" \
             dmg_src/ || \
           hdiutil create \
-            -volname "FluxDown ${VERSION}" \
+            -volname "RinaDown ${VERSION}" \
             -srcfolder dmg_src \
             -ov -format UDZO \
-            "build/installer/FluxDown-${VERSION}-macos-${{ matrix.arch }}.dmg"
+            "build/installer/RinaDown-${VERSION}-macos-${{ matrix.arch }}.dmg"
 
       # ── Upload artifacts（供 release job 使用）──
       - name: Upload macOS DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-dmg-${{ matrix.arch }}
-          path: build/installer/FluxDown-*-macos-${{ matrix.arch }}.dmg
+          path: build/installer/RinaDown-*-macos-${{ matrix.arch }}.dmg
           if-no-files-found: error
 
       - name: Upload macOS portable artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-portable-${{ matrix.arch }}
-          path: build/installer/FluxDown-*-macos-${{ matrix.arch }}.tar.gz
+          path: build/installer/RinaDown-*-macos-${{ matrix.arch }}.tar.gz
           if-no-files-found: error
 
   # ── 并行 Job 4b: 构建 Android APK（覆盖常用硬件 ABI + 通用包）──
@@ -1377,17 +1377,17 @@ jobs:
           VERSION=${{ steps.version.outputs.VERSION }}
           SRC="build/app/outputs/flutter-apk"
           mkdir -p build/android
-          cp "$SRC/app-arm64-v8a-release.apk"   "build/android/FluxDown-${VERSION}-android-arm64-v8a.apk"
-          cp "$SRC/app-armeabi-v7a-release.apk" "build/android/FluxDown-${VERSION}-android-armeabi-v7a.apk"
-          cp "$SRC/app-x86_64-release.apk"      "build/android/FluxDown-${VERSION}-android-x86_64.apk"
-          cp "$SRC/app-release.apk"             "build/android/FluxDown-${VERSION}-android-universal.apk"
+          cp "$SRC/app-arm64-v8a-release.apk"   "build/android/RinaDown-${VERSION}-android-arm64-v8a.apk"
+          cp "$SRC/app-armeabi-v7a-release.apk" "build/android/RinaDown-${VERSION}-android-armeabi-v7a.apk"
+          cp "$SRC/app-x86_64-release.apk"      "build/android/RinaDown-${VERSION}-android-x86_64.apk"
+          cp "$SRC/app-release.apk"             "build/android/RinaDown-${VERSION}-android-universal.apk"
           ls -la build/android/
 
       - name: Upload Android APK artifacts
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: build/android/FluxDown-*.apk
+          path: build/android/RinaDown-*.apk
           if-no-files-found: error
 
   # ── 并行 Job 5a: 构建服务器 Web SPA（一次构建，供所有平台二进制包复用）──
@@ -1427,8 +1427,8 @@ jobs:
   #   macos   → arm64 runner 原生编译 + 交叉编译 x64（Apple SDK 双架构开箱即用）
   # 不提供 x86(32位)：macOS/Win11 已无 32 位，Linux i686 无实际需求；
   # 如需 armv7（老 NAS/树莓派 32 位）可后续用 cross-rs 追加 matrix 项。
-  # 打包布局：单文件 fluxdown-server(.exe)——Web SPA 由 native/server/build.rs
-  # 在编译期经 FLUXDOWN_EMBED_WEBROOT 嵌进二进制，产物不再附带 web/ 目录。
+  # 打包布局：单文件 rinadown-server(.exe)——Web SPA 由 native/server/build.rs
+  # 在编译期经 RINADOWN_EMBED_WEBROOT 嵌进二进制，产物不再附带 web/ 目录。
   build-server-binaries:
     name: Build Server (${{ matrix.platform }})
     needs: [changes, verify-engine, build-web]
@@ -1487,7 +1487,7 @@ jobs:
           restore-keys: |
             server-${{ matrix.platform }}-
 
-      # 前端产物必须在 cargo build 之前就位：build.rs 按 FLUXDOWN_EMBED_WEBROOT
+      # 前端产物必须在 cargo build 之前就位：build.rs 按 RINADOWN_EMBED_WEBROOT
       # 把 web/dist 全量 include_bytes! 进二进制（单文件分发）。
       - name: Download webroot artifact
         uses: actions/download-artifact@v4
@@ -1495,32 +1495,32 @@ jobs:
           name: server-webroot
           path: webroot
 
-      # FLUXDOWN_SERVER_VERSION：编译期注入 tag 版本号（/ping、stats、OpenAPI 显示）
+      # RINADOWN_SERVER_VERSION：编译期注入 tag 版本号（/ping、stats、OpenAPI 显示）
       - name: Build server binary
         env:
-          FLUXDOWN_SERVER_VERSION: ${{ steps.version.outputs.VERSION }}
-          FLUXDOWN_ANALYTICS_APP_KEY: ${{ secrets.ANALYTICS_APP_KEY }}
-          FLUXDOWN_EMBED_WEBROOT: ${{ github.workspace }}/webroot
-        run: cargo build --release --locked -p fluxdown_server --target ${{ matrix.target }}
+          RINADOWN_SERVER_VERSION: ${{ steps.version.outputs.VERSION }}
+          RINADOWN_ANALYTICS_APP_KEY: ${{ secrets.ANALYTICS_APP_KEY }}
+          RINADOWN_EMBED_WEBROOT: ${{ github.workspace }}/webroot
+        run: cargo build --release --locked -p rinadown_server --target ${{ matrix.target }}
 
       - name: Package (tar.gz)
         if: runner.os != 'Windows'
         shell: bash
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          PKG="fluxdown-server-${VERSION}-${{ matrix.platform }}"
+          PKG="rinadown-server-${VERSION}-${{ matrix.platform }}"
           mkdir -p "build/server/${PKG}" release-assets
-          cp "target/${{ matrix.target }}/release/fluxdown-server" "build/server/${PKG}/"
-          tar -C build/server -czf "release-assets/FluxDown-Server-${VERSION}-${{ matrix.platform }}.tar.gz" "${PKG}"
+          cp "target/${{ matrix.target }}/release/rinadown-server" "build/server/${PKG}/"
+          tar -C build/server -czf "release-assets/RinaDown-Server-${VERSION}-${{ matrix.platform }}.tar.gz" "${PKG}"
           ls -la release-assets/
 
-      # ── SignPath 签名: fluxdown-server.exe（打包前签名，zip 内即为已签名二进制）──
+      # ── SignPath 签名: rinadown-server.exe（打包前签名，zip 内即为已签名二进制）──
       - name: Collect unsigned server executable
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path build\signing\unsigned | Out-Null
-          Copy-Item "target\${{ matrix.target }}\release\fluxdown-server.exe" "build\signing\unsigned\"
+          Copy-Item "target\${{ matrix.target }}\release\rinadown-server.exe" "build\signing\unsigned\"
 
       - name: Upload unsigned server executable
         if: runner.os == 'Windows'
@@ -1548,17 +1548,17 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Copy-Item "build\signing\signed\fluxdown-server.exe" "target\${{ matrix.target }}\release\fluxdown-server.exe" -Force
+          Copy-Item "build\signing\signed\rinadown-server.exe" "target\${{ matrix.target }}\release\rinadown-server.exe" -Force
 
       - name: Package (zip)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $Version = "${{ steps.version.outputs.VERSION }}"
-          $Pkg = "fluxdown-server-$Version-${{ matrix.platform }}"
+          $Pkg = "rinadown-server-$Version-${{ matrix.platform }}"
           New-Item -ItemType Directory -Force -Path "build\server\$Pkg", "release-assets" | Out-Null
-          Copy-Item "target\${{ matrix.target }}\release\fluxdown-server.exe" "build\server\$Pkg\"
-          Compress-Archive -Path "build\server\$Pkg" -DestinationPath "release-assets\FluxDown-Server-$Version-${{ matrix.platform }}.zip"
+          Copy-Item "target\${{ matrix.target }}\release\rinadown-server.exe" "build\server\$Pkg\"
+          Compress-Archive -Path "build\server\$Pkg" -DestinationPath "release-assets\RinaDown-Server-$Version-${{ matrix.platform }}.zip"
           Get-ChildItem release-assets
 
       - name: Upload server binary artifact
@@ -1599,8 +1599,8 @@ jobs:
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
           mkdir -p extracted
-          tar -C extracted -xzf "tarballs/FluxDown-Server-${VERSION}-linux-x64.tar.gz"
-          tar -C extracted -xzf "tarballs/FluxDown-Server-${VERSION}-linux-arm64.tar.gz"
+          tar -C extracted -xzf "tarballs/RinaDown-Server-${VERSION}-linux-x64.tar.gz"
+          tar -C extracted -xzf "tarballs/RinaDown-Server-${VERSION}-linux-arm64.tar.gz"
 
       - name: Install QDK and imagemagick
         run: |
@@ -1617,33 +1617,33 @@ jobs:
       - name: Build OpenWrt ipk
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          X64="extracted/fluxdown-server-${VERSION}-linux-x64"
-          A64="extracted/fluxdown-server-${VERSION}-linux-arm64"
-          ./packaging/openwrt/build_ipk.sh server "$VERSION" "$X64/fluxdown-server" x86_64 release-assets
-          ./packaging/openwrt/build_ipk.sh server "$VERSION" "$A64/fluxdown-server" \
+          X64="extracted/rinadown-server-${VERSION}-linux-x64"
+          A64="extracted/rinadown-server-${VERSION}-linux-arm64"
+          ./packaging/openwrt/build_ipk.sh server "$VERSION" "$X64/rinadown-server" x86_64 release-assets
+          ./packaging/openwrt/build_ipk.sh server "$VERSION" "$A64/rinadown-server" \
             aarch64_generic,aarch64_cortex-a53,aarch64_cortex-a72,aarch64_cortex-a76 release-assets
           ./packaging/openwrt/build_ipk.sh luci "$VERSION" release-assets
 
       - name: Build QNAP qpkg
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          X64="extracted/fluxdown-server-${VERSION}-linux-x64"
-          A64="extracted/fluxdown-server-${VERSION}-linux-arm64"
-          ./packaging/qnap/build_qpkg.sh "$VERSION" x86_64 "$X64/fluxdown-server" \
-            "release-assets/FluxDown-Server-${VERSION}-qnap-x64.qpkg"
-          ./packaging/qnap/build_qpkg.sh "$VERSION" arm_64 "$A64/fluxdown-server" \
-            "release-assets/FluxDown-Server-${VERSION}-qnap-arm64.qpkg"
+          X64="extracted/rinadown-server-${VERSION}-linux-x64"
+          A64="extracted/rinadown-server-${VERSION}-linux-arm64"
+          ./packaging/qnap/build_qpkg.sh "$VERSION" x86_64 "$X64/rinadown-server" \
+            "release-assets/RinaDown-Server-${VERSION}-qnap-x64.qpkg"
+          ./packaging/qnap/build_qpkg.sh "$VERSION" arm_64 "$A64/rinadown-server" \
+            "release-assets/RinaDown-Server-${VERSION}-qnap-arm64.qpkg"
 
       - name: Build Synology spk
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          X64="extracted/fluxdown-server-${VERSION}-linux-x64"
-          A64="extracted/fluxdown-server-${VERSION}-linux-arm64"
+          X64="extracted/rinadown-server-${VERSION}-linux-x64"
+          A64="extracted/rinadown-server-${VERSION}-linux-arm64"
           for dsm in dsm7 dsm6; do
-            ./packaging/synology/build_spk.sh "$VERSION" "$dsm" x86_64 "$X64/fluxdown-server" \
-              "release-assets/FluxDown-Server-${VERSION}-synology-${dsm}-x64.spk"
-            ./packaging/synology/build_spk.sh "$VERSION" "$dsm" armv8 "$A64/fluxdown-server" \
-              "release-assets/FluxDown-Server-${VERSION}-synology-${dsm}-arm64.spk"
+            ./packaging/synology/build_spk.sh "$VERSION" "$dsm" x86_64 "$X64/rinadown-server" \
+              "release-assets/RinaDown-Server-${VERSION}-synology-${dsm}-x64.spk"
+            ./packaging/synology/build_spk.sh "$VERSION" "$dsm" armv8 "$A64/rinadown-server" \
+              "release-assets/RinaDown-Server-${VERSION}-synology-${dsm}-arm64.spk"
           done
 
       - name: Upload package artifacts
@@ -1652,12 +1652,12 @@ jobs:
           name: server-bin-nas-packages
           path: release-assets/*
 
-  # ── 并行 Job: 构建 CLI 二进制（fluxdown，6 平台）──
+  # ── 并行 Job: 构建 CLI 二进制（rinadown，6 平台）──
   # 与 build-server-binaries 同套 runner/target 策略（全原生 runner 规避 C 依赖交叉编译）：
   #   linux   → musl 静态链接（零 glibc 依赖）
   #   windows → MSVC + Schannel（native-tls）
   #   macos   → 各架构原生 runner 编译
-  # CLI 是单二进制（无 webroot），产物即 fluxdown(.exe)。
+  # CLI 是单二进制（无 webroot），产物即 rinadown(.exe)。
   build-cli-binaries:
     name: Build CLI (${{ matrix.platform }})
     needs: [changes, verify-engine]
@@ -1717,26 +1717,26 @@ jobs:
             cli-${{ matrix.platform }}-
 
       - name: Build CLI binary
-        run: cargo build --release --locked -p fluxdown_cli --target ${{ matrix.target }}
+        run: cargo build --release --locked -p rinadown_cli --target ${{ matrix.target }}
 
       - name: Package (tar.gz)
         if: runner.os != 'Windows'
         shell: bash
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
-          PKG="fluxdown-cli-${VERSION}-${{ matrix.platform }}"
+          PKG="rinadown-cli-${VERSION}-${{ matrix.platform }}"
           mkdir -p "build/cli/${PKG}" release-assets
-          cp "target/${{ matrix.target }}/release/fluxdown" "build/cli/${PKG}/"
-          tar -C build/cli -czf "release-assets/FluxDown-CLI-${VERSION}-${{ matrix.platform }}.tar.gz" "${PKG}"
+          cp "target/${{ matrix.target }}/release/rinadown" "build/cli/${PKG}/"
+          tar -C build/cli -czf "release-assets/RinaDown-CLI-${VERSION}-${{ matrix.platform }}.tar.gz" "${PKG}"
           ls -la release-assets/
 
-      # ── SignPath 签名: fluxdown.exe（打包前签名，zip 内即为已签名二进制）──
+      # ── SignPath 签名: rinadown.exe（打包前签名，zip 内即为已签名二进制）──
       - name: Collect unsigned CLI executable
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path build\signing\unsigned | Out-Null
-          Copy-Item "target\${{ matrix.target }}\release\fluxdown.exe" "build\signing\unsigned\"
+          Copy-Item "target\${{ matrix.target }}\release\rinadown.exe" "build\signing\unsigned\"
 
       - name: Upload unsigned CLI executable
         if: runner.os == 'Windows'
@@ -1764,17 +1764,17 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Copy-Item "build\signing\signed\fluxdown.exe" "target\${{ matrix.target }}\release\fluxdown.exe" -Force
+          Copy-Item "build\signing\signed\rinadown.exe" "target\${{ matrix.target }}\release\rinadown.exe" -Force
 
       - name: Package (zip)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $Version = "${{ steps.version.outputs.VERSION }}"
-          $Pkg = "fluxdown-cli-$Version-${{ matrix.platform }}"
+          $Pkg = "rinadown-cli-$Version-${{ matrix.platform }}"
           New-Item -ItemType Directory -Force -Path "build\cli\$Pkg", "release-assets" | Out-Null
-          Copy-Item "target\${{ matrix.target }}\release\fluxdown.exe" "build\cli\$Pkg\"
-          Compress-Archive -Path "build\cli\$Pkg" -DestinationPath "release-assets\FluxDown-CLI-$Version-${{ matrix.platform }}.zip"
+          Copy-Item "target\${{ matrix.target }}\release\rinadown.exe" "build\cli\$Pkg\"
+          Compress-Archive -Path "build\cli\$Pkg" -DestinationPath "release-assets\RinaDown-CLI-$Version-${{ matrix.platform }}.zip"
           Get-ChildItem release-assets
 
       - name: Upload CLI binary artifact
@@ -1820,7 +1820,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/fluxdown-server
+          images: ghcr.io/${{ github.repository_owner }}/rinadown-server
           tags: |
             type=raw,value=${{ steps.version.outputs.VERSION }}
             type=raw,value=latest
@@ -1835,8 +1835,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            FLUXDOWN_SERVER_VERSION=${{ steps.version.outputs.VERSION }}
-            FLUXDOWN_ANALYTICS_APP_KEY=${{ secrets.ANALYTICS_APP_KEY }}
+            RINADOWN_SERVER_VERSION=${{ steps.version.outputs.VERSION }}
+            RINADOWN_ANALYTICS_APP_KEY=${{ secrets.ANALYTICS_APP_KEY }}
             VITE_FLUXCLOUD_BASE_URL=${{ secrets.FLUXCLOUD_BASE_URL }}
           cache-from: type=gha,scope=server
           cache-to: type=gha,scope=server,mode=max
@@ -1926,7 +1926,7 @@ jobs:
         with:
           component: 浏览器扩展（Chrome / Firefox / Edge）
           fallback-title: Browser Extension Release v${{ steps.version.outputs.VERSION }}
-          paths: fluxDown/**
+          paths: rinaDown/**
           claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
       - name: Download browser extensions
@@ -1945,7 +1945,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: extension-v${{ steps.version.outputs.VERSION }}
-          name: FluxDown Extension v${{ steps.version.outputs.VERSION }}
+          name: RinaDown Extension v${{ steps.version.outputs.VERSION }}
           files: release-assets/*
           body_path: RELEASE_NOTES.md
           generate_release_notes: false
@@ -1990,30 +1990,30 @@ jobs:
 
           | 平台 | 资产 |
           |---|---|
-          | Windows x64 / ARM64 | \`FluxDown-Server-${VERSION}-windows-{x64,arm64}.zip\` |
-          | macOS Intel / Apple Silicon | \`FluxDown-Server-${VERSION}-macos-{x64,arm64}.tar.gz\` |
-          | Linux x64 / ARM64（musl 静态链接，任意发行版可用） | \`FluxDown-Server-${VERSION}-linux-{x64,arm64}.tar.gz\` |
-          | OpenWrt 软路由（x86_64 / aarch64 各子架构） | \`fluxdown-server_${VERSION}_<arch>.ipk\` + \`luci-app-fluxdown_${VERSION}_all.ipk\` |
-          | QNAP NAS（QTS x86_64 / ARM64） | \`FluxDown-Server-${VERSION}-qnap-{x64,arm64}.qpkg\` |
-          | 群晖 NAS（DSM 7 / DSM 6，x86_64 / ARM64） | \`FluxDown-Server-${VERSION}-synology-{dsm7,dsm6}-{x64,arm64}.spk\` |
+          | Windows x64 / ARM64 | \`RinaDown-Server-${VERSION}-windows-{x64,arm64}.zip\` |
+          | macOS Intel / Apple Silicon | \`RinaDown-Server-${VERSION}-macos-{x64,arm64}.tar.gz\` |
+          | Linux x64 / ARM64（musl 静态链接，任意发行版可用） | \`RinaDown-Server-${VERSION}-linux-{x64,arm64}.tar.gz\` |
+          | OpenWrt 软路由（x86_64 / aarch64 各子架构） | \`rinadown-server_${VERSION}_<arch>.ipk\` + \`luci-app-rinadown_${VERSION}_all.ipk\` |
+          | QNAP NAS（QTS x86_64 / ARM64） | \`RinaDown-Server-${VERSION}-qnap-{x64,arm64}.qpkg\` |
+          | 群晖 NAS（DSM 7 / DSM 6，x86_64 / ARM64） | \`RinaDown-Server-${VERSION}-synology-{dsm7,dsm6}-{x64,arm64}.spk\` |
 
-          解压后直接运行 \`fluxdown-server\`（Windows 为 \`fluxdown-server.exe\`），浏览器访问 \`http://127.0.0.1:17800\`。
+          解压后直接运行 \`rinadown-server\`（Windows 为 \`rinadown-server.exe\`），浏览器访问 \`http://127.0.0.1:17800\`。
           **单文件分发**：Web 控制台已编译进二进制，包内只有可执行文件本身，无需附带任何静态资源目录。
-          首次启动请在浏览器里完成「初始化 FluxDown Server」向导设置访问密钥（无人值守部署可用 \`FLUXDOWN_TOKEN\` 预置）。文件校验见 \`SHA256SUMS.txt\`。
+          首次启动请在浏览器里完成「初始化 RinaDown Server」向导设置访问密钥（无人值守部署可用 \`RINADOWN_TOKEN\` 预置）。文件校验见 \`SHA256SUMS.txt\`。
 
-          **OpenWrt**：\`opkg install fluxdown-server_*.ipk luci-app-fluxdown_*.ipk\`，LuCI「服务 → FluxDown」页管理，Web 界面在 \`http://路由器IP:17800\`。二进制含完整 Web UI（约 30MB），需 overlay 空间充足的软路由设备。
+          **OpenWrt**：\`opkg install rinadown-server_*.ipk luci-app-rinadown_*.ipk\`，LuCI「服务 → RinaDown」页管理，Web 界面在 \`http://路由器IP:17800\`。二进制含完整 Web UI（约 30MB），需 overlay 空间充足的软路由设备。
           **QNAP**：App Center → 手动安装 \`.qpkg\`（需在设置中允许安装未经验证的应用），装完点应用图标直达 Web 界面。
           **群晖**：套件中心 → 手动安装 \`.spk\`（需在「设置 → 信任来源」允许任何发行者）。DSM 7.x 装 \`dsm7\` 包（以套件专属用户运行），DSM 6.x 装 \`dsm6\` 包；Intel/AMD 机型选 x64，ARM 机型（rtd1296/rtd1619b 等）选 arm64。装完在套件中心点「打开」直达 Web 界面（端口 17800）。
 
           ## 🐳 Docker（linux/amd64 · linux/arm64）
 
           \`\`\`bash
-          docker pull ghcr.io/${{ github.repository_owner }}/fluxdown-server:${VERSION}
-          docker run -d -p 17800:17800 -v fluxdown-data:/data \\
-            ghcr.io/${{ github.repository_owner }}/fluxdown-server:${VERSION}
+          docker pull ghcr.io/${{ github.repository_owner }}/rinadown-server:${VERSION}
+          docker run -d -p 17800:17800 -v rinadown-data:/data \\
+            ghcr.io/${{ github.repository_owner }}/rinadown-server:${VERSION}
           \`\`\`
 
-          Compose 部署见仓库 \`docker/docker-compose.yml\`。首次打开 Web 界面时按向导设置访问密钥，或用 \`-e FLUXDOWN_TOKEN=...\` 预置。
+          Compose 部署见仓库 \`docker/docker-compose.yml\`。首次打开 Web 界面时按向导设置访问密钥，或用 \`-e RINADOWN_TOKEN=...\` 预置。
           EOF
 
       - name: Download server artifacts
@@ -2036,7 +2036,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: server-v${{ steps.version.outputs.VERSION }}
-          name: FluxDown Server v${{ steps.version.outputs.VERSION }}
+          name: RinaDown Server v${{ steps.version.outputs.VERSION }}
           files: release-assets/*
           body_path: RELEASE_NOTES.md
           generate_release_notes: false
@@ -2082,28 +2082,28 @@ jobs:
 
           | 平台 | 资产 |
           |---|---|
-          | Windows x64 / ARM64 | \`FluxDown-CLI-${VERSION}-windows-{x64,arm64}.zip\` |
-          | macOS Intel / Apple Silicon | \`FluxDown-CLI-${VERSION}-macos-{x64,arm64}.tar.gz\` |
-          | Linux x64 / ARM64（musl 静态链接，任意发行版可用） | \`FluxDown-CLI-${VERSION}-linux-{x64,arm64}.tar.gz\` |
+          | Windows x64 / ARM64 | \`RinaDown-CLI-${VERSION}-windows-{x64,arm64}.zip\` |
+          | macOS Intel / Apple Silicon | \`RinaDown-CLI-${VERSION}-macos-{x64,arm64}.tar.gz\` |
+          | Linux x64 / ARM64（musl 静态链接，任意发行版可用） | \`RinaDown-CLI-${VERSION}-linux-{x64,arm64}.tar.gz\` |
 
-          解压后得到 \`fluxdown\`（Windows 为 \`fluxdown.exe\`），放入 PATH 即可使用。文件校验见 \`SHA256SUMS.txt\`。
+          解压后得到 \`rinadown\`（Windows 为 \`rinadown.exe\`），放入 PATH 即可使用。文件校验见 \`SHA256SUMS.txt\`。
 
           ## 🛠️ 从源码安装
 
           \`\`\`bash
-          cargo install --git https://github.com/${{ github.repository }} fluxdown_cli
+          cargo install --git https://github.com/${{ github.repository }} rinadown_cli
           \`\`\`
 
           ## 🚀 快速开始
 
           \`\`\`bash
-          fluxdown ping                         # 探活（需 FluxDown App / server 运行中）
-          fluxdown add https://example.com/f.zip
-          fluxdown ls
+          rinadown ping                         # 探活（需 RinaDown App / server 运行中）
+          rinadown add https://example.com/f.zip
+          rinadown ls
           \`\`\`
 
-          服务地址经 \`--url\` 或 \`FLUXDOWN_URL\`（默认 \`http://127.0.0.1:17800\`），
-          管理 token 经 \`--token\` 或 \`FLUXDOWN_TOKEN\`。
+          服务地址经 \`--url\` 或 \`RINADOWN_URL\`（默认 \`http://127.0.0.1:17800\`），
+          管理 token 经 \`--token\` 或 \`RINADOWN_TOKEN\`。
           EOF
 
       - name: Download CLI artifacts
@@ -2125,7 +2125,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: cli-v${{ steps.version.outputs.VERSION }}
-          name: FluxDown CLI v${{ steps.version.outputs.VERSION }}
+          name: RinaDown CLI v${{ steps.version.outputs.VERSION }}
           files: release-assets/*
           body_path: RELEASE_NOTES.md
           generate_release_notes: false
@@ -2177,7 +2177,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: mobile-v${{ steps.version.outputs.VERSION }}
-          name: FluxDown Mobile v${{ steps.version.outputs.VERSION }}
+          name: RinaDown Mobile v${{ steps.version.outputs.VERSION }}
           files: release-assets/*
           body_path: RELEASE_NOTES.md
           generate_release_notes: false

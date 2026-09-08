@@ -1,9 +1,9 @@
-//! FluxDown 应用自有的 gpui-base 视觉封装。
+//! RinaDown 应用自有的 gpui-base 视觉封装。
 //!
 //! gpui-base 提供交互、键盘与无障碍语义；本 crate 只负责从完整主题 token
 //! 组装稳定的 shadcn 风格。业务组件依赖这里，不直接散落颜色和尺寸字面量。
 
-use fluxdown_ui_theme::active_theme;
+use rinadown_ui_theme::active_theme;
 use gpui::{
     App, Div, ElementId, FontWeight, Hsla, InteractiveElement, IntoElement, ParentElement,
     SharedString, StatefulInteractiveElement as _, Styled, div, px, relative,
@@ -260,7 +260,7 @@ struct ButtonPalette {
 }
 
 impl ButtonPalette {
-    fn for_variant(variant: ButtonVariant, colors: fluxdown_ui_theme::ColorTokens) -> Self {
+    fn for_variant(variant: ButtonVariant, colors: rinadown_ui_theme::ColorTokens) -> Self {
         match variant {
             ButtonVariant::Primary => Self::filled(colors.primary, colors.primary_foreground),
             ButtonVariant::Secondary => Self {

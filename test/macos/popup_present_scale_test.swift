@@ -31,16 +31,16 @@ struct PopupPresentScaleTest {
         app.setActivationPolicy(.accessory)
 
         PopupWindowHost.shared.register(with: ShimMessenger())
-        guard let hostChannel = FlutterMethodChannel.registry["fluxdown/popup_host"] else {
-            print("FATAL: fluxdown/popup_host not registered")
+        guard let hostChannel = FlutterMethodChannel.registry["rinadown/popup_host"] else {
+            print("FATAL: rinadown/popup_host not registered")
             exit(2)
         }
 
         // Cycle 1: create + present once so first-attach backing latching settles;
         // the regression is about re-presents where AppKit reports no change.
         call(hostChannel, "show", "{}")
-        guard let childChannel = FlutterMethodChannel.registry["fluxdown/popup_child"] else {
-            print("FATAL: fluxdown/popup_child not registered")
+        guard let childChannel = FlutterMethodChannel.registry["rinadown/popup_child"] else {
+            print("FATAL: rinadown/popup_child not registered")
             exit(2)
         }
         call(childChannel, "reveal", ["height": 400.0])

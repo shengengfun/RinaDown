@@ -10,8 +10,8 @@ use axum::extract::{Path as AxumPath, State, WebSocketUpgrade};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use fluxdown_protocol::{EventFrame, RpcNotification};
 use futures_util::StreamExt;
+use rinadown_protocol::{EventFrame, RpcNotification};
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tokio_util::io::ReaderStream;
@@ -273,7 +273,7 @@ async fn receive_event(
 
 async fn send_event(socket: &mut WebSocket, frame: EventFrame) -> Result<(), ()> {
     let params = serde_json::to_value(frame).map_err(|_| ())?;
-    let notification = RpcNotification::new(fluxdown_protocol::method::SERVICE_EVENT, Some(params));
+    let notification = RpcNotification::new(rinadown_protocol::method::SERVICE_EVENT, Some(params));
     let json = serde_json::to_string(&notification).map_err(|_| ())?;
     socket
         .send(Message::Text(json.into()))

@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 
-use fluxdown_protocol::{
+use rinadown_protocol::{
     DaemonConfigError, is_public_daemon_config_key, normalize_daemon_config_patch,
 };
 
@@ -23,9 +23,9 @@ pub struct DaemonConfig {
 /// daemon 配置错误。
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
-    #[error("FLUXDOWN_DAEMON_BIND is invalid: {0}")]
+    #[error("RINADOWN_DAEMON_BIND is invalid: {0}")]
     InvalidBind(String),
-    #[error("FLUXDOWN_DAEMON_BIND must be loopback, got {0}")]
+    #[error("RINADOWN_DAEMON_BIND must be loopback, got {0}")]
     NonLoopback(IpAddr),
     #[error("unknown or daemon-private config field: {0}")]
     UnknownField(String),
@@ -38,7 +38,7 @@ pub enum ConfigError {
 impl DaemonConfig {
     /// 从环境读取配置并拒绝非 loopback 绑定。
     pub fn from_env() -> Result<Self, ConfigError> {
-        let bind_text = std::env::var("FLUXDOWN_DAEMON_BIND")
+        let bind_text = std::env::var("RINADOWN_DAEMON_BIND")
             .unwrap_or_else(|_| DEFAULT_DAEMON_BIND.to_owned());
         let bind_addr = bind_text
             .parse::<SocketAddr>()
@@ -48,17 +48,17 @@ impl DaemonConfig {
         }
         Ok(Self {
             bind_addr,
-            data_dir_override: std::env::var_os("FLUXDOWN_DATA_DIR").map(PathBuf::from),
-            database_url: std::env::var("FLUXDOWN_DATABASE_URL")
+            data_dir_override: std::env::var_os("RINADOWN_DATA_DIR").map(PathBuf::from),
+            database_url: std::env::var("RINADOWN_DATABASE_URL")
                 .ok()
                 .filter(|value| !value.trim().is_empty()),
-            token_file_override: std::env::var_os("FLUXDOWN_DAEMON_TOKEN_FILE").map(PathBuf::from),
+            token_file_override: std::env::var_os("RINADOWN_DAEMON_TOKEN_FILE").map(PathBuf::from),
         })
     }
 }
 
 /// 校验并规范化客户端可写的 daemon 设置（键表与值域唯一来源：
-/// [`fluxdown_protocol::DAEMON_CONFIG_FIELDS`]）。
+/// [`rinadown_protocol::DAEMON_CONFIG_FIELDS`]）。
 ///
 /// 规范化后的布尔值再按引擎落库编码转写：`bt_seed_enabled` /
 /// `bt_auto_reseed` 在引擎侧按 `"0"` 判定关闭（Flutter 也写 `'1'`/`'0'`），
@@ -99,21 +99,21 @@ pub fn public_config_values(all: &HashMap<String, String>) -> BTreeMap<String, S
 ///
 /// `bt_seed_time_limit_minutes` / `bt_seed_inactive_time_limit_minutes` 落库
 /// 时已是分钟；`*_unit` 键仅记录设置页的展示单位（Flutter / hub 同义），
-/// 引擎 [`fluxdown_engine::bt_downloader::BtConfig`] 直接取分钟值。
+/// 引擎 [`rinadown_engine::bt_downloader::BtConfig`] 直接取分钟值。
 /// `bt_seed_enabled` / `bt_auto_reseed` 不在 `BtConfig` 内：引擎在完成 /
 /// 启动时实时读库，落库即生效。
 #[must_use]
 pub fn bt_config_from_map(
     cfg: &HashMap<String, String>,
-) -> fluxdown_engine::bt_downloader::BtConfig {
-    use fluxdown_engine::bt_downloader::BtMseMode;
-    use fluxdown_engine::bt_seeding::SeedingLimitOperator;
+) -> rinadown_engine::bt_downloader::BtConfig {
+    use rinadown_engine::bt_downloader::BtMseMode;
+    use rinadown_engine::bt_seeding::SeedingLimitOperator;
 
     let subscription_enabled = cfg
         .get("bt_tracker_sub_enabled")
         .map(|value| value == "true")
         .unwrap_or(true);
-    fluxdown_engine::bt_downloader::BtConfig {
+    rinadown_engine::bt_downloader::BtConfig {
         enable_dht: cfg
             .get("bt_enable_dht")
             .map(|value| value == "true")

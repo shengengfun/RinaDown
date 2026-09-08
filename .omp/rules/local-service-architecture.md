@@ -1,10 +1,10 @@
 ---
-description: FluxDown 下一代 daemon/agent/protocol 本机服务边界、状态所有权、JSON-RPC 契约与旧宿主迁移规则
+description: RinaDown 下一代 daemon/agent/protocol 本机服务边界、状态所有权、JSON-RPC 契约与旧宿主迁移规则
 condition: native/**
 interruptMode: never
 ---
 
-你正在修改 FluxDown Rust 本机核心或宿主。`native/{protocol,daemon,agent}` 已建立 crate 边界，但生产运行链路仍在迁移；不得把基础 crate 误报成已可运行服务。
+你正在修改 RinaDown Rust 本机核心或宿主。`native/{protocol,daemon,agent}` 已建立 crate 边界，但生产运行链路仍在迁移；不得把基础 crate 误报成已可运行服务。
 
 ## 固定分层
 
@@ -12,27 +12,27 @@ interruptMode: never
 GPUI / WASM Web / CLI
           |
           v
-fluxdown-agent  ---- HTTPS/SSE ----> FluxCloud
+rinadown-agent  ---- HTTPS/SSE ----> FluxCloud
           |
           | JSON-RPC
           v
-      fluxdownd
+      rinadownd
           |
           v
- fluxdown_engine
+ rinadown_engine
 ```
 
 - `native/engine`：下载领域实现；不知道 UI、FluxCloud 账户和进程传输。
-- `native/daemon`（`fluxdown_daemon`，目标二进制 `fluxdownd`）：aria2c 式纯下载核心；拥有下载任务、下载设置、RSS、插件、Webhook、下载 DB 与下载事件。
-- `native/agent`（`fluxdown_agent`，目标二进制 `fluxdown-agent`）：官方客户端常驻后端；拥有 FluxCloud Token、设备身份、配置同步、Entitlements、远程任务和 UI Gateway。
-- `native/protocol`（`fluxdown_protocol`）：传输无关 wire；只放 DTO、版本、方法名、事件和稳定错误码，不放网络运行时、业务实现、数据库或 UI。
+- `native/daemon`（`rinadown_daemon`，目标二进制 `rinadownd`）：aria2c 式纯下载核心；拥有下载任务、下载设置、RSS、插件、Webhook、下载 DB 与下载事件。
+- `native/agent`（`rinadown_agent`，目标二进制 `rinadown-agent`）：官方客户端常驻后端；拥有 FluxCloud Token、设备身份、配置同步、Entitlements、远程任务和 UI Gateway。
+- `native/protocol`（`rinadown_protocol`）：传输无关 wire；只放 DTO、版本、方法名、事件和稳定错误码，不放网络运行时、业务实现、数据库或 UI。
 - `native/server`：旧 headless 生产路径，进入废弃期；新功能不得依赖或落入 server，迁移代码直接归 daemon/agent/protocol。
 
 ## 状态单一所有者
 
 - 下载任务、队列、分组、下载配置的事实源只能是 daemon；agent/UI 不直接读写下载 DB。
 - FluxCloud Access/Refresh Token、同步 revision、设备信任与远程任务状态机的事实源只能是 agent；Token 不进入 daemon、GPUI、WASM LocalStorage 或 URL。
-- `fluxdown_engine` 只执行下载领域行为；agent 不直接依赖或调用 engine，必须经 daemon 协议。
+- `rinadown_engine` 只执行下载领域行为；agent 不直接依赖或调用 engine，必须经 daemon 协议。
 - UI 只管理表单草稿、选择、路由、滚动、窗口等展示状态；关闭全部 UI 后 daemon 与 agent 的后台状态机仍可继续。
 - 下载设置云同步由 agent 协调，但最终值必须先由 daemon 校验、持久化和应用；禁止 agent 与 daemon 各存一份可独立修改的下载设置。
 

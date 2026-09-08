@@ -1,13 +1,13 @@
 #!/bin/sh
-# FluxDown Server 群晖套件生命周期脚本（DSM 6 / DSM 7 通用）。
+# RinaDown Server 群晖套件生命周期脚本（DSM 6 / DSM 7 通用）。
 # DSM 7 由套件专属用户运行（conf/privilege run-as package），var 目录归属该用户；
-# DSM 6 以 root 运行。数据/日志均落在 /var/packages/FluxDown/var。
-PKG_NAME="FluxDown"
+# DSM 6 以 root 运行。数据/日志均落在 /var/packages/RinaDown/var。
+PKG_NAME="RinaDown"
 PKG_DIR="/var/packages/${PKG_NAME}"
 TARGET_DIR="${SYNOPKG_PKGDEST:-${PKG_DIR}/target}"
 VAR_DIR="${SYNOPKG_PKGVAR:-${PKG_DIR}/var}"
-PID_FILE="${VAR_DIR}/fluxdown-server.pid"
-LOG_FILE="${VAR_DIR}/fluxdown-server.log"
+PID_FILE="${VAR_DIR}/rinadown-server.pid"
+LOG_FILE="${VAR_DIR}/rinadown-server.log"
 
 is_running() {
 	[ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null
@@ -15,9 +15,9 @@ is_running() {
 
 start_server() {
 	mkdir -p "$VAR_DIR"
-	FLUXDOWN_DATA_DIR="$VAR_DIR" \
-	FLUXDOWN_BIND="0.0.0.0:17800" \
-		"$TARGET_DIR/bin/fluxdown-server" >> "$LOG_FILE" 2>&1 &
+	RINADOWN_DATA_DIR="$VAR_DIR" \
+	RINADOWN_BIND="0.0.0.0:17800" \
+		"$TARGET_DIR/bin/rinadown-server" >> "$LOG_FILE" 2>&1 &
 	echo $! > "$PID_FILE"
 }
 

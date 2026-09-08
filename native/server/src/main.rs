@@ -1,10 +1,10 @@
-//! FluxDown headless 服务器 —— 复用 `fluxdown_engine` 下载引擎与
-//! `fluxdown_api` HTTP 契约，外加 WebSocket 实时推送与 Web SPA 托管。
+//! RinaDown headless 服务器 —— 复用 `rinadown_engine` 下载引擎与
+//! `rinadown_api` HTTP 契约，外加 WebSocket 实时推送与 Web SPA 托管。
 //!
 //! 端到端：浏览器打开服务器地址 → token 登录 → 三栏任务界面管理下载 →
 //! WS 实时进度 → 完成后经 `/api/v1/tasks/{id}/file` 流式取回。
 //!
-//! 运行：`cargo run -p fluxdown_server`（环境变量见 [`config`] 模块文档）。
+//! 运行：`cargo run -p rinadown_server`（环境变量见 [`config`] 模块文档）。
 
 mod actor;
 mod analytics;
@@ -19,14 +19,14 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::Router;
-use fluxdown_api::server::{ApiServerConfig, api_router};
-use fluxdown_engine::db::Db;
-use fluxdown_engine::download_manager::{self};
-use fluxdown_engine::events::EventSink;
-use fluxdown_engine::log_info;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::selection::HostSelection;
-use fluxdown_engine::{Engine, EngineConfig};
+use rinadown_api::server::{ApiServerConfig, api_router};
+use rinadown_engine::db::Db;
+use rinadown_engine::download_manager::{self};
+use rinadown_engine::events::EventSink;
+use rinadown_engine::log_info;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::selection::HostSelection;
+use rinadown_engine::{Engine, EngineConfig};
 use tokio::sync::mpsc;
 use tower_http::services::{ServeDir, ServeFile};
 
@@ -38,14 +38,14 @@ use crate::config::{ServerConfig, default_save_dir, ensure_server_config};
 use crate::host::ServerApiHost;
 use crate::routes_ext::{ServerState, extra_router};
 use crate::ws_hub::{EngineEventSink, WsHostSelection, WsHub};
-use fluxdown_protocol::daemon::WsServerMsg;
+use rinadown_protocol::daemon::WsServerMsg;
 
-/// 服务器版本。发布流水线在编译期经 `FLUXDOWN_SERVER_VERSION` 注入 git tag
+/// 服务器版本。发布流水线在编译期经 `RINADOWN_SERVER_VERSION` 注入 git tag
 /// 版本号；本地开发构建（`cargo run` 未注入）时固定显示 `dev`，
 /// 而非 crate 版本号（crate 版本不随发布演进，直接显示无意义）。
 /// web 端据此跳过更新检测（`dev` 视为无版本，永不判定"有新版本"）。
 pub(crate) const SERVER_VERSION: &str = {
-    let injected = match option_env!("FLUXDOWN_SERVER_VERSION") {
+    let injected = match option_env!("RINADOWN_SERVER_VERSION") {
         Some(v) => v,
         None => "",
     };
@@ -57,12 +57,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match run().await {
         Ok(()) => Ok(()),
         Err(error) => {
-            if fluxdown_engine::logger::health().initialized {
-                fluxdown_engine::logger::report_error("server", "main", error.as_ref());
+            if rinadown_engine::logger::health().initialized {
+                rinadown_engine::logger::report_error("server", "main", error.as_ref());
             } else {
                 eprintln!(
-                    "FluxDown server failed before logging initialized: {}",
-                    fluxdown_engine::logger::format_error_chain(error.as_ref())
+                    "RinaDown server failed before logging initialized: {}",
+                    rinadown_engine::logger::format_error_chain(error.as_ref())
                 );
             }
             Err(error)
@@ -74,11 +74,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let server_cfg = ServerConfig::from_env();
 
     // 数据目录：显式覆盖或平台自动探测（与桌面一致的解析器）。先解析、再初始化
-    // 日志——日志须落到同一数据目录（`FLUXDOWN_DATA_DIR`，Docker 下为挂载卷
+    // 日志——日志须落到同一数据目录（`RINADOWN_DATA_DIR`，Docker 下为挂载卷
     // `/data`），而非平台默认的 HOME 路径，才能持久化并让「关于」页正确显示。
     let data_dir =
-        fluxdown_engine::data_dir::resolve_data_dir(server_cfg.data_dir_override.as_deref())?;
-    fluxdown_engine::logger::init_with_dir(&data_dir)?;
+        rinadown_engine::data_dir::resolve_data_dir(server_cfg.data_dir_override.as_deref())?;
+    rinadown_engine::logger::init_with_dir(&data_dir)?;
     log_info!("[server] data dir: {}", data_dir.display());
     if let Some(url) = &server_cfg.database_url {
         // 打印时掩掉凭证段，避免密码进日志。
@@ -96,10 +96,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // 空串 = 尚未设置访问密钥，服务器进入「待设置」状态（见下方横幅）。
     let token = ensure_server_config(&boot_db).await?;
 
-    // FLUXDOWN_LANG 是部署级默认语言：不写库，仅作设置页未保存过语言时的
+    // RINADOWN_LANG 是部署级默认语言：不写库，仅作设置页未保存过语言时的
     // 回退值（ServerApiHost::web_language 实时求值）——手动更改永远优先。
     if let Some(lang) = &server_cfg.language {
-        log_info!("[server] default web language (FLUXDOWN_LANG): {}", lang);
+        log_info!("[server] default web language (RINADOWN_LANG): {}", lang);
     }
 
     let all_cfg = boot_db.get_all_config().await.unwrap_or_default();
@@ -108,7 +108,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         .get("log_max_size_mb")
         .and_then(|v| v.parse::<u64>().ok())
     {
-        fluxdown_engine::logger::set_max_total_bytes(mb * 1024 * 1024);
+        rinadown_engine::logger::set_max_total_bytes(mb * 1024 * 1024);
     }
     let max_concurrent = all_cfg
         .get("max_concurrent_tasks")
@@ -266,7 +266,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     // 本地设备互联（P2P 局域网配对 + mDNS 发现 + 直连传输）。
-    // 广播端口 = FLUXDOWN_BIND 的端口；FLUXDOWN_MDNS=off 时不主动广播（仍可手动配对）。
+    // 广播端口 = RINADOWN_BIND 的端口；RINADOWN_MDNS=off 时不主动广播（仍可手动配对）。
     let link_mgr = {
         let api_port = server_cfg
             .bind
@@ -274,17 +274,17 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             .next()
             .and_then(|p| p.parse::<u16>().ok())
             .unwrap_or(17800);
-        let self_name = std::env::var("FLUXDOWN_LINK_NAME")
+        let self_name = std::env::var("RINADOWN_LINK_NAME")
             .ok()
             .filter(|s| !s.trim().is_empty())
-            .unwrap_or_else(|| "FluxDown Server".to_string());
-        let self_info = fluxdown_engine::link::SelfInfo {
+            .unwrap_or_else(|| "RinaDown Server".to_string());
+        let self_info = rinadown_engine::link::SelfInfo {
             name: self_name,
             platform: Some("server".to_string()),
             app_version: Some(SERVER_VERSION.to_string()),
         };
-        let (link_tx, mut link_rx) = mpsc::channel::<fluxdown_engine::link::LinkEngineEvent>(64);
-        match fluxdown_engine::link::LinkManager::load(
+        let (link_tx, mut link_rx) = mpsc::channel::<rinadown_engine::link::LinkEngineEvent>(64);
+        match rinadown_engine::link::LinkManager::load(
             db_handle.clone(),
             self_info,
             api_port,
@@ -308,8 +308,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 tokio::spawn(async move {
                     while let Some(ev) = link_rx.recv().await {
                         match ev {
-                            fluxdown_engine::link::LinkEngineEvent::Discovered(_) => {}
-                            fluxdown_engine::link::LinkEngineEvent::Paired(r) => {
+                            rinadown_engine::link::LinkEngineEvent::Discovered(_) => {}
+                            rinadown_engine::link::LinkEngineEvent::Paired(r) => {
                                 log_info!(
                                     "[server] paired device: {} ({})",
                                     r.name,
@@ -317,13 +317,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                                 );
                                 ws_hub.broadcast(&WsServerMsg::LinkDevicesChanged {});
                             }
-                            fluxdown_engine::link::LinkEngineEvent::Unpaired(_) => {
+                            rinadown_engine::link::LinkEngineEvent::Unpaired(_) => {
                                 ws_hub.broadcast(&WsServerMsg::LinkDevicesChanged {});
                             }
-                            fluxdown_engine::link::LinkEngineEvent::Error(m) => {
+                            rinadown_engine::link::LinkEngineEvent::Error(m) => {
                                 log_info!("[server] link error: {}", m);
                             }
-                            fluxdown_engine::link::LinkEngineEvent::IncomingPairing {
+                            rinadown_engine::link::LinkEngineEvent::IncomingPairing {
                                 session_id,
                                 sas,
                                 peer_name,
@@ -339,7 +339,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 });
-                let mdns_on = std::env::var("FLUXDOWN_MDNS")
+                let mdns_on = std::env::var("RINADOWN_MDNS")
                     .map(|v| {
                         !matches!(
                             v.trim().to_ascii_lowercase().as_str(),
@@ -361,7 +361,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // 匿名统计（首次部署/每日活跃；不含任何下载任务信息）。
-    // FLUXDOWN_ANALYTICS=off 或未配置 App-Key 时内部自行退出。
+    // RINADOWN_ANALYTICS=off 或未配置 App-Key 时内部自行退出。
     tokio::spawn(analytics::run(db_handle.clone(), SERVER_VERSION));
 
     // Tracker 订阅启动自动刷新：启用且缓存超过刷新周期未更新时，后台拉取一次
@@ -381,7 +381,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap_or(0);
         if sub_enabled
             && now.saturating_sub(updated_at)
-                > fluxdown_engine::tracker_subscription::REFRESH_INTERVAL_SECS
+                > rinadown_engine::tracker_subscription::REFRESH_INTERVAL_SECS
         {
             log_info!(
                 "[server] tracker subscription stale (updated_at={}), auto-refreshing",
@@ -407,7 +407,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             log_info!(
                 "[server] ed2k server sub cache version {} < {}, invalidating (byte-order fix)",
                 plan.cache_version,
-                fluxdown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION
+                rinadown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION
             );
             let _ = db_handle.set_config("ed2k_server_sub_cache", "").await;
         }
@@ -447,17 +447,17 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // 路由：核心（fluxdown_api 复用）+ 扩展（本 crate）+ SPA 静态托管。
+    // 路由：核心（rinadown_api 复用）+ 扩展（本 crate）+ SPA 静态托管。
     let api_cfg = ApiServerConfig::from_config_map(&all_cfg, SERVER_VERSION);
     // 访问密钥由 cell 持有：首次运行向导 / 设置页 / regenerate 改写后，核心路由
     // 与扩展路由同一刻看到新值，无需重启进程（NAS 用户没有「重启容器」这一步）。
-    let token_cell = fluxdown_api::auth::TokenCell::new(token.as_str());
+    let token_cell = rinadown_api::auth::TokenCell::new(token.as_str());
     let api_cfg = ApiServerConfig {
         token: token_cell.clone(),
         management_enabled: true,
         ..api_cfg
     };
-    let host: Arc<dyn fluxdown_api::service::ApiHost> = Arc::new(ServerApiHost::new(
+    let host: Arc<dyn rinadown_api::service::ApiHost> = Arc::new(ServerApiHost::new(
         db_handle.clone(),
         cmd_tx.clone(),
         hub.clone(),
@@ -488,7 +488,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         // 内置演示下载源（无鉴权，生成字节流）；仅演示模式挂载。
         app = app.merge(demo::demo_router());
     }
-    // SPA：常态用二进制内嵌产物（单文件分发）；`FLUXDOWN_WEBROOT` 显式指定时
+    // SPA：常态用二进制内嵌产物（单文件分发）；`RINADOWN_WEBROOT` 显式指定时
     // 改从磁盘目录托管（自定义前端 / 本地调试）。
     let app = match &server_cfg.webroot {
         Some(dir) => {
@@ -508,7 +508,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 log_info!("[server] web ui not embedded in this build");
                 eprintln!(
                     "警告：本构建未嵌入 Web 界面（web/dist 缺失）。API 正常，浏览器打开会看到提示页；\n\
-                     可先在 web/ 执行 `bun run build` 重新编译，或设置 FLUXDOWN_WEBROOT 指向已构建目录。"
+                     可先在 web/ 执行 `bun run build` 重新编译，或设置 RINADOWN_WEBROOT 指向已构建目录。"
                 );
             }
             app.fallback(web_assets::handler)
@@ -517,7 +517,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let listener = tokio::net::TcpListener::bind(&server_cfg.bind).await?;
     log_info!("[server] listening on {}", server_cfg.bind);
-    eprintln!("FluxDown Server listening on http://{}", server_cfg.bind);
+    eprintln!("RinaDown Server listening on http://{}", server_cfg.bind);
     eprintln!("  Web UI:    http://{}/", server_cfg.bind);
     eprintln!("  API docs:  http://{}/api/v1/docs", server_cfg.bind);
     if token.is_empty() {

@@ -6,11 +6,11 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:launch_at_startup/launch_at_startup.dart';
 
-import 'package:flux_down/src/bindings/bindings.dart';
-import 'package:flux_down/src/models/settings_provider.dart';
-import 'package:flux_down/src/popup/popup_payload.dart';
-import 'package:flux_down/src/services/popup_window_service.dart';
-import 'package:flux_down/src/theme/theme_provider.dart';
+import 'package:rina_down/src/bindings/bindings.dart';
+import 'package:rina_down/src/models/settings_provider.dart';
+import 'package:rina_down/src/popup/popup_payload.dart';
+import 'package:rina_down/src/services/popup_window_service.dart';
+import 'package:rina_down/src/theme/theme_provider.dart';
 
 /// 复现浏览器扩展批量下载竞态：N 条 ExternalDownloadRequest 短时爆发时，
 /// 只允许发出一次原生 show，其余请求必须经 append 合入（含 reveal 前重试）。
@@ -19,11 +19,11 @@ import 'package:flux_down/src/theme/theme_provider.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   launchAtStartup.setup(
-    appName: 'FluxDownTest',
+    appName: 'RinaDownTest',
     appPath: Platform.resolvedExecutable,
   );
 
-  const channel = MethodChannel('fluxdown/popup_host');
+  const channel = MethodChannel('rinadown/popup_host');
 
   ExternalDownloadRequest req(String url) => ExternalDownloadRequest(
     url: url,
@@ -289,7 +289,7 @@ void main() {
       seq: 1,
     ).toJsonString();
     await tester.binding.defaultBinaryMessenger.handlePlatformMessage(
-      'fluxdown/popup_host',
+      'rinadown/popup_host',
       const StandardMethodCodec().encodeMethodCall(
         MethodCall('onRelay', closedMsg),
       ),

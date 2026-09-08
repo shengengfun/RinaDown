@@ -1,10 +1,10 @@
 // PopupWindowHost.swift
 // 外部唤起独立下载小窗（原生宿主，macOS）。
 //
-// 完整契约见 FluxDown 跨端契约文档（外部唤起独立小窗 v1）：
-// - 主引擎通道 fluxdown/popup_host（注册在主引擎 messenger 上）：show / close / relay，
+// 完整契约见 RinaDown 跨端契约文档（外部唤起独立小窗 v1）：
+// - 主引擎通道 rinadown/popup_host（注册在主引擎 messenger 上）：show / close / relay，
 //   回调 onResult / onClosed / onRelay。
-// - 弹窗引擎通道 fluxdown/popup_child（注册在弹窗引擎 messenger 上）：ready / submit /
+// - 弹窗引擎通道 rinadown/popup_child（注册在弹窗引擎 messenger 上）：ready / submit /
 //   cancel / pickFolder / startDrag / reveal（height + width）/ resize（height，可选
 //   width）/ relay，回调 setPayload / appendPayload / onRelay。
 //
@@ -65,9 +65,9 @@ final class PopupWindowHost: NSObject, NSWindowDelegate {
     private var window: QuickPopupWindow?
     private var popupController: FlutterViewController?
 
-    /// fluxdown/popup_host —— 注册在主引擎 messenger 上，用于回调 onResult/onClosed。
+    /// rinadown/popup_host —— 注册在主引擎 messenger 上，用于回调 onResult/onClosed。
     private var hostChannel: FlutterMethodChannel?
-    /// fluxdown/popup_child —— 注册在弹窗引擎 messenger 上，用于投递 setPayload。
+    /// rinadown/popup_child —— 注册在弹窗引擎 messenger 上，用于投递 setPayload。
     private var childChannel: FlutterMethodChannel?
 
     /// 弹窗 Dart 是否已完成首帧并调用 ready()。
@@ -85,7 +85,7 @@ final class PopupWindowHost: NSObject, NSWindowDelegate {
 
     /// 由 MainFlutterWindow.awakeFromNib 调用一次，完成主引擎侧 channel 注册。
     func register(with messenger: FlutterBinaryMessenger) {
-        let channel = FlutterMethodChannel(name: "fluxdown/popup_host", binaryMessenger: messenger)
+        let channel = FlutterMethodChannel(name: "rinadown/popup_host", binaryMessenger: messenger)
         channel.setMethodCallHandler { [weak self] call, result in
             self?.handleHostCall(call, result: result)
         }
@@ -93,7 +93,7 @@ final class PopupWindowHost: NSObject, NSWindowDelegate {
     }
 
     // -------------------------------------------------------------------
-    // fluxdown/popup_host 分发（Dart -> Native，主引擎侧）
+    // rinadown/popup_host 分发（Dart -> Native，主引擎侧）
     // -------------------------------------------------------------------
 
     private func handleHostCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -296,9 +296,9 @@ final class PopupWindowHost: NSObject, NSWindowDelegate {
         win.collectionBehavior = [.transient, .ignoresCycle, .fullScreenAuxiliary]
         win.contentViewController = controller
 
-        // 弹窗引擎 channel：fluxdown/popup_child，注册在弹窗引擎（非主引擎）messenger 上。
+        // 弹窗引擎 channel：rinadown/popup_child，注册在弹窗引擎（非主引擎）messenger 上。
         let channel = FlutterMethodChannel(
-            name: "fluxdown/popup_child",
+            name: "rinadown/popup_child",
             binaryMessenger: controller.engine.binaryMessenger
         )
         channel.setMethodCallHandler { [weak self] call, result in
@@ -320,7 +320,7 @@ final class PopupWindowHost: NSObject, NSWindowDelegate {
     }
 
     // -------------------------------------------------------------------
-    // fluxdown/popup_child 分发（Dart -> Native，弹窗引擎侧）
+    // rinadown/popup_child 分发（Dart -> Native，弹窗引擎侧）
     // -------------------------------------------------------------------
 
     private func handleChildCall(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

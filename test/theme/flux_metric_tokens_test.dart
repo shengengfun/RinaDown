@@ -11,9 +11,9 @@
 import 'package:flutter/widgets.dart' show BorderRadius, Color;
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flux_down/src/theme/app_metrics.dart';
-import 'package:flux_down/src/theme/flux_metric_tokens.dart';
-import 'package:flux_down/src/theme/flux_theme_tokens.dart';
+import 'package:rina_down/src/theme/app_metrics.dart';
+import 'package:rina_down/src/theme/flux_metric_tokens.dart';
+import 'package:rina_down/src/theme/flux_theme_tokens.dart';
 
 /// 55 个字段各自的最小扰动闭包：对 [FluxMetricTokens] 的 copyWith 施加一个
 /// 可辨识的变化（geom/stroke +1，alpha ±0.05 且保持在 (0,1) 内）。

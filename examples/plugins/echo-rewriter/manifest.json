@@ -1,9 +1,9 @@
 {
-  "identity": "fluxdown@echo-rewriter",
+  "identity": "rinadown@echo-rewriter",
   "name": "Echo Rewriter (示例)",
   "version": "1.0.0",
-  "description": "FluxDown 插件系统示例：演示 resolver 惰性解析、通知钩子、7 种设置控件与 flux.* 桥接 API。classic-script + globalThis 入口范式。",
-  "homepage": "https://fluxdown.zerx.dev",
+  "description": "RinaDown 插件系统示例：演示 resolver 惰性解析、通知钩子、7 种设置控件与 flux.* 桥接 API。classic-script + globalThis 入口范式。",
+  "homepage": "https://rinadown.zerx.dev",
   "minAppVersion": "0.1.60",
   "resolvers": [
     {

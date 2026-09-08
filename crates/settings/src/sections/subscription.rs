@@ -1,8 +1,8 @@
 //! 多行列表编辑（Tracker / 服务器 / 订阅源）与订阅状态行。
 
-use fluxdown_protocol::method;
-use fluxdown_ui_components::{ButtonVariant, button};
-use fluxdown_ui_theme::active_theme;
+use rinadown_protocol::method;
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_theme::active_theme;
 use gpui::{
     App, AppContext as _, Entity, IntoElement as _, ParentElement, SharedString, Styled,
     Subscription, Window, div, px,

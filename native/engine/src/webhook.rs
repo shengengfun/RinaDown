@@ -108,7 +108,7 @@ impl WebhookEventKind {
         WebhookEventKind::TaskFailed,
     ];
 
-    /// wire 名（payload `event` 字段与 `X-FluxDown-Event` 头）。
+    /// wire 名（payload `event` 字段与 `X-RinaDown-Event` 头）。
     pub fn wire(self) -> &'static str {
         match self {
             WebhookEventKind::TaskCreated => "task.created",
@@ -141,7 +141,7 @@ impl WebhookEventKind {
     }
 }
 
-/// 事件里的任务快照。字段名对齐 `fluxdown_protocol::daemon::TaskDto`。
+/// 事件里的任务快照。字段名对齐 `rinadown_protocol::daemon::TaskDto`。
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WebhookTask {
@@ -389,13 +389,13 @@ impl Preset {
             // ntfy 的 JSON 发布必须打到服务根，topic 走 body（见 effective_url）。
             Preset::Ntfy => concat!(
                 r#"{"topic":"{ntfy.topic}","title":"{event.title}","#,
-                r#""message":"{event.summary}","tags":["fluxdown"]}"#
+                r#""message":"{event.summary}","tags":["rinadown"]}"#
             ),
             Preset::Gotify => {
                 r#"{"title":"{event.title}","message":"{event.summary}","priority":5}"#
             }
             Preset::Bark => {
-                r#"{"title":"{event.title}","body":"{event.summary}","group":"FluxDown"}"#
+                r#"{"title":"{event.title}","body":"{event.summary}","group":"RinaDown"}"#
             }
             Preset::ServerChan => r#"{"title":"{event.title}","desp":"{event.summary}"}"#,
             // chat_id 走 URL query（?chat_id=…），body 只带文本。
@@ -716,7 +716,7 @@ fn detect_host() -> String {
     {
         return v.trim().to_string();
     }
-    "fluxdown".to_string()
+    "rinadown".to_string()
 }
 
 struct Clients {
@@ -776,8 +776,8 @@ impl WebhookDispatcher {
             workers: StdMutex::new(HashMap::new()),
             sema: Arc::new(Semaphore::new(MAX_CONCURRENT_DELIVERIES)),
             instance: InstanceInfo {
-                app: "fluxdown",
-                version: env!("FLUXDOWN_APP_VERSION"),
+                app: "rinadown",
+                version: env!("RINADOWN_APP_VERSION"),
                 host: detect_host(),
             },
             any_enabled: AtomicBool::new(false),
@@ -945,7 +945,7 @@ impl WebhookDispatcher {
 }
 
 fn build_clients(proxy_config: &ProxyConfig) -> Clients {
-    // UA 传空 → downloader 用内置 `FluxDown/<version>`（设计要求的固定 UA）。
+    // UA 传空 → downloader 用内置 `RinaDown/<version>`（设计要求的固定 UA）。
     let direct = downloader::build_client(&ProxyConfig::default(), "").unwrap_or_else(|e| {
         log_info!("[webhook] direct client build failed, using default: {e}");
         Client::new()
@@ -1199,15 +1199,15 @@ impl Inner {
                 preset.content_type().to_string(),
             ),
             (
-                "X-FluxDown-Event".to_string(),
+                "X-RinaDown-Event".to_string(),
                 event.kind.wire().to_string(),
             ),
-            ("X-FluxDown-Delivery".to_string(), delivery_id.clone()),
+            ("X-RinaDown-Delivery".to_string(), delivery_id.clone()),
         ];
         if !spec.sign_secret.is_empty() {
             let sig = sign_header(&spec.sign_secret, now.timestamp(), &body);
             if !sig.is_empty() {
-                headers.push(("X-FluxDown-Signature".to_string(), sig));
+                headers.push(("X-RinaDown-Signature".to_string(), sig));
             }
         }
         // 用户自定义头最后落，允许覆盖上面任意一项（含 Content-Type）。
@@ -1353,7 +1353,7 @@ mod tests {
             workers: StdMutex::new(HashMap::new()),
             sema: Arc::new(Semaphore::new(1)),
             instance: InstanceInfo {
-                app: "fluxdown",
+                app: "rinadown",
                 version: "9.9.9",
                 host: "TESTHOST".to_string(),
             },
@@ -1616,7 +1616,7 @@ mod tests {
     // ---- 投递语义（真实 HTTP，最小 mock 服务器） ----
 
     /// 极简 HTTP/1.1 服务器：每个连接读完请求头后回一条固定响应。
-    /// 记录收到的请求数与 `X-FluxDown-Event` 头到达顺序，供重试/保序断言。
+    /// 记录收到的请求数与 `X-RinaDown-Event` 头到达顺序，供重试/保序断言。
     struct MockServer {
         addr: std::net::SocketAddr,
         hits: Arc<AtomicUsize>,
@@ -1639,7 +1639,7 @@ mod tests {
                 use std::io::Read as _;
                 let read = stream.read(&mut buf).unwrap_or(0);
                 let text = String::from_utf8_lossy(&buf[..read]).to_ascii_lowercase();
-                if let Some(rest) = text.split("x-fluxdown-event:").nth(1)
+                if let Some(rest) = text.split("x-rinadown-event:").nth(1)
                     && let Some(line) = rest.split("\r\n").next()
                     && let Ok(mut seen) = events_c.lock()
                 {
@@ -1666,7 +1666,7 @@ mod tests {
     #[tokio::test]
     async fn deliveries_survive_restart() {
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_webhook_persist_{}_{}",
+            "rinadown_webhook_persist_{}_{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

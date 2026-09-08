@@ -1,4 +1,4 @@
-# FluxDown 项目级 omp 设置（手编维护；omp config set 只写全局，不会碰此文件）
+# RinaDown 项目级 omp 设置（手编维护；omp config set 只写全局，不会碰此文件）
 # 文档: https://omp.sh/docs -> settings.md / approval-mode.md / ttsr / task / advisor
 # 配套文件：.omp/RULES.md（粘性红线）、.omp/rules/*.md（TTSR 流中断规则）、
 #          .omp/agents/build-verifier.md（唯一自定义子代理：只读验证员）、.omp/WATCHDOG.md（advisor 审查焦点）

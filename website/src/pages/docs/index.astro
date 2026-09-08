@@ -7,7 +7,7 @@ import { parseAcceptLanguage } from "../../lib/locale-detect";
 
 export const prerender = false;
 
-const cookie = Astro.cookies.get("fluxdown-locale")?.value;
+const cookie = Astro.cookies.get("rinadown-locale")?.value;
 const lang =
   cookie === "zh" || cookie === "en"
     ? cookie

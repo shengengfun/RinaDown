@@ -1,16 +1,16 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/popup/popup_app.dart';
-import 'package:flux_down/src/popup/popup_payload.dart';
-import 'package:flux_down/src/theme/flux_theme_tokens.dart';
-import 'package:flux_down/src/widgets/context_menu.dart';
-import 'package:flux_down/src/widgets/quick_download_form.dart';
+import 'package:rina_down/src/popup/popup_app.dart';
+import 'package:rina_down/src/popup/popup_payload.dart';
+import 'package:rina_down/src/theme/flux_theme_tokens.dart';
+import 'package:rina_down/src/widgets/context_menu.dart';
+import 'package:rina_down/src/widgets/quick_download_form.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  const channel = MethodChannel('fluxdown/popup_child');
+  const channel = MethodChannel('rinadown/popup_child');
 
   QuickPopupPayload payload(int requestId) => QuickPopupPayload(
     requestId: requestId,

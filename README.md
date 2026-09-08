@@ -1,31 +1,31 @@
 <div align="center">
 
-<img src="assets/logo/fluxdown_logo.png" alt="FluxDown Logo" width="128" />
+<img src="assets/logo/rinadown_logo.png" alt="RinaDown Logo" width="128" />
 
-# FluxDown
+# RinaDown
 
 ### Downloads, Supercharged.
 
 *A blazing fast, multi-protocol download manager — the free & open-source IDM alternative.*
 
-[![Latest Release](https://img.shields.io/github/v/release/zerx-lab/FluxDown?style=flat-square&color=06b6d4&label=release)](https://github.com/zerx-lab/FluxDown/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/zerx-lab/FluxDown/total?style=flat-square&color=22c55e)](https://github.com/zerx-lab/FluxDown/releases)
+[![Latest Release](https://img.shields.io/github/v/release/zerx-lab/RinaDown?style=flat-square&color=06b6d4&label=release)](https://github.com/zerx-lab/RinaDown/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/zerx-lab/RinaDown/total?style=flat-square&color=22c55e)](https://github.com/zerx-lab/RinaDown/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20NAS%20%7C%20Android-8b5cf6?style=flat-square)](#installation)
 [![Rust](https://img.shields.io/badge/engine-Rust-f74c00?style=flat-square&logo=rust)](native/engine)
 [![Flutter](https://img.shields.io/badge/UI-Flutter-02569B?style=flat-square&logo=flutter)](lib)
-[![MCP Server](https://glama.ai/mcp/servers/zerx-lab/FluxDown/badges/score.svg)](https://glama.ai/mcp/servers/zerx-lab/FluxDown)
+[![MCP Server](https://glama.ai/mcp/servers/zerx-lab/RinaDown/badges/score.svg)](https://glama.ai/mcp/servers/zerx-lab/RinaDown)
 
 [![Awesome Rust](https://img.shields.io/badge/Awesome-Rust-orange?logo=rust&style=flat-square)](https://github.com/rust-unofficial/awesome-rust#utilities)
 [![Awesome Windows](https://img.shields.io/badge/Awesome-Windows-0078D4?style=flat-square)](https://github.com/thechampagne/awesome-windows#utilities)
 [![Awesome Free Apps](https://img.shields.io/badge/Awesome-Free%20Apps-22c55e?style=flat-square)](https://github.com/Axorax/awesome-free-apps#download-managers)
 [![Android FOSS](https://img.shields.io/badge/Android-FOSS-3DDC84?style=flat-square&logo=android&logoColor=white)](https://github.com/offa/android-foss#-downloader--manager)
 [![Open Source Android](https://img.shields.io/badge/Open%20Source-Android%20Apps-3DDC84?style=flat-square&logo=android&logoColor=white)](https://github.com/pcqpcq/open-source-android-apps/blob/master/categories/tools.md)
-[![Portainer](https://img.shields.io/badge/Portainer-Template-13BEF9?style=flat-square&logo=portainer&logoColor=white)](https://portainer-templates.as93.net/fluxdown)
-[![Unraid CA](https://img.shields.io/badge/Unraid-CA-F15A2C?style=flat-square)](https://github.com/selfhosters/unRAID-CA-templates/blob/master/templates/fluxdown.xml)
+[![Portainer](https://img.shields.io/badge/Portainer-Template-13BEF9?style=flat-square&logo=portainer&logoColor=white)](https://portainer-templates.as93.net/rinadown)
+[![Unraid CA](https://img.shields.io/badge/Unraid-CA-F15A2C?style=flat-square)](https://github.com/selfhosters/unRAID-CA-templates/blob/master/templates/rinadown.xml)
 [![Chinese Indie Dev](https://img.shields.io/badge/Chinese%20Indie-Dev-ef4444?style=flat-square)](https://github.com/1c7/chinese-independent-developer)
 
-[**Website**](https://fluxdown.zerx.dev) · [**Download**](https://fluxdown.zerx.dev/#download) · [**Changelog**](https://fluxdown.zerx.dev/changelog) · [**FAQ**](https://fluxdown.zerx.dev/faq) · [**Feedback**](https://fluxdown.zerx.dev/feedback)
+[**Website**](https://rinadown.zerx.dev) · [**Download**](https://rinadown.zerx.dev/#download) · [**Changelog**](https://rinadown.zerx.dev/changelog) · [**FAQ**](https://rinadown.zerx.dev/faq) · [**Feedback**](https://rinadown.zerx.dev/feedback)
 
 **English** | [简体中文](README.zh-CN.md)
 
@@ -57,9 +57,9 @@
 | **Beautiful Interface** | shadcn-style widgets, IDM-style segment visualization, named queues, system tray |
 | **Clean & Private** | Zero ads, zero telemetry lock-in, zero accounts — your data never leaves your machine |
 
-## FluxDown vs. IDM
+## RinaDown vs. IDM
 
-| | FluxDown | IDM |
+| | RinaDown | IDM |
 |---|:---:|:---:|
 | Price | **Free & open source** | $24.95 + renewals |
 | Open source | Yes (AGPL-3.0) | No |
@@ -73,7 +73,7 @@
 
 ## Installation
 
-Grab the latest build from [**GitHub Releases**](https://github.com/zerx-lab/FluxDown/releases/latest) or [**fluxdown.zerx.dev**](https://fluxdown.zerx.dev/#download):
+Grab the latest build from [**GitHub Releases**](https://github.com/zerx-lab/RinaDown/releases/latest) or [**rinadown.zerx.dev**](https://rinadown.zerx.dev/#download):
 
 | Platform | Packages |
 |---|---|
@@ -81,22 +81,22 @@ Grab the latest build from [**GitHub Releases**](https://github.com/zerx-lab/Flu
 | **macOS** (Intel / Apple Silicon) | `.dmg` · portable `.tar.gz` |
 | **Linux** (x64) | `.AppImage` · `.deb` · Arch `.pkg.tar.zst` · portable `.tar.gz` |
 | **Android** (arm64-v8a / armeabi-v7a / x86_64) | per-ABI `.apk` · universal `.apk` |
-| **NAS / Server** (headless, x64 / ARM64) | [Docker](https://ghcr.io/zerx-lab/fluxdown-server) · Synology DSM 6/7 `.spk` · QNAP `.qpkg` · OpenWrt `.ipk` · Unraid CA template · CasaOS / ZimaOS app store |
+| **NAS / Server** (headless, x64 / ARM64) | [Docker](https://ghcr.io/zerx-lab/rinadown-server) · Synology DSM 6/7 `.spk` · QNAP `.qpkg` · OpenWrt `.ipk` · Unraid CA template · CasaOS / ZimaOS app store |
 
 ### Browser Extension
 
-Install the extension so FluxDown takes over browser downloads automatically:
+Install the extension so RinaDown takes over browser downloads automatically:
 
-[<img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Chrome Web Store" />](https://chromewebstore.google.com/detail/fluxdown/meleenglfggcmcajknpeeeiobnpfmahc)
-[<img src="https://img.shields.io/badge/Edge-Add--ons-0078D4?style=for-the-badge&logo=microsoftedge&logoColor=white" alt="Edge Add-ons" />](https://microsoftedge.microsoft.com/addons/detail/fluxdown/nglkkjbogjghekbhhcnccnpfedjbdhhd)
-[<img src="https://img.shields.io/badge/Firefox-Add--ons-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white" alt="Firefox Add-ons" />](https://addons.mozilla.org/firefox/addon/fluxdown)
+[<img src="https://img.shields.io/badge/Chrome-Web%20Store-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Chrome Web Store" />](https://chromewebstore.google.com/detail/rinadown/meleenglfggcmcajknpeeeiobnpfmahc)
+[<img src="https://img.shields.io/badge/Edge-Add--ons-0078D4?style=for-the-badge&logo=microsoftedge&logoColor=white" alt="Edge Add-ons" />](https://microsoftedge.microsoft.com/addons/detail/rinadown/nglkkjbogjghekbhhcnccnpfedjbdhhd)
+[<img src="https://img.shields.io/badge/Firefox-Add--ons-FF7139?style=for-the-badge&logo=firefoxbrowser&logoColor=white" alt="Firefox Add-ons" />](https://addons.mozilla.org/firefox/addon/rinadown)
 
 ## MCP Server (Model Context Protocol)
 
-FluxDown ships a built-in **MCP server** so AI agents (Claude Desktop, Cursor, Cline, …) can manage downloads via the [Model Context Protocol](https://modelcontextprotocol.io). It speaks **Streamable HTTP** (JSON-RPC 2.0 over a single `POST /mcp`) on the local API port — no extra process needed.
+RinaDown ships a built-in **MCP server** so AI agents (Claude Desktop, Cursor, Cline, …) can manage downloads via the [Model Context Protocol](https://modelcontextprotocol.io). It speaks **Streamable HTTP** (JSON-RPC 2.0 over a single `POST /mcp`) on the local API port — no extra process needed.
 
 - **Endpoint**: `http://127.0.0.1:17800/mcp` (local-only by default)
-- **Auth**: Bearer token (`Authorization: Bearer <token>` or `X-FluxDown-Token`), shared with the management API
+- **Auth**: Bearer token (`Authorization: Bearer <token>` or `X-RinaDown-Token`), shared with the management API
 - **Enable**: Settings → API Service → toggle *MCP endpoint* (a token is generated automatically); the headless server enables it by default
 
 ### Tools (12)
@@ -119,7 +119,7 @@ FluxDown ships a built-in **MCP server** so AI agents (Claude Desktop, Cursor, C
 ```json
 {
   "mcpServers": {
-    "fluxdown": {
+    "rinadown": {
       "url": "http://127.0.0.1:17800/mcp",
       "headers": { "Authorization": "Bearer <your-token>" }
     }
@@ -135,10 +135,10 @@ Flutter renders the UI; a zero-FFI Rust engine does the heavy lifting. The two t
 
 ```mermaid
 flowchart TD
-    EXT["Browser Extension (WXT)"] -->|Native Messaging| NMH["fluxdown_nmh"]
+    EXT["Browser Extension (WXT)"] -->|Native Messaging| NMH["rinadown_nmh"]
     NMH -->|Named Pipe / Unix socket| HUB
     UI["Flutter UI (shadcn_ui)"] <-->|Rinf signals| HUB["hub — FFI adapter"]
-    HUB --> ENGINE["fluxdown_engine"]
+    HUB --> ENGINE["rinadown_engine"]
     ENGINE --> HTTP["HTTP/HTTPS"]
     ENGINE --> FTP["FTP"]
     ENGINE --> BT["BitTorrent"]
@@ -152,7 +152,7 @@ flowchart TD
 | UI | Flutter + shadcn_ui | [`lib/`](lib) |
 | FFI bridge | Rinf (Dart ↔ Rust signals) | [`native/hub/`](native/hub) |
 | Download engine | Rust + Tokio (zero FFI deps) | [`native/engine/`](native/engine) |
-| Browser extension | WXT + TypeScript | [`fluxDown/`](fluxDown) |
+| Browser extension | WXT + TypeScript | [`rinaDown/`](rinaDown) |
 | Website | Astro + React | [`website/`](website) |
 
 ## Building from Source
@@ -161,8 +161,8 @@ flowchart TD
 
 ```shell
 # Clone the development branch (main = active development, stable = stable releases)
-git clone -b main https://github.com/zerx-lab/FluxDown.git
-cd FluxDown
+git clone -b main https://github.com/zerx-lab/RinaDown.git
+cd RinaDown
 
 # Check your environment
 rustc --version
@@ -194,7 +194,7 @@ sudo apt-get install cmake ninja-build clang pkg-config \
 sudo pacman -S cmake ninja clang pkgconf gtk3 libayatana-appindicator libnotify libsecret patchelf zstd
 ```
 
-The NMH relay binary (`fluxdown_nmh`) is built automatically by CMake during `flutter build`. Distribution packages (AppImage / deb / Arch / portable) are produced by [CI](.github/workflows/release.yml) on every tag.
+The NMH relay binary (`rinadown_nmh`) is built automatically by CMake during `flutter build`. Distribution packages (AppImage / deb / Arch / portable) are produced by [CI](.github/workflows/release.yml) on every tag.
 
 </details>
 
@@ -203,7 +203,7 @@ The NMH relay binary (`fluxdown_nmh`) is built automatically by CMake during `fl
 
 ```shell
 flutter test                          # Dart tests
-cargo test -p fluxdown_engine        # Rust engine tests
+cargo test -p rinadown_engine        # Rust engine tests
 cargo test -p hub                    # FFI adapter tests
 ```
 
@@ -211,8 +211,8 @@ cargo test -p hub                    # FFI adapter tests
 
 ## Contributing & Community
 
-- **Bug reports / feature requests** — [GitHub Issues](https://github.com/zerx-lab/FluxDown/issues) or the in-app feedback dialog
-- **QQ Group** — [832143651](https://fluxdown.zerx.dev/qq-group)
+- **Bug reports / feature requests** — [GitHub Issues](https://github.com/zerx-lab/RinaDown/issues) or the in-app feedback dialog
+- **QQ Group** — [832143651](https://rinadown.zerx.dev/qq-group)
 
 Pull requests are welcome! Branch off `main` and target `main` — it is the development branch, while `stable` only tracks stable releases (maintainers advance it from `main`). Before submitting, please make sure:
 
@@ -229,7 +229,7 @@ Distributed under the [GNU Affero General Public License v3.0](LICENSE).
 
 <div align="center">
 
-**If FluxDown saves you time, consider giving it a Star — it helps more people discover the project.**
+**If RinaDown saves you time, consider giving it a Star — it helps more people discover the project.**
 
 Made by [zerx-lab](https://github.com/zerx-lab)
 

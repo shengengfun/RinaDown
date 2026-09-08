@@ -339,7 +339,7 @@ impl PluginManager {
     /// # Examples
     ///
     /// ```no_run
-    /// # async fn run(pm: std::sync::Arc<fluxdown_engine::plugin::PluginManager>) {
+    /// # async fn run(pm: std::sync::Arc<rinadown_engine::plugin::PluginManager>) {
     /// // 未声明 multi 的插件恒不命中，即使 URL glob 匹配。
     /// let hit = pm.match_multi_resolver("https://pan.example.com/s/abc").await;
     /// assert!(hit.is_none() || hit.is_some());
@@ -768,9 +768,7 @@ impl PluginManager {
     /// 保留调用点仅为计数告警占位；若日后要恢复自动禁用，把本函数体改回
     /// `write_enabled(false, CircuitBreaker)` + `load_all()` + emit 事件即可。
     async fn trip_circuit_breaker(&self, identity: &str) {
-        crate::log_warn!(
-            "[plugin] {identity} 连续超时/超内存达到阈值；按用户要求不再自动禁用插件"
-        );
+        crate::log_warn!("[plugin] {identity} 连续超时/超内存达到阈值；按用户要求不再自动禁用插件");
     }
 
     /// 批量设置，all-or-nothing。

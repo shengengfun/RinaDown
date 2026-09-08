@@ -22,7 +22,7 @@ static const gdouble kResizeWorkareaFraction = 0.9;
 // =============================================================================
 
 struct _PopupWindowHost {
-  // fluxdown/popup_host 通道，注册在主引擎 messenger 上，本结构体持有引用。
+  // rinadown/popup_host 通道，注册在主引擎 messenger 上，本结构体持有引用。
   FlMethodChannel* host_channel;
 
   // 懒创建的弹窗顶层窗口；GTK 部件树拥有其生命周期，这里只是弱引用（唯一
@@ -31,7 +31,7 @@ struct _PopupWindowHost {
   // popup_window 下唯一的子部件，承载第二个 Flutter 引擎；随 popup_window
   // 一起被 GTK 销毁，这里同样只是弱引用。
   FlView* popup_view;
-  // fluxdown/popup_child 通道，注册在弹窗引擎 messenger 上，本结构体持有
+  // rinadown/popup_child 通道，注册在弹窗引擎 messenger 上，本结构体持有
   // 引用；与 popup_window/popup_view 同生共死，NULL 表示尚未创建。
   FlMethodChannel* child_channel;
 
@@ -197,7 +197,7 @@ static gboolean popup_window_delete_event_cb(GtkWidget* /*widget*/,
 }
 
 // =============================================================================
-// 弹窗引擎通道 fluxdown/popup_child 处理器
+// 弹窗引擎通道 rinadown/popup_child 处理器
 // =============================================================================
 
 static FlMethodResponse* handle_child_ready(PopupWindowHost* self) {
@@ -530,7 +530,7 @@ static void ensure_popup_window(PopupWindowHost* self) {
   //    下被 GDK 静默忽略——弹窗可能不置顶、可能出现在任务栏/概览中。
   // 3. 显示即获焦：外部请求到达时前台是浏览器（另一进程），本进程拿不到
   //    xdg-activation 的用户交互 token，GNOME 等合成器的防焦点抢占会拒绝
-  //    聚焦（可能只弹"FluxDown 已就绪"通知）——用户需点击一次弹窗才能输
+  //    聚焦（可能只弹"RinaDown 已就绪"通知）——用户需点击一次弹窗才能输
   //    入。GTK3 层无解，与主窗口对话框回退路径受同一限制，不构成方案回退
   //    理由。
   // 4. startDrag：begin_move_drag 的 serial 重建可能被严格合成器忽略（见
@@ -561,7 +561,7 @@ static void ensure_popup_window(PopupWindowHost* self) {
   // 件的 natural size 并忽略 default_size/gtk_window_resize —— FlView 的
   // natural size 为 0，设 FALSE 会导致窗口塌缩且 Dart 驱动的 resize() 失
   // 效。无边框窗口本就没有用户拖边调尺寸的入口，不需要 FALSE 来禁用。
-  gtk_window_set_title(window, "FluxDown Quick Download");
+  gtk_window_set_title(window, "RinaDown Quick Download");
   // 520x600 逻辑像素——只在窗口第一次显示时生效（GTK 语义：隐藏后再显示会
   // 保留上次尺寸），后续高度变化由 Dart 经 resize() 驱动。
   gtk_window_set_default_size(window, kPopupLogicalWidth, kPopupDefaultHeight);
@@ -592,12 +592,12 @@ static void ensure_popup_window(PopupWindowHost* self) {
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
 
   // 弹窗引擎零插件注册：不调用 fl_register_plugins()。第二个引擎的所有原
-  // 生能力都经下面这条 fluxdown/popup_child 通道由本文件提供，不加载任何
+  // 生能力都经下面这条 rinadown/popup_child 通道由本文件提供，不加载任何
   // 生成的插件 registrant，也不触碰 Rust。
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
   self->child_channel = fl_method_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(view)),
-      "fluxdown/popup_child", FL_METHOD_CODEC(codec));
+      "rinadown/popup_child", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(self->child_channel,
                                             child_method_call_cb, self,
                                             nullptr);
@@ -637,7 +637,7 @@ static void present_popup(PopupWindowHost* self) {
 }
 
 // =============================================================================
-// 主引擎通道 fluxdown/popup_host 处理器
+// 主引擎通道 rinadown/popup_host 处理器
 // =============================================================================
 
 static FlMethodResponse* handle_host_show(PopupWindowHost* self, FlValue* args) {
@@ -747,7 +747,7 @@ PopupWindowHost* popup_window_host_new(FlBinaryMessenger* main_messenger) {
 
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
   self->host_channel = fl_method_channel_new(
-      main_messenger, "fluxdown/popup_host", FL_METHOD_CODEC(codec));
+      main_messenger, "rinadown/popup_host", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(self->host_channel,
                                             host_method_call_cb, self,
                                             nullptr);

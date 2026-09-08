@@ -112,7 +112,7 @@ mod tests {
 
     use super::*;
     use crate::service::{ApiError, TaskEventKind};
-    use fluxdown_protocol::daemon::{CreateTaskRequest, DownloadRequest, QueueDto, TaskDto};
+    use rinadown_protocol::daemon::{CreateTaskRequest, DownloadRequest, QueueDto, TaskDto};
 
     /// `respond_to_text` 专用的最小 `ApiHost`：只关心 `create_task` 是否被
     /// 调用。与 `jsonrpc.rs`/`tests.rs` 各自的 mock 相互独立——每个模块只需要

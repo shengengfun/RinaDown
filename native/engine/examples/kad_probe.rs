@@ -1,9 +1,9 @@
 //! Kad 找源探针：读本地 nodes.dat，对 eMule0.50a.zip 跑 find_sources_kad。
-//! run: cargo run -p fluxdown_engine --example kad_probe -- <nodes.dat path>
+//! run: cargo run -p rinadown_engine --example kad_probe -- <nodes.dat path>
 
 use std::time::Duration;
 
-use fluxdown_engine::ed2k::kad::node::find_sources_kad;
+use rinadown_engine::ed2k::kad::node::find_sources_kad;
 use tokio_util::sync::CancellationToken;
 
 const FILE_HASH: [u8; 16] = [

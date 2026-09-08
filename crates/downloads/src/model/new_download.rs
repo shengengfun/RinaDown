@@ -6,7 +6,7 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use fluxdown_protocol::CreateTaskRequest;
+use rinadown_protocol::CreateTaskRequest;
 
 /// 一条解析出的下载条目（aria2 风格：URL + 可选 `out=` / `checksum=` 选项行）。
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -494,7 +494,7 @@ mod tests {
     fn ua_thread_and_checksum_helpers() {
         assert_eq!(detect_ua_preset(""), "default");
         assert_eq!(detect_ua_preset(super::UA_PRESETS[1].1), "firefox");
-        assert_eq!(detect_ua_preset("FluxDown/1.0"), "custom");
+        assert_eq!(detect_ua_preset("RinaDown/1.0"), "custom");
         assert_eq!(ThreadChoice::from_segments(0), ThreadChoice::Auto);
         assert_eq!(ThreadChoice::from_segments(16), ThreadChoice::Preset(16));
         assert_eq!(ThreadChoice::from_segments(10), ThreadChoice::Custom);

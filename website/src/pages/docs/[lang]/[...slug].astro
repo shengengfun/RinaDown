@@ -65,7 +65,7 @@ const all = await getCollection("docs");
 const { groups, flat } = buildDocsNav(all, lang);
 const { Content, headings } = await render(entry);
 
-const site = Astro.site ?? new URL("https://fluxdown.zerx.dev");
+const site = Astro.site ?? new URL("https://rinadown.zerx.dev");
 const enUrl = new URL(`/docs/en/${slugPath}/`, site).href;
 const zhUrl = new URL(`/docs/zh/${slugPath}/`, site).href;
 // hreflang(D4):仅当 zh 真实存在译文时互链;回退页自身不输出任何 alternate
@@ -86,7 +86,7 @@ const idx = flat.findIndex((i) => i.slug === slugPath);
 const prev = idx > 0 ? (flat[idx - 1] ?? null) : null;
 const next = idx >= 0 && idx < flat.length - 1 ? (flat[idx + 1] ?? null) : null;
 
-const REPO = "https://github.com/zerx-lab/fluxdown";
+const REPO = "https://github.com/zerx-lab/rinadown";
 const srcLang = fallback ? "en" : lang;
 const filePath = `website/src/content/docs/${srcLang}/${slugPath}.md`;
 const editUrl = `${REPO}/edit/main/${filePath}`;
@@ -102,9 +102,9 @@ const sectionLabel = groups.find((g) => g.id === entry.data.section)?.label;
 ---
 
 <Layout
-  title={`${entry.data.title} - FluxDown Docs`}
+  title={`${entry.data.title} - RinaDown Docs`}
   description={entry.data.description ??
-    (zh ? "FluxDown 使用文档。" : "FluxDown documentation.")}
+    (zh ? "RinaDown 使用文档。" : "RinaDown documentation.")}
   canonicalUrl={zh ? zhUrl : enUrl}
   lang={zh ? "zh-CN" : "en"}
   ogLocale={zh ? "zh_CN" : "en_US"}
@@ -233,7 +233,7 @@ const sectionLabel = groups.find((g) => g.id === entry.data.section)?.label;
   <script is:inline define:vars={{ pageLang: lang, altHref }}>
     // 1) 语言纠偏提示:localStorage 与 URL 语言不一致时显示切换提示(不自动跳转,防循环)
     try {
-      var saved = localStorage.getItem("fluxdown-locale");
+      var saved = localStorage.getItem("rinadown-locale");
       if (saved && saved !== pageLang) {
         var hint = document.getElementById("docs-locale-hint");
         var link = document.getElementById("docs-locale-hint-link");

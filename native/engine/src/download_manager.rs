@@ -960,7 +960,7 @@ fn due_schedule_actions<'a>(
 /// 全字段带默认值，调用方只填关心的字段，后续新增字段不再震荡全部调用点：
 ///
 /// ```
-/// use fluxdown_engine::download_manager::NewTaskSpec;
+/// use rinadown_engine::download_manager::NewTaskSpec;
 ///
 /// let spec = NewTaskSpec {
 ///     url: "https://example.com/file.bin".to_string(),
@@ -4064,11 +4064,11 @@ impl DownloadManager {
     ///
     /// ```no_run
     /// # use std::sync::Arc;
-    /// # use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
-    /// # use fluxdown_engine::bt_downloader::BtConfig;
-    /// # use fluxdown_engine::proxy_config::ProxyConfig;
-    /// # async fn run() -> Result<(), fluxdown_engine::EngineError> {
-    /// # let config = EngineConfig { max_concurrent: 5, speed_limit_bps: 0, upload_limit_bps: 0, default_save_dir: "/tmp/downloads".to_string(), app_data_dir: "/tmp/fluxdown".to_string(), bt_config: BtConfig::default(), proxy_config: ProxyConfig::default(), user_agent: String::new(), data_dir_override: None, database_url: None };
+    /// # use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+    /// # use rinadown_engine::bt_downloader::BtConfig;
+    /// # use rinadown_engine::proxy_config::ProxyConfig;
+    /// # async fn run() -> Result<(), rinadown_engine::EngineError> {
+    /// # let config = EngineConfig { max_concurrent: 5, speed_limit_bps: 0, upload_limit_bps: 0, default_save_dir: "/tmp/downloads".to_string(), app_data_dir: "/tmp/rinadown".to_string(), bt_config: BtConfig::default(), proxy_config: ProxyConfig::default(), user_agent: String::new(), data_dir_override: None, database_url: None };
     /// let engine = Engine::new(config, Arc::new(NoopSink), Arc::new(NoopSelection)).await?;
     /// engine.manager.spawn_file_scan();
     /// # Ok(())
@@ -9584,7 +9584,7 @@ mod tests {
 
     fn unique_dedup_dir(tag: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!(
-            "fluxdown_test_ddsync_{}_{}",
+            "rinadown_test_ddsync_{}_{}",
             tag,
             uuid::Uuid::new_v4()
         ))
@@ -10173,10 +10173,10 @@ mod tests {
     }
 
     // -------------------------------------------------------------------------
-    // 文件跟踪（FluxDown #11）：task_target_path / probe_missing / scan_missing_files
+    // 文件跟踪（RinaDown #11）：task_target_path / probe_missing / scan_missing_files
     // -------------------------------------------------------------------------
 
-    /// FluxDown #11：空名与路径穿越/绝对路径必须解析为 `None`——无法安全判定
+    /// RinaDown #11：空名与路径穿越/绝对路径必须解析为 `None`——无法安全判定
     /// 存在性时跳过该任务，而不是把 `save_dir` 本身或盘外路径当成目标文件。
     #[test]
     fn task_target_path_rejects_unsafe_or_empty_names() {
@@ -10221,7 +10221,7 @@ mod tests {
     /// 文件跟踪测试专用的唯一临时目录（防并行测试互相干扰，测后自行清理）。
     fn unique_filetrack_test_dir(tag: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
-            "fluxdown_filetrack_test_{tag}_{}_{}",
+            "rinadown_filetrack_test_{tag}_{}_{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -10836,7 +10836,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// FluxDown #11 核心契约：completed 任务的目标文件消失后 `file_missing`
+    /// RinaDown #11 核心契约：completed 任务的目标文件消失后 `file_missing`
     /// 落库为 true 并定向上报 `FileMissingChanged`；文件移回后无棘轮地翻回
     /// false 并再次上报（双向自愈）。文件仍存在时不落库变化、不发事件。
     #[tokio::test]

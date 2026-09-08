@@ -4,13 +4,13 @@ import { useLocale } from "@/lib/i18n";
 import { ANNOUNCEMENTS } from "@/lib/announcements";
 import type { Announcement } from "@/lib/announcements";
 
-const STORAGE_KEY = "fluxdown-dismissed-announcements";
+const STORAGE_KEY = "rinadown-dismissed-announcements";
 
 /** 官方域名列表；首项为主域名，用于"前往官网"按钮。 */
 const OFFICIAL_SITES = [
-  "https://www.fluxdown.com",
-  "https://fluxdown.com",
-  "https://fluxdown.zerx.dev",
+  "https://www.rinadown.com",
+  "https://rinadown.com",
+  "https://rinadown.zerx.dev",
 ] as const;
 
 function getDismissed(): string[] {

@@ -6,8 +6,8 @@ mod pages;
 
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use fluxdown_protocol::{AgentSnapshot, ApplicationErrorCode, RpcErrorData, ServiceEvent};
-use fluxdown_ui_i18n::Translator;
+use rinadown_protocol::{AgentSnapshot, ApplicationErrorCode, RpcErrorData, ServiceEvent};
+use rinadown_ui_i18n::Translator;
 use gpui::{
     Context, Entity, IntoElement, ParentElement, Render, Styled, Window, div,
     prelude::FluentBuilder as _,

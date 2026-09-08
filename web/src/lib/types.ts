@@ -311,7 +311,7 @@ export interface PingInfo {
   app: string
   version: string
   message: string
-  /** 服务器默认语言（FLUXDOWN_LANG / config `web_language`），未配置时缺省。 */
+  /** 服务器默认语言（RINADOWN_LANG / config `web_language`），未配置时缺省。 */
   language?: string
 }
 
@@ -430,7 +430,7 @@ export interface CdnNodeWire {
 }
 
 /** 多 CDN 并发下载的节点级活动事件（任务详情日志；语义见
- *  fluxdown_engine events.rs EngineEvent::TaskCdnEvent）。 */
+ *  rinadown_engine events.rs EngineEvent::TaskCdnEvent）。 */
 export interface TaskCdnEventMsg {
   taskId: string
   /** "pool" | "kick" | "breaker" | "fallback" | "leases" | "summary" */
@@ -533,7 +533,7 @@ export interface StatsResponse {
   saveDir: string
   serverVersion: string
   wsClients: number
-  /** 演示模式开关（服务器以 FLUXDOWN_DEMO_URL 启动时为 true）。 */
+  /** 演示模式开关（服务器以 RINADOWN_DEMO_URL 启动时为 true）。 */
   demoMode: boolean
   /** 演示模式下唯一允许下载的 URL；非演示模式为空串。 */
   demoUrl: string

@@ -27,7 +27,7 @@ use directories::UserDirs;
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::user_dirs::download_dir;
+/// use rinadown_engine::user_dirs::download_dir;
 ///
 /// // 有主目录的环境下必有值；CI 容器里可能为 None。
 /// if let Some(dir) = download_dir() {
@@ -50,7 +50,7 @@ pub fn download_dir() -> Option<PathBuf> {
 /// # Examples
 ///
 /// ```
-/// use fluxdown_engine::user_dirs::download_dir_or_cwd;
+/// use rinadown_engine::user_dirs::download_dir_or_cwd;
 ///
 /// assert!(!download_dir_or_cwd().is_empty());
 /// ```

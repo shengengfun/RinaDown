@@ -1,7 +1,7 @@
 // 登录凭证存储：记住设备 → localStorage；否则 sessionStorage。
 
-const TOKEN_KEY = 'fluxdown.token'
-const BASE_KEY = 'fluxdown.base'
+const TOKEN_KEY = 'rinadown.token'
+const BASE_KEY = 'rinadown.base'
 
 export function getToken(): string {
   return sessionStorage.getItem(TOKEN_KEY) ?? localStorage.getItem(TOKEN_KEY) ?? ''

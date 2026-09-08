@@ -10,8 +10,8 @@ use axum::extract::{State, WebSocketUpgrade};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
-use fluxdown_protocol::method;
-use fluxdown_protocol::{
+use rinadown_protocol::method;
+use rinadown_protocol::{
     ApplicationErrorCode, RpcErrorData, RpcErrorObject, RpcNotification, RpcRequest, RpcResponse,
     ServiceHello, ServiceRole, validate_first_request,
 };
@@ -32,7 +32,7 @@ use crate::remote::{RemoteError, RemoteTaskService};
 use crate::sync::SyncService;
 use crate::update::{UpdateError, UpdateService};
 
-/// daemon `/blobs/*` 请求体上限（与 `fluxdown_daemon::http::REQUEST_BODY_LIMIT` 一致）。
+/// daemon `/blobs/*` 请求体上限（与 `rinadown_daemon::http::REQUEST_BODY_LIMIT` 一致）。
 const BLOB_UPLOAD_LIMIT: u64 = 4 * 1024 * 1024;
 
 pub struct GatewayService {
@@ -48,8 +48,8 @@ pub struct GatewayService {
     update: Arc<UpdateService>,
     state: Arc<tokio::sync::Mutex<crate::state::AgentState>>,
     store: Arc<crate::state::StateStore>,
-    api_switches: Arc<fluxdown_api::server::ApiRuntimeSwitches>,
-    api_token: fluxdown_api::auth::TokenCell,
+    api_switches: Arc<rinadown_api::server::ApiRuntimeSwitches>,
+    api_token: rinadown_api::auth::TokenCell,
     hello: ServiceHello,
     selection_clients: AtomicUsize,
 }
@@ -73,8 +73,8 @@ impl GatewayService {
         update: Arc<UpdateService>,
         state: Arc<tokio::sync::Mutex<crate::state::AgentState>>,
         store: Arc<crate::state::StateStore>,
-        api_switches: Arc<fluxdown_api::server::ApiRuntimeSwitches>,
-        api_token: fluxdown_api::auth::TokenCell,
+        api_switches: Arc<rinadown_api::server::ApiRuntimeSwitches>,
+        api_token: rinadown_api::auth::TokenCell,
     ) -> Self {
         Self {
             daemon,
@@ -126,8 +126,8 @@ impl GatewayService {
             method::AGENT_SESSION_GET => {
                 let snapshot = self.events.snapshot();
                 let session = match snapshot.body {
-                    fluxdown_protocol::SnapshotBody::Agent(agent) => agent.session,
-                    fluxdown_protocol::SnapshotBody::Daemon(_) => None,
+                    rinadown_protocol::SnapshotBody::Agent(agent) => agent.session,
+                    rinadown_protocol::SnapshotBody::Daemon(_) => None,
                 };
                 serde_json::to_value(session)
                     .map_err(|_| RpcErrorData::new(ApplicationErrorCode::Internal, false))
@@ -135,8 +135,8 @@ impl GatewayService {
             method::AGENT_GATEWAY_GET => {
                 let snapshot = self.events.snapshot();
                 let gateway = match snapshot.body {
-                    fluxdown_protocol::SnapshotBody::Agent(agent) => agent.gateway,
-                    fluxdown_protocol::SnapshotBody::Daemon(_) => Default::default(),
+                    rinadown_protocol::SnapshotBody::Agent(agent) => agent.gateway,
+                    rinadown_protocol::SnapshotBody::Daemon(_) => Default::default(),
                 };
                 serde_json::to_value(gateway)
                     .map_err(|_| RpcErrorData::new(ApplicationErrorCode::Internal, false))
@@ -325,7 +325,7 @@ impl GatewayService {
             }
             method::AGENT_PLATFORM_OPEN_PATH => {
                 let params =
-                    parse_params::<fluxdown_protocol::PlatformOpenPathParams>(request.params)?;
+                    parse_params::<rinadown_protocol::PlatformOpenPathParams>(request.params)?;
                 platform_blocking(move || {
                     crate::platform::open_path(Path::new(&params.path), params.reveal)
                 })
@@ -339,13 +339,13 @@ impl GatewayService {
             }
             method::AGENT_PLATFORM_SET_AUTOSTART => {
                 let params =
-                    parse_params::<fluxdown_protocol::PlatformToggleParams>(request.params)?;
+                    parse_params::<rinadown_protocol::PlatformToggleParams>(request.params)?;
                 platform_integration_apply(move || crate::platform::set_autostart(params.enabled))
                     .await
             }
             method::AGENT_PLATFORM_SET_FILE_ASSOCIATION => {
                 let params =
-                    parse_params::<fluxdown_protocol::PlatformToggleParams>(request.params)?;
+                    parse_params::<rinadown_protocol::PlatformToggleParams>(request.params)?;
                 platform_integration_apply(move || {
                     crate::platform::set_file_association(params.enabled)
                 })
@@ -353,7 +353,7 @@ impl GatewayService {
             }
             method::AGENT_PLATFORM_SET_URL_PROTOCOL => {
                 let params =
-                    parse_params::<fluxdown_protocol::PlatformUrlProtocolParams>(request.params)?;
+                    parse_params::<rinadown_protocol::PlatformUrlProtocolParams>(request.params)?;
                 platform_integration_apply(move || {
                     crate::platform::set_url_protocol(&params.scheme, params.enabled)
                 })
@@ -364,12 +364,12 @@ impl GatewayService {
             }
             method::AGENT_DIAGNOSTICS_REPAIR => {
                 let params =
-                    parse_params::<fluxdown_protocol::DiagnosticRepairParams>(request.params)?;
+                    parse_params::<rinadown_protocol::DiagnosticRepairParams>(request.params)?;
                 diagnostics_value(self.diagnostics.repair(&params).await)
             }
             method::AGENT_DIAGNOSTICS_LOG_PATHS => to_value(self.diagnostics.log_paths().await),
             method::AGENT_DIAGNOSTICS_EXPORT_LOGS => {
-                let params = parse_params::<fluxdown_protocol::LogExportParams>(request.params)?;
+                let params = parse_params::<rinadown_protocol::LogExportParams>(request.params)?;
                 diagnostics_value(self.diagnostics.export_logs(&params).await).and_then(to_value)
             }
             method::AGENT_UPDATE_CHECK => self.update_check(params_or_empty(request.params)).await,
@@ -401,7 +401,7 @@ impl GatewayService {
                 .await
                 .map_err(cloud_error_data)?;
             self.events
-                .publish(fluxdown_protocol::AgentEvent::SessionChanged(Box::new(
+                .publish(rinadown_protocol::AgentEvent::SessionChanged(Box::new(
                     Some(session),
                 )));
         }
@@ -412,7 +412,7 @@ impl GatewayService {
         &self,
         params: serde_json::Value,
     ) -> Result<serde_json::Value, RpcErrorData> {
-        let patch = parse_params::<fluxdown_protocol::GatewayPatchParams>(Some(params))?;
+        let patch = parse_params::<rinadown_protocol::GatewayPatchParams>(Some(params))?;
         let mut state = self.state.lock().await;
         if let Some(value) = patch.takeover_enabled {
             state.gateway.takeover_enabled = value;
@@ -455,7 +455,7 @@ impl GatewayService {
         );
         self.api_token.set(user_token);
         self.events
-            .publish(fluxdown_protocol::AgentEvent::GatewayChanged(
+            .publish(rinadown_protocol::AgentEvent::GatewayChanged(
                 gateway.clone(),
             ));
         serde_json::to_value(gateway)
@@ -471,7 +471,7 @@ impl GatewayService {
             .map_err(cloud_error_data)?;
         let devices = cloud_devices_from_value(&value)?;
         self.events
-            .publish(fluxdown_protocol::AgentEvent::CloudDevicesChanged(devices));
+            .publish(rinadown_protocol::AgentEvent::CloudDevicesChanged(devices));
         Ok(value)
     }
 
@@ -489,7 +489,7 @@ impl GatewayService {
             .rename_device(&id, &name)
             .await
             .map_err(cloud_error_data)?;
-        let updated = serde_json::from_value::<fluxdown_protocol::CloudDevice>(value.clone())
+        let updated = serde_json::from_value::<rinadown_protocol::CloudDevice>(value.clone())
             .map_err(|_| RpcErrorData::new(ApplicationErrorCode::Internal, false))?;
         let mut devices = agent_snapshot(&self.events)?.cloud_devices;
         if let Some(existing) = devices.iter_mut().find(|device| device.id == updated.id) {
@@ -498,7 +498,7 @@ impl GatewayService {
             devices.push(updated);
         }
         self.events
-            .publish(fluxdown_protocol::AgentEvent::CloudDevicesChanged(devices));
+            .publish(rinadown_protocol::AgentEvent::CloudDevicesChanged(devices));
         Ok(value)
     }
 
@@ -519,11 +519,11 @@ impl GatewayService {
             .map_err(cloud_error_data)?;
         devices.retain(|device| device.id != id);
         self.events
-            .publish(fluxdown_protocol::AgentEvent::CloudDevicesChanged(devices));
+            .publish(rinadown_protocol::AgentEvent::CloudDevicesChanged(devices));
         if deleting_current {
             self.cloud.clear_session().await.map_err(cloud_error_data)?;
             self.events
-                .publish(fluxdown_protocol::AgentEvent::SessionChanged(Box::new(
+                .publish(rinadown_protocol::AgentEvent::SessionChanged(Box::new(
                     None,
                 )));
         }
@@ -621,7 +621,7 @@ impl GatewayService {
             .cloned()
             .unwrap_or_else(|| params.clone());
         let request =
-            serde_json::from_value::<fluxdown_protocol::DownloadRequest>(request_value)
+            serde_json::from_value::<rinadown_protocol::DownloadRequest>(request_value)
                 .map_err(|_| RpcErrorData::new(ApplicationErrorCode::InvalidArgument, false))?;
         let silent = params
             .get("silent")
@@ -667,7 +667,7 @@ impl GatewayService {
             .file_stem()
             .map(|stem| stem.to_string_lossy().into_owned())
             .unwrap_or_default();
-        let request = fluxdown_protocol::DownloadRequest {
+        let request = rinadown_protocol::DownloadRequest {
             url: format!("torrent-file://{file_name}"),
             filename,
             save_dir: String::new(),
@@ -703,7 +703,7 @@ impl GatewayService {
         &self,
         params: serde_json::Value,
     ) -> Result<serde_json::Value, RpcErrorData> {
-        let params = parse_params::<fluxdown_protocol::UpdateCheckParams>(Some(params))?;
+        let params = parse_params::<rinadown_protocol::UpdateCheckParams>(Some(params))?;
         let channel = match params.channel {
             Some(channel) => channel,
             None => self
@@ -735,10 +735,10 @@ impl GatewayService {
         reveal: bool,
     ) -> Result<serde_json::Value, RpcErrorData> {
         let task_id = required_string(&params, "taskId")?;
-        let task: fluxdown_protocol::TaskDto = self
+        let task: rinadown_protocol::TaskDto = self
             .daemon
             .call(
-                fluxdown_protocol::method::DAEMON_TASK_GET,
+                rinadown_protocol::method::DAEMON_TASK_GET,
                 Some(serde_json::json!({ "taskId": task_id })),
             )
             .await?;
@@ -886,10 +886,10 @@ fn invalid_field(field: &str) -> RpcErrorData {
 
 fn agent_snapshot(
     events: &AgentEventHub,
-) -> Result<fluxdown_protocol::AgentSnapshot, RpcErrorData> {
+) -> Result<rinadown_protocol::AgentSnapshot, RpcErrorData> {
     match events.snapshot().body {
-        fluxdown_protocol::SnapshotBody::Agent(snapshot) => Ok(*snapshot),
-        fluxdown_protocol::SnapshotBody::Daemon(_) => {
+        rinadown_protocol::SnapshotBody::Agent(snapshot) => Ok(*snapshot),
+        rinadown_protocol::SnapshotBody::Daemon(_) => {
             Err(RpcErrorData::new(ApplicationErrorCode::Internal, false))
         }
     }
@@ -897,7 +897,7 @@ fn agent_snapshot(
 
 fn cloud_devices_from_value(
     value: &serde_json::Value,
-) -> Result<Vec<fluxdown_protocol::CloudDevice>, RpcErrorData> {
+) -> Result<Vec<rinadown_protocol::CloudDevice>, RpcErrorData> {
     let devices = value
         .get("devices")
         .or_else(|| value.get("value"))
@@ -1100,7 +1100,7 @@ pub async fn serve(
     listener: TcpListener,
     service: Arc<GatewayService>,
     api_host: Arc<AgentApiHost>,
-    api_config: fluxdown_api::server::ApiServerConfig,
+    api_config: rinadown_api::server::ApiServerConfig,
     bearer: String,
     cancel: CancellationToken,
 ) -> Result<(), std::io::Error> {
@@ -1112,7 +1112,7 @@ pub async fn serve(
     let rpc = Router::new()
         .route("/rpc", get(rpc_upgrade))
         .with_state(state);
-    let app = fluxdown_api::server::api_router(api_host, api_config).merge(rpc);
+    let app = rinadown_api::server::api_router(api_host, api_config).merge(rpc);
     axum::serve(listener, app)
         .with_graceful_shutdown(cancel.cancelled_owned())
         .await
@@ -1248,8 +1248,8 @@ async fn send_response(socket: &mut WebSocket, response: RpcResponse) -> Result<
 }
 
 async fn receive_event(
-    receiver: &mut Option<tokio::sync::broadcast::Receiver<fluxdown_protocol::EventFrame>>,
-) -> Result<fluxdown_protocol::EventFrame, tokio::sync::broadcast::error::RecvError> {
+    receiver: &mut Option<tokio::sync::broadcast::Receiver<rinadown_protocol::EventFrame>>,
+) -> Result<rinadown_protocol::EventFrame, tokio::sync::broadcast::error::RecvError> {
     match receiver {
         Some(receiver) => receiver.recv().await,
         None => std::future::pending().await,
@@ -1294,7 +1294,7 @@ mod tests {
     use std::time::Duration;
 
     use axum::http::{HeaderMap, HeaderValue, header};
-    use fluxdown_protocol::{
+    use rinadown_protocol::{
         AgentSnapshot, ApplicationErrorCode, RequestId, RpcRequest, RpcResponse,
     };
 
@@ -1303,7 +1303,7 @@ mod tests {
     #[tokio::test]
     async fn service_bearer_is_exact_stable_and_private() {
         let dir = std::env::temp_dir().join(format!(
-            "fluxdown_agent_token_{}_{}",
+            "rinadown_agent_token_{}_{}",
             std::process::id(),
             uuid::Uuid::new_v4()
         ));
@@ -1347,7 +1347,7 @@ mod tests {
     impl TestGateway {
         async fn new(label: &str) -> Self {
             let dir = std::env::temp_dir().join(format!(
-                "fluxdown_agent_{label}_{}_{}",
+                "rinadown_agent_{label}_{}_{}",
                 std::process::id(),
                 uuid::Uuid::new_v4()
             ));
@@ -1395,7 +1395,7 @@ mod tests {
             let blobs = Arc::new(
                 crate::capture::DaemonBlobClient::new(&daemon_config).expect("blob client"),
             );
-            let api_switches = Arc::new(fluxdown_api::server::ApiRuntimeSwitches::new(
+            let api_switches = Arc::new(rinadown_api::server::ApiRuntimeSwitches::new(
                 false, false, false, false, false,
             ));
             let diagnostics = Arc::new(crate::diagnostics::DiagnosticsService::new(
@@ -1424,7 +1424,7 @@ mod tests {
                 state.clone(),
                 store.clone(),
                 api_switches,
-                fluxdown_api::auth::TokenCell::new(""),
+                rinadown_api::auth::TokenCell::new(""),
             );
             Self {
                 service,
@@ -1463,7 +1463,7 @@ mod tests {
         let harness = TestGateway::new("gateway_patch").await;
         let response = harness
             .call(
-                fluxdown_protocol::method::AGENT_GATEWAY_PATCH,
+                rinadown_protocol::method::AGENT_GATEWAY_PATCH,
                 serde_json::json!({ "lanEnabled": true, "regenerateUserToken": true }),
             )
             .await;
@@ -1486,7 +1486,7 @@ mod tests {
 
         let response = harness
             .call(
-                fluxdown_protocol::method::AGENT_GATEWAY_PATCH,
+                rinadown_protocol::method::AGENT_GATEWAY_PATCH,
                 serde_json::json!({ "regenerateUserToken": true, "userToken": "ignored" }),
             )
             .await;
@@ -1497,7 +1497,7 @@ mod tests {
 
         let response = harness
             .call(
-                fluxdown_protocol::method::AGENT_GATEWAY_PATCH,
+                rinadown_protocol::method::AGENT_GATEWAY_PATCH,
                 serde_json::json!({ "userToken": "", "lanEnabled": false }),
             )
             .await;
@@ -1516,8 +1516,8 @@ mod tests {
     async fn file_backed_methods_reject_missing_or_non_regular_paths() {
         let harness = TestGateway::new("file_paths").await;
         for method_name in [
-            fluxdown_protocol::method::AGENT_PLUGIN_INSTALL_FILE,
-            fluxdown_protocol::method::AGENT_CAPTURE_SUBMIT_TORRENT_FILE,
+            rinadown_protocol::method::AGENT_PLUGIN_INSTALL_FILE,
+            rinadown_protocol::method::AGENT_CAPTURE_SUBMIT_TORRENT_FILE,
         ] {
             for path in [
                 harness.dir.join("missing.bin").display().to_string(),
@@ -1542,14 +1542,14 @@ mod tests {
         let harness = TestGateway::new("dispatch").await;
         let service = &harness.service;
 
-        for (index, method_name) in fluxdown_protocol::method::ALL_METHODS
+        for (index, method_name) in rinadown_protocol::method::ALL_METHODS
             .iter()
             .copied()
             .filter(|name| name.starts_with("agent."))
             .enumerate()
         {
             // 版本检查会真的访问官方站点；用非法渠道让它在触网前返回 InvalidArgument。
-            let params = if method_name == fluxdown_protocol::method::AGENT_UPDATE_CHECK {
+            let params = if method_name == rinadown_protocol::method::AGENT_UPDATE_CHECK {
                 serde_json::json!({ "channel": "offline-test" })
             } else {
                 serde_json::json!({})

@@ -3,7 +3,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-use fluxdown_engine::db::Db;
+use rinadown_engine::db::Db;
 
 #[tokio::test]
 async fn loaded_task_snapshot_carries_referrer() {

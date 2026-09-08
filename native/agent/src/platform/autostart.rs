@@ -1,10 +1,10 @@
-//! 开机自启：登录时以 `--minimized` 拉起同级 `fluxdown-desktop`。
+//! 开机自启：登录时以 `--minimized` 拉起同级 `rinadown-desktop`。
 //!
-//! - Windows：`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 的 `FluxDown`
+//! - Windows：`HKCU\Software\Microsoft\Windows\CurrentVersion\Run` 的 `RinaDown`
 //!   值（与 Flutter 时代 `launch_at_startup` 及 `installer/windows/setup.iss`
 //!   的 `RemoveAutostartRunValue` 使用同一值名）。
-//! - macOS：`~/Library/LaunchAgents/dev.zerx.fluxdown.desktop.plist`（RunAtLoad）。
-//! - Linux：`~/.config/autostart/fluxdown.desktop`（XDG autostart）。
+//! - macOS：`~/Library/LaunchAgents/dev.zerx.rinadown.desktop.plist`（RunAtLoad）。
+//! - Linux：`~/.config/autostart/rinadown.desktop`（XDG autostart）。
 //!
 //! “已启用”要求条目指向当前桌面程序；程序移动/升级后旧条目视为未启用，
 //! 用户重新开启即覆盖为新路径。
@@ -19,7 +19,7 @@ mod inner {
     use crate::platform::{PlatformError, registry_executable};
 
     const RUN_KEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-    const VALUE_NAME: &str = "FluxDown";
+    const VALUE_NAME: &str = "RinaDown";
 
     pub fn supported(desktop: Option<&Path>) -> bool {
         desktop.is_some()
@@ -73,7 +73,7 @@ mod inner {
 
     use crate::platform::PlatformError;
 
-    const LABEL: &str = "dev.zerx.fluxdown.desktop";
+    const LABEL: &str = "dev.zerx.rinadown.desktop";
 
     pub fn supported(desktop: Option<&Path>) -> bool {
         desktop.is_some()
@@ -169,7 +169,7 @@ mod inner {
     fn entry_path() -> Result<PathBuf, PlatformError> {
         let base = directories::BaseDirs::new()
             .ok_or(PlatformError::Unsupported("home directory unavailable"))?;
-        Ok(base.config_dir().join("autostart").join("fluxdown.desktop"))
+        Ok(base.config_dir().join("autostart").join("rinadown.desktop"))
     }
 
     /// 按 Desktop Entry 规范为 `Exec` 引用并转义参数。
@@ -191,10 +191,10 @@ mod inner {
         format!(
             "[Desktop Entry]\n\
              Type=Application\n\
-             Name=FluxDown\n\
+             Name=RinaDown\n\
              Comment=Free IDM-alternative download manager\n\
              Exec={exec} --minimized\n\
-             Icon=com.fluxdown.app\n\
+             Icon=com.rinadown.app\n\
              Terminal=false\n\
              X-GNOME-Autostart-enabled=true\n"
         )

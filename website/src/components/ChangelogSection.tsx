@@ -57,8 +57,8 @@ function inferAssetMeta(name: string): {
 } {
   const lower = name.toLowerCase();
 
-  // CLI（独立 cli-v* release，命名 FluxDown-CLI-<ver>-<os>-<arch>.<ext>）
-  if (lower.startsWith("fluxdown-cli-")) {
+  // CLI（独立 cli-v* release，命名 RinaDown-CLI-<ver>-<os>-<arch>.<ext>）
+  if (lower.startsWith("rinadown-cli-")) {
     const platMatch = lower.match(
       /-(windows|linux|macos)-(x64|arm64)\.(zip|tar\.gz)$/,
     );
@@ -69,8 +69,8 @@ function inferAssetMeta(name: string): {
       icon: <Terminal className="w-3.5 h-3.5" />,
     };
   }
-  // FluxDown Server（独立 server-v* release，命名 FluxDown-Server-<ver>-<os>-<arch>.<ext>）
-  if (lower.startsWith("fluxdown-server-")) {
+  // RinaDown Server（独立 server-v* release，命名 RinaDown-Server-<ver>-<os>-<arch>.<ext>）
+  if (lower.startsWith("rinadown-server-")) {
     const nasQnap = lower.match(/-qnap-(x64|arm64)\.qpkg$/);
     if (nasQnap) {
       return {
@@ -96,15 +96,15 @@ function inferAssetMeta(name: string): {
       icon: <Globe className="w-3.5 h-3.5" />,
     };
   }
-  // OpenWrt ipk（命名 fluxdown-server_<ver>_<arch>.ipk / luci-app-fluxdown_<ver>_all.ipk）
-  if (lower.startsWith("luci-app-fluxdown_") && lower.endsWith(".ipk")) {
+  // OpenWrt ipk（命名 rinadown-server_<ver>_<arch>.ipk / luci-app-rinadown_<ver>_all.ipk）
+  if (lower.startsWith("luci-app-rinadown_") && lower.endsWith(".ipk")) {
     return {
       label: "NAS",
       sub: "OpenWrt LuCI",
       icon: <HardDrive className="w-3.5 h-3.5" />,
     };
   }
-  if (lower.startsWith("fluxdown-server_") && lower.endsWith(".ipk")) {
+  if (lower.startsWith("rinadown-server_") && lower.endsWith(".ipk")) {
     const archMatch = lower.match(/_([a-z0-9_-]+)\.ipk$/);
     return {
       label: "NAS",
@@ -112,7 +112,7 @@ function inferAssetMeta(name: string): {
       icon: <HardDrive className="w-3.5 h-3.5" />,
     };
   }
-  // Android（独立 mobile-v* release，命名 FluxDown-<ver>-android-<abi>.apk）
+  // Android（独立 mobile-v* release，命名 RinaDown-<ver>-android-<abi>.apk）
   if (lower.includes("-android-") && lower.endsWith(".apk")) {
     const abiMatch = lower.match(/-android-([a-z0-9_-]+)\.apk$/);
     return {
@@ -409,7 +409,7 @@ function cleanInline(text: string): string {
 }
 
 /** 双语 release body 的语言标记（由 release 工作流翻译步骤写入） */
-const LANG_MARKER_RE = /<!--\s*fluxdown:lang:(zh|en)\s*-->/g;
+const LANG_MARKER_RE = /<!--\s*rinadown:lang:(zh|en)\s*-->/g;
 
 /**
  * 从双语 release body 中取出当前语言区块。
@@ -433,7 +433,7 @@ function pickLocaleBody(body: string, locale: string): string {
 function toPlainText(release: Release, locale: string): string {
   const date = formatDate(release.published_at, locale);
   const result: string[] = [
-    `【FluxDown ${release.tag} 更新日志】`,
+    `【RinaDown ${release.tag} 更新日志】`,
     `📅 ${date}`,
     "",
   ];

@@ -7,7 +7,7 @@
  * 下载量计算：
  *   total_downloads = 历史基础下载量 + GitHub 当前仓库所有 release 的 asset download_count 之和。
  *   历史基础量（DOWNLOADS_BASELINE）来自不再统计的旧渠道：
- *     - 已归档旧仓库 zerx-lab/fluxdown-archive 全量 release 下载：55,318
+ *     - 已归档旧仓库 zerx-lab/rinadown-archive 全量 release 下载：55,318
  *     - Cloudflare R2 flux-down 桶下载（B 类操作累计 GET）：58,320
  *   两者相加固定为 113,638，叠加当前仓库分页拉取的全量真实下载数据。
  *
@@ -29,7 +29,7 @@
  *     assets: { windows_x64, windows_arm64, linux_x64, linux_arm64, macos_x64, macos_arm64,
  *               openwrt_x64, openwrt_arm64, openwrt_luci, qnap_x64, qnap_arm64,
  *               synology_dsm7_x64, synology_dsm7_arm64, synology_dsm6_x64, synology_dsm6_arm64 }
- *   } | null,  // FluxDown Server（headless Web 版），无对应 release 时为 null
+ *   } | null,  // RinaDown Server（headless Web 版），无对应 release 时为 null
  *   cli: { version, tag, assets:{ windows_x64, windows_arm64, linux_x64, linux_arm64, macos_x64, macos_arm64 } } | null,
  *   mobile: { version, tag, assets:{ android_arm64, android_armv7, android_x64, android_universal } } | null
  * }
@@ -46,7 +46,7 @@ const CACHE_KEY = "release";
 const CACHE_TTL = 12 * 60 * 60 * 1000;
 
 // ── 历史基础下载量 ──
-// 已归档旧仓库 zerx-lab/fluxdown-archive（55,318）+ 已停用的 Cloudflare R2
+// 已归档旧仓库 zerx-lab/rinadown-archive（55,318）+ 已停用的 Cloudflare R2
 // flux-down 桶累计下载（B 类 GET 操作 58,320）。两个旧渠道均不再产生新增量，
 // 因此作为固定基数叠加到当前仓库的动态下载量之上。
 const DOWNLOADS_BASELINE = 55_318 + 58_320;
@@ -240,29 +240,29 @@ export const GET: APIRoute = async ({ url }) => {
         ),
       );
 
-    // FluxDown Server release：独立 server-v* release（headless Web 服务器）
+    // RinaDown Server release：独立 server-v* release（headless Web 服务器）
     const serverRe = includePrerelease
       ? /^server-v\d+\.\d+\.\d+(-[\w.]+)?$/
       : /^server-v\d+\.\d+\.\d+$/;
     const serverRelease = pickRelease(
       appPool,
       serverRe,
-      (a) => a.name.startsWith("FluxDown-Server-"),
+      (a) => a.name.startsWith("RinaDown-Server-"),
       includePrerelease,
     );
 
-    // FluxDown CLI release：独立 cli-v* release（命令行客户端 fluxdown）
+    // RinaDown CLI release：独立 cli-v* release（命令行客户端 rinadown）
     const cliRe = includePrerelease
       ? /^cli-v\d+\.\d+\.\d+(-[\w.]+)?$/
       : /^cli-v\d+\.\d+\.\d+$/;
     const cliRelease = pickRelease(
       appPool,
       cliRe,
-      (a) => a.name.startsWith("FluxDown-CLI-"),
+      (a) => a.name.startsWith("RinaDown-CLI-"),
       includePrerelease,
     );
 
-    // FluxDown 移动端 release：独立 mobile-v* release（Android APK）
+    // RinaDown 移动端 release：独立 mobile-v* release（Android APK）
     const mobileRe = includePrerelease
       ? /^mobile-v\d+\.\d+\.\d+(-[\w.]+)?$/
       : /^mobile-v\d+\.\d+\.\d+$/;
@@ -301,10 +301,10 @@ export const GET: APIRoute = async ({ url }) => {
     // 扩展版本号：优先从 extension-v* tag 提取；旧版合并 release 则从资产名解析
     const extensionVersion = extensionRelease
       ? /^extension-v(\d+\.\d+\.\d+)$/.exec(extensionRelease.tag_name)?.[1] ??
-        /^FluxDown-(\d+\.\d+\.\d+)-(?:chrome|extension)\.zip$/.exec(
+        /^RinaDown-(\d+\.\d+\.\d+)-(?:chrome|extension)\.zip$/.exec(
           extensionAsset?.name ?? "",
         )?.[1] ??
-        /^FluxDown-(\d+\.\d+\.\d+)-firefox\.xpi$/.exec(
+        /^RinaDown-(\d+\.\d+\.\d+)-firefox\.xpi$/.exec(
           firefoxExtensionAsset?.name ?? "",
         )?.[1]
       : undefined;
@@ -334,11 +334,11 @@ export const GET: APIRoute = async ({ url }) => {
     const linuxTarballAsset = latest.assets.find((a) =>
       a.name.endsWith("-linux-x64.tar.gz"),
     );
-    // FluxDown Server 资产（独立 server-v* release，命名：FluxDown-Server-<ver>-<os>-<arch>.<ext>）
+    // RinaDown Server 资产（独立 server-v* release，命名：RinaDown-Server-<ver>-<os>-<arch>.<ext>）
     const findServerAsset = (suffix: string) =>
       serverRelease?.assets.find(
         (a) =>
-          a.name.startsWith("FluxDown-Server-") && a.name.endsWith(suffix),
+          a.name.startsWith("RinaDown-Server-") && a.name.endsWith(suffix),
       );
     const serverWindowsX64Asset = findServerAsset("-windows-x64.zip");
     const serverWindowsArm64Asset = findServerAsset("-windows-arm64.zip");
@@ -346,31 +346,31 @@ export const GET: APIRoute = async ({ url }) => {
     const serverLinuxArm64Asset = findServerAsset("-linux-arm64.tar.gz");
     const serverMacosX64Asset = findServerAsset("-macos-x64.tar.gz");
     const serverMacosArm64Asset = findServerAsset("-macos-arm64.tar.gz");
-    // OpenWrt ipk（命名：fluxdown-server_<ver>_<arch>.ipk / luci-app-fluxdown_<ver>_all.ipk）；
+    // OpenWrt ipk（命名：rinadown-server_<ver>_<arch>.ipk / luci-app-rinadown_<ver>_all.ipk）；
     // aarch64 有多个子架构标签的 ipk，官网只挂 aarch64_generic，其余在 release 页可取
     const serverOpenwrtX64Asset = serverRelease?.assets.find(
-      (a) => a.name.startsWith("fluxdown-server_") && a.name.endsWith("_x86_64.ipk"),
+      (a) => a.name.startsWith("rinadown-server_") && a.name.endsWith("_x86_64.ipk"),
     );
     const serverOpenwrtArm64Asset = serverRelease?.assets.find(
       (a) =>
-        a.name.startsWith("fluxdown-server_") &&
+        a.name.startsWith("rinadown-server_") &&
         a.name.endsWith("_aarch64_generic.ipk"),
     );
     const serverOpenwrtLuciAsset = serverRelease?.assets.find(
-      (a) => a.name.startsWith("luci-app-fluxdown_") && a.name.endsWith("_all.ipk"),
+      (a) => a.name.startsWith("luci-app-rinadown_") && a.name.endsWith("_all.ipk"),
     );
-    // QNAP qpkg（命名：FluxDown-Server-<ver>-qnap-<arch>.qpkg）
+    // QNAP qpkg（命名：RinaDown-Server-<ver>-qnap-<arch>.qpkg）
     const serverQnapX64Asset = findServerAsset("-qnap-x64.qpkg");
     const serverQnapArm64Asset = findServerAsset("-qnap-arm64.qpkg");
-    // 群晖 spk（命名：FluxDown-Server-<ver>-synology-<dsm6|dsm7>-<arch>.spk）
+    // 群晖 spk（命名：RinaDown-Server-<ver>-synology-<dsm6|dsm7>-<arch>.spk）
     const serverSynoDsm7X64Asset = findServerAsset("-synology-dsm7-x64.spk");
     const serverSynoDsm7Arm64Asset = findServerAsset("-synology-dsm7-arm64.spk");
     const serverSynoDsm6X64Asset = findServerAsset("-synology-dsm6-x64.spk");
     const serverSynoDsm6Arm64Asset = findServerAsset("-synology-dsm6-arm64.spk");
-    // FluxDown CLI 资产（命名：FluxDown-CLI-<ver>-<os>-<arch>.<ext>）
+    // RinaDown CLI 资产（命名：RinaDown-CLI-<ver>-<os>-<arch>.<ext>）
     const findCliAsset = (suffix: string) =>
       cliRelease?.assets.find(
-        (a) => a.name.startsWith("FluxDown-CLI-") && a.name.endsWith(suffix),
+        (a) => a.name.startsWith("RinaDown-CLI-") && a.name.endsWith(suffix),
       );
     const cliWindowsX64Asset = findCliAsset("-windows-x64.zip");
     const cliWindowsArm64Asset = findCliAsset("-windows-arm64.zip");
@@ -378,7 +378,7 @@ export const GET: APIRoute = async ({ url }) => {
     const cliLinuxArm64Asset = findCliAsset("-linux-arm64.tar.gz");
     const cliMacosX64Asset = findCliAsset("-macos-x64.tar.gz");
     const cliMacosArm64Asset = findCliAsset("-macos-arm64.tar.gz");
-    // 移动端 Android 资产（命名：FluxDown-<ver>-android-<abi>.apk）
+    // 移动端 Android 资产（命名：RinaDown-<ver>-android-<abi>.apk）
     const findMobileAsset = (suffix: string) =>
       mobileRelease?.assets.find(
         (a) => a.name.includes("-android-") && a.name.endsWith(suffix),

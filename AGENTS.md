@@ -1,7 +1,7 @@
-# FluxDown — AI 工作契约（核心）
+# RinaDown — AI 工作契约（核心）
 
-多协议下载管理器（IDM 的免费替代）。官网 <https://fluxdown.zerx.dev>，版本号以 `pubspec.yaml` 为准。
-**一套 Rust 下载引擎 `fluxdown_engine` + 多宿主 + 多客户端**：当前默认 PC/移动 App 仍是 Flutter；GPUI 包 `fluxdown_ui_app` 已接入 `fluxdown-desktop → fluxdown-agent → fluxdownd → fluxdown_engine` 三进程本机链路。另有 headless Web 服务器、CLI、WXT 浏览器扩展、Tampermonkey 用户脚本、JS 插件系统、内置 MCP/REST/aria2 API、React Web SPA。FFI 框架 [Rinf 8.10](https://rinf.cunarist.org)（bincode 信号）**仅** Flutter App（`hub` crate）用到；`native/server`/`hub` 在 Flutter 完成独立切换前继续作为 legacy 生产宿主。
+多协议下载管理器（IDM 的免费替代）。官网 <https://rinadown.zerx.dev>，版本号以 `pubspec.yaml` 为准。
+**一套 Rust 下载引擎 `rinadown_engine` + 多宿主 + 多客户端**：当前默认 PC/移动 App 仍是 Flutter；GPUI 包 `rinadown_ui_app` 已接入 `rinadown-desktop → rinadown-agent → rinadownd → rinadown_engine` 三进程本机链路。另有 headless Web 服务器、CLI、WXT 浏览器扩展、Tampermonkey 用户脚本、JS 插件系统、内置 MCP/REST/aria2 API、React Web SPA。FFI 框架 [Rinf 8.10](https://rinf.cunarist.org)（bincode 信号）**仅** Flutter App（`hub` crate）用到；`native/server`/`hub` 在 Flutter 完成独立切换前继续作为 legacy 生产宿主。
 
 ---
 
@@ -50,15 +50,15 @@
 
 ## 1. 执行目录：两种打开方式都要可靠
 
-**本文件所有路径以 `FluxDown/` 为根**，命令按 cwd=`FluxDown/` 书写。
+**本文件所有路径以 `RinaDown/` 为根**，命令按 cwd=`RinaDown/` 书写。
 
-- **cwd = `FluxDown/`**（本文件自动加载）：路径与命令照抄即可。
-- **cwd = 上级 `FluxDownProject/` 工作区**（那里的 `AGENTS.md` 自动加载，本文件按需 `read`）：所有路径前置 `FluxDown/`；命令必须带目录限定（bash 工具 `cwd="FluxDown"`、`cd FluxDown && …`、`--manifest-path FluxDown/…`），git 一律 `git -C FluxDown …`。**工作区根既不是 git 仓库也不是工程根**，不带限定必然报错；bash 的 cwd 不跨调用保持。
+- **cwd = `RinaDown/`**（本文件自动加载）：路径与命令照抄即可。
+- **cwd = 上级 `RinaDownProject/` 工作区**（那里的 `AGENTS.md` 自动加载，本文件按需 `read`）：所有路径前置 `RinaDown/`；命令必须带目录限定（bash 工具 `cwd="RinaDown"`、`cd RinaDown && …`、`--manifest-path RinaDown/…`），git 一律 `git -C RinaDown …`。**工作区根既不是 git 仓库也不是工程根**，不带限定必然报错；bash 的 cwd 不跨调用保持。
 
 两份文档分工，互不复制：
 - 跨仓地图与跨仓契约（FluxCloud `/api/v1`、插件索引仓、主题仓、发布镜像 secret）→ 上级 `../AGENTS.md`。
-- FluxDown 内部架构 / 不变式 / 命令 → 本文件；**内部技术细节以本文件为准**（离代码最近）。
-- 两边都写的红线（git 授权门槛、分支模型、禁用命令、i18n 基线）语义必须一致；FluxDown 被单独 clone 时本文件自洽，不依赖上级文件存在。
+- RinaDown 内部架构 / 不变式 / 命令 → 本文件；**内部技术细节以本文件为准**（离代码最近）。
+- 两边都写的红线（git 授权门槛、分支模型、禁用命令、i18n 基线）语义必须一致；RinaDown 被单独 clone 时本文件自洽，不依赖上级文件存在。
 
 ---
 
@@ -75,30 +75,30 @@ flutter analyze                       # Dart 静态分析
 # flutter run -d windows              # ⚠️ 禁止运行此命令
 
 # ── 测试（按 crate/过滤，不要 --workspace）──
-cargo nextest run -p fluxdown_engine <filter>   # 引擎单测（协议/分段/DB）
-cargo test -p fluxdown_api            # HTTP API（axum/aria2/MCP/OpenAPI 漂移守卫）
-cargo test -p fluxdown_server         # headless server（WS/actor/扩展路由）
-cargo test -p fluxdown_cli            # CLI（退出码/尺寸解析 doctest）
+cargo nextest run -p rinadown_engine <filter>   # 引擎单测（协议/分段/DB）
+cargo test -p rinadown_api            # HTTP API（axum/aria2/MCP/OpenAPI 漂移守卫）
+cargo test -p rinadown_server         # headless server（WS/actor/扩展路由）
+cargo test -p rinadown_cli            # CLI（退出码/尺寸解析 doctest）
 flutter test                          # Dart 测试
-PG_TEST_URL=postgres://postgres:pw@localhost/postgres cargo test -p fluxdown_engine -- --ignored pg_smoke
+PG_TEST_URL=postgres://postgres:pw@localhost/postgres cargo test -p rinadown_engine -- --ignored pg_smoke
 # 插件相关（feature 门控）：
-cargo test -p fluxdown_engine --features plugins,components --test plugin_ffmpeg   # 真实执行经 FLUXDOWN_TEST_FFMPEG=<abs> 注入
-cargo test -p fluxdown_engine --features plugins,components --test plugin_ytdlp    # FLUXDOWN_TEST_YTDLP=<abs>
-cargo check -p fluxdown_engine        # 不带 feature：验证 mobile 关插件时主链路零变化
+cargo test -p rinadown_engine --features plugins,components --test plugin_ffmpeg   # 真实执行经 RINADOWN_TEST_FFMPEG=<abs> 注入
+cargo test -p rinadown_engine --features plugins,components --test plugin_ytdlp    # RINADOWN_TEST_YTDLP=<abs>
+cargo check -p rinadown_engine        # 不带 feature：验证 mobile 关插件时主链路零变化
 
 # ── 各宿主/客户端运行 ──
-cargo run -p fluxdown_server          # headless 服务器（env 见 .omp/knowledge/hosts-and-api.md）
-cargo run -p fluxdown_cli -- ping     # CLI 探活（子命令同上文件）
-cargo run -p fluxdown_cli -- add <url> --local   # B 模式：内嵌引擎独立下载
+cargo run -p rinadown_server          # headless 服务器（env 见 .omp/knowledge/hosts-and-api.md）
+cargo run -p rinadown_cli -- ping     # CLI 探活（子命令同上文件）
+cargo run -p rinadown_cli -- add <url> --local   # B 模式：内嵌引擎独立下载
 
 # ── 前端/官网/扩展 ──
 cd web && bun run dev                 # Web SPA localhost:5173（/api 代理到 :17800）；bun run build → web/dist
 cd website && npm run dev             # 官网 Astro localhost:4321
-cd fluxDown && npm run dev            # 扩展开发（Chrome）；dev:firefox / build / zip
+cd rinaDown && npm run dev            # 扩展开发（Chrome）；dev:firefox / build / zip
 
 # ── OpenAPI / 图标 / 发布 ──
-cargo run -p fluxdown_api --example gen_openapi > website/public/openapi.json   # 改 API 后重生成
-bun scripts/gen_icons.ts              # 改 assets/logo/fluxdown_logo.svg 后全平台图标一键生成
+cargo run -p rinadown_api --example gen_openapi > website/public/openapi.json   # 改 API 后重生成
+bun scripts/gen_icons.ts              # 改 assets/logo/rinadown_logo.svg 后全平台图标一键生成
 git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z   # 触发发布流水线（稳定版从 stable，预览 -rc.N 从 main；见 §6）
 ```
 
@@ -106,7 +106,7 @@ git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z   # 触发发布流水�
 
 ## 3. 架构缝：三个引擎自有 trait
 
-**一个引擎，多个宿主，多个客户端。** 所有下载逻辑集中在 `fluxdown_engine`（`native/engine`，零 FFI/零 rinf），经三个 trait 与外界解耦：
+**一个引擎，多个宿主，多个客户端。** 所有下载逻辑集中在 `rinadown_engine`（`native/engine`，零 FFI/零 rinf），经三个 trait 与外界解耦：
 
 | Trait | 定义位置 | 方向 | 职责 |
 |---|---|---|---|
@@ -114,7 +114,7 @@ git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z   # 触发发布流水�
 | `HostSelection` | `engine/src/selection.rs` | 引擎→宿主（请求决策） | HLS 画质 / BT 文件 / 插件 variant 选择（tristate：用户选/超时默认/无 selector 短路） |
 | `ApiHost` | `native/api/src/service.rs` | 客户端→引擎（HTTP 契约） | REST/aria2/MCP 的能力面；必需方法 + 可默认降级方法 |
 
-- 当前两个生产宿主仍是 `hub`（App，actor=`download_actor.rs`）与 `server`（headless，actor=`actor.rs`）；`fluxdown_api` 只依赖 `&dyn ApiHost`，同一套 HTTP 面服务任意宿主。CLI 双模式：默认 HTTP 连宿主，`add --local` 内嵌引擎。
+- 当前两个生产宿主仍是 `hub`（App，actor=`download_actor.rs`）与 `server`（headless，actor=`actor.rs`）；`rinadown_api` 只依赖 `&dyn ApiHost`，同一套 HTTP 面服务任意宿主。CLI 双模式：默认 HTTP 连宿主，`add --local` 内嵌引擎。
 - **迁移目标**：`native/daemon` 成为可独立运行的纯下载核心，`native/agent` 常驻承载账户/云同步/设备协同与官方 UI Gateway；两者共享 `native/protocol` 的 JSON-RPC 语义。`native/server` 进入废弃路径，任何新实现不得依赖它。
 - **并发模型**：current_thread tokio actor 串行化写；每个下载 spawn 独立 task + CancellationToken；插件 resolve 永不阻塞 actor（off-actor spawn + 通道回流）。
 - 客户端捕获三条并行前端进同一本机 RPC（`:17800/download`）：扩展、用户脚本、桌面确认框。
@@ -124,21 +124,21 @@ git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z   # 触发发布流水�
 ## 4. crate 边界与硬不变式
 
 **crate 边界**
-- `fluxdown_engine`：零 rinf/Dart/axum 依赖，只经 `EventSink`/`HostSelection` 与宿主解耦。协议/分段/DB/队列/组/插件全在这里。
-- `fluxdown_api`：依赖 `fluxdown_protocol` 的规范 DTO 与 `&dyn ApiHost`，只定义 HTTP 路径/服务器/兼容层。零引擎、零 rinf。
+- `rinadown_engine`：零 rinf/Dart/axum 依赖，只经 `EventSink`/`HostSelection` 与宿主解耦。协议/分段/DB/队列/组/插件全在这里。
+- `rinadown_api`：依赖 `rinadown_protocol` 的规范 DTO 与 `&dyn ApiHost`，只定义 HTTP 路径/服务器/兼容层。零引擎、零 rinf。
 - `hub`：**唯一**碰 rinf FFI 的 crate（crate 名不可改，rinf 硬编码）。只做信号收发与类型转换，不含协议逻辑；`signal_bridge.rs` 是 `engine::model` ↔ `hub::signals` 的孤儿规则边界。
 - `crates/{i18n,theme,components,shell,downloads,settings,account,rss,extensions,app}`：GPUI PC 迁移层；`app` 是唯一 composition root，所有 capability 只依赖本地端口和 protocol DTO。新增页面与 capability 的 crate 边界、目录归属、依赖方向见 `rule://gpui-crate-architecture`。
-- `fluxdown_protocol`：唯一传输无关 wire 层；只能依赖序列化/纯类型能力，不依赖引擎、运行时、数据库、HTTP 或 UI。
-- `fluxdown_engine_protocol`：引擎模型与 protocol DTO 的无状态、无损转换边界；宿主使用命名函数，API/agent/UI 不依赖它。
-- `fluxdown_daemon`：`fluxdownd` 纯下载核心；独占 engine/下载 DB，拥有任务、队列、组、下载设置、RSS、插件、Webhook 与选择。
-- `fluxdown_agent`：`fluxdown-agent` 官方 UI Gateway 与 FluxCloud owner；拥有 Token、设备身份、同步、远程任务、捕获与兼容 API，只经 protocol RPC 调 daemon。
+- `rinadown_protocol`：唯一传输无关 wire 层；只能依赖序列化/纯类型能力，不依赖引擎、运行时、数据库、HTTP 或 UI。
+- `rinadown_engine_protocol`：引擎模型与 protocol DTO 的无状态、无损转换边界；宿主使用命名函数，API/agent/UI 不依赖它。
+- `rinadown_daemon`：`rinadownd` 纯下载核心；独占 engine/下载 DB，拥有任务、队列、组、下载设置、RSS、插件、Webhook 与选择。
+- `rinadown_agent`：`rinadown-agent` 官方 UI Gateway 与 FluxCloud owner；拥有 Token、设备身份、同步、远程任务、捕获与兼容 API，只经 protocol RPC 调 daemon。
 - **feature 门控**：`plugins`、`components`（默认关；desktop/server 开，mobile/CLI 关）。**关插件时下载主链路零行为变化**（注入 no-op `PluginManager`）。
 
 **编译期陷阱**
 - `download_actor.rs` 主 `tokio::select!` **已占满 tokio 64 分支硬上限**，再加一条即编译错误。新增任何 Dart 信号 / 定时节拍 / 回流通道**都不许往主循环加分支**——并进既有 `AuxSignal` 合并泵（两个后台 spawn 把消息合流进单条 `aux_tx`，主循环只有一条 `aux_rx.recv()`）。
 - rquickjs（`engine/Cargo.toml`）：禁止叠加 `rust-alloc`/`allocator`（会让 `set_memory_limit` 静默失效）；必带 `parallel`（`AsyncRuntime`/`AsyncContext` 的 Send/Sync 依赖它）。
 - `profile.release` **不**设 `panic="abort"`——`download_manager` 靠 `catch_unwind` 恢复 task panic。
-- **`fluxdown_server` 的 Web UI 是编译期内嵌的**：`native/server/build.rs` 把 `FLUXDOWN_EMBED_WEBROOT`（缺省 `web/dist`）整棵目录递归全量 `include_bytes!` 进二进制（不按扩展名筛选，新增文件/新建子目录下次编译自动进包）。改了前端**必须先 `cd web && bun run build` 再重编服务器**才能看到；产物是单二进制，不再有同级 `web/` 目录，`FLUXDOWN_WEBROOT` 降级为可选的磁盘覆盖。构建时目录缺失只 warning + 运行期 503 提示页，不会让编译失败。
+- **`rinadown_server` 的 Web UI 是编译期内嵌的**：`native/server/build.rs` 把 `RINADOWN_EMBED_WEBROOT`（缺省 `web/dist`）整棵目录递归全量 `include_bytes!` 进二进制（不按扩展名筛选，新增文件/新建子目录下次编译自动进包）。改了前端**必须先 `cd web && bun run build` 再重编服务器**才能看到；产物是单二进制，不再有同级 `web/` 目录，`RINADOWN_WEBROOT` 降级为可选的磁盘覆盖。构建时目录缺失只 warning + 运行期 503 提示页，不会让编译失败。
 
 **运行期不变式**
 - 两个宿主 actor **都必须** drain `resolve_rx`（off-actor 插件解析回流）与 `plugin_retry_rx`，否则命中 resolver 的下载永久挂起。
@@ -165,7 +165,7 @@ git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z   # 触发发布流水�
 | `native/nmh/src/main.rs::log_path`（中继自身的诊断日志，在 App 日志目录之外） | `native/hub/src/diagnostics.rs::nmh_log_path`（Doctor 读同一文件的尾部）；改路径必须同步，否则 Doctor 只会报「无日志」 |
 | `hub/src/signals/mod.rs` | `rinf gen` → `download_actor` 的 `AuxSignal` 泵 → Dart 侧 `rustSignalStream` 监听 |
 | `native/api` 契约 | 重跑 `gen_openapi` 覆盖 `website/public/openapi.json` |
-| 任一 UI 文案 | 只补 **en + zh 基线对**：App `assets/i18n/{en,zh}.json` + `translations.dart` getter；`web/src/lib/locales/{en,zh}.json`；`website/src/lib/locales/{en,zh-CN}.json`；`fluxDown/utils/locales/{en,zh-CN}.ts`。社区语言（`ja` 等）由 Weblate 维护，**不碰**（运行时键级回退英文） |
+| 任一 UI 文案 | 只补 **en + zh 基线对**：App `assets/i18n/{en,zh}.json` + `translations.dart` getter；`web/src/lib/locales/{en,zh}.json`；`website/src/lib/locales/{en,zh-CN}.json`；`rinaDown/utils/locales/{en,zh-CN}.ts`。社区语言（`ja` 等）由 Weblate 维护，**不碰**（运行时键级回退英文） |
 | web 设置项 / 对话框字段归属 | **基准 = 桌面**：同一功能在两端的分类归属与分区排序必须一致（桌面 `settings_page.dart` 分类 ↔ web 分区组件 GeneralSettings/DownloadSettings/ProxySettings…）。双端并行开发时归属分类要写成一份共享契约，禁止两份各自措辞 |
 | 「一键分类目录」的目录名推导 | `lib/src/models/custom_category.dart` 的 `sanitizeCategoryDirName` / `categoryDirUnder` ↔ `web/src/lib/categories.ts` 同名函数（含分隔符归一）；**且内置分类显示名两端逐字一致**（App `assets/i18n` 的 `categoryVideo/...` ↔ web `type.video/...`），否则同一台机器上桌面与 Web 会各建一套目录（`Document` vs `Documents`） |
 

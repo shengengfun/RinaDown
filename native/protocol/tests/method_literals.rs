@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use fluxdown_protocol::method::{
+use rinadown_protocol::method::{
     AGENT_CAPABILITIES, ALL_METHODS, CLIENT_CAPABILITIES, DAEMON_CAPABILITIES,
 };
 

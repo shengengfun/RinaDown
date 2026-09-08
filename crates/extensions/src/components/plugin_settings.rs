@@ -4,8 +4,8 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use fluxdown_protocol::{PluginDto, RpcErrorData, SettingFieldDto};
-use fluxdown_ui_i18n::Translator;
+use rinadown_protocol::{PluginDto, RpcErrorData, SettingFieldDto};
+use rinadown_ui_i18n::Translator;
 use gpui::{
     Anchor, AppContext as _, ClipboardItem, Context, Entity, InteractiveElement as _, IntoElement,
     ParentElement, Render, SharedString, StatefulInteractiveElement as _, Styled, Window, div,
@@ -488,7 +488,7 @@ impl Render for PluginSettingsForm {
 
 #[cfg(test)]
 mod tests {
-    use fluxdown_protocol::{SettingFieldDto, SettingOptionDto};
+    use rinadown_protocol::{SettingFieldDto, SettingOptionDto};
 
     use super::{FieldError, trim_number, validate_field};
 

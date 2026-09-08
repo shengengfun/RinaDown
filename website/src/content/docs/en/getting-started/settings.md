@@ -1,6 +1,6 @@
 ---
 title: Settings Reference
-description: Every setting in FluxDown, grouped by the categories in the Settings sidebar, with defaults.
+description: Every setting in RinaDown, grouped by the categories in the Settings sidebar, with defaults.
 section: getting-started
 order: 4
 ---
@@ -11,11 +11,11 @@ Open **Settings** from the top bar's gear icon. The settings sidebar has nine ca
 
 | Setting | Purpose | Default |
 |---|---|---|
-| Launch at Startup | Automatically run FluxDown when the system starts. | Off |
+| Launch at Startup | Automatically run RinaDown when the system starts. | Off |
 | Minimize to Tray on Close | Hide to the system tray instead of quitting when you click the close button. | On |
 | Desktop Floating Ball | An always-on-top desktop widget showing download speed and progress; drag URLs or torrent files onto it to start a download. Unavailable on Wayland (see the note below). | Off |
 | Clipboard Watcher *(Linux Wayland only)* | While the main window is hidden, watch the clipboard for download links and notify you. Only shown as a fallback when the floating ball is unavailable on Wayland. | Off |
-| Associate .torrent Files | Make FluxDown the default handler for `.torrent` files. FluxDown prompts once on first launch if this hasn't been set. | Off |
+| Associate .torrent Files | Make RinaDown the default handler for `.torrent` files. RinaDown prompts once on first launch if this hasn't been set. | Off |
 | Completion Notifications | Show a system notification when a task finishes. | On |
 | Keep Awake While Downloading | Prevent the system from sleeping or turning off the display while any task is downloading; restores automatically once idle. | Off |
 | Sidebar Sections (Status / Queues / Category) | Choose which of the three sidebar sections are visible. Turning all three off hides the sidebar entirely. | All on |
@@ -57,7 +57,7 @@ Open **Settings** from the top bar's gear icon. The settings sidebar has nine ca
 - **macOS** — uses the Launch Services default for `public.folder`.
 - **Linux** — uses the `inode/directory` default from `mimeapps.list` (via `xdg-open`).
 
-To use a manager that is **not** your system default — or to highlight the exact file inside a third-party manager — fill in the **File manager command** template above. One command covers both "Show in Folder" (a downloaded file) and "Open Folder" (a directory); FluxDown fills the placeholders according to the case. Placeholders are **already shell-quoted, so don't add your own quotes** around them — but the executable path still needs quotes if it contains spaces:
+To use a manager that is **not** your system default — or to highlight the exact file inside a third-party manager — fill in the **File manager command** template above. One command covers both "Show in Folder" (a downloaded file) and "Open Folder" (a directory); RinaDown fills the placeholders according to the case. Placeholders are **already shell-quoted, so don't add your own quotes** around them — but the executable path still needs quotes if it contains spaces:
 
 - `{path}` — the current path: the full file path when showing a file, the folder path when opening a directory.
 - `{dir}` — the directory (the file's parent when showing a file, the folder itself when opening a directory).
@@ -71,17 +71,17 @@ Example commands on Windows (adjust the install path; use `{path}` for managers 
 | Directory Opus | `"C:\Program Files\GPSoftware\Directory Opus\dopusrt.exe" /cmd Go {path} NEW` |
 | Total Commander | `"C:\totalcmd\TOTALCMD64.EXE" /O /T {dir}` |
 
-A configured template always takes priority over auto-detection; if it fails to launch, FluxDown falls back to the platform default.
+A configured template always takes priority over auto-detection; if it fails to launch, RinaDown falls back to the platform default.
 
 ## BitTorrent
 
 | Setting | Purpose | Default |
 |---|---|---|
-| Listen Port Range | The port range FluxDown listens on for incoming BT connections. | 6881–6891 |
+| Listen Port Range | The port range RinaDown listens on for incoming BT connections. | 6881–6891 |
 | Tracker List | Custom tracker servers for peer discovery, one per line, on top of 25 built-in trackers (Asia-priority ordering). Can be reset to the built-in list. | 25 built-in trackers |
 | Tracker Subscription | Periodically fetch up-to-date trackers from community-maintained lists and merge them with the list above. | On |
 
-Some BT changes require restarting the BT engine to take effect (FluxDown shows a reminder in this category). DHT and UPnP are always enabled internally and have no separate toggle. Proxy settings (below) don't apply to BitTorrent downloads.
+Some BT changes require restarting the BT engine to take effect (RinaDown shows a reminder in this category). DHT and UPnP are always enabled internally and have no separate toggle. Proxy settings (below) don't apply to BitTorrent downloads.
 
 ## eD2K
 
@@ -115,7 +115,7 @@ A local-only HTTP API (127.0.0.1) used by the browser extension, aria2-compatibl
 | Enable API Service | Master switch for the local HTTP server; the three feature toggles below only work while this is on. | On |
 | Listen Port | The port the local server binds to (1024–65535). | 17800 |
 | Access Token | Token used to authenticate API requests; generate or copy it with the buttons next to the field. Required once Management API is enabled. | Empty |
-| Browser Script Takeover | Lets the FluxDown userscript take over browser downloads at `http://127.0.0.1:<port>`. Includes a button to copy the userscript. | On |
+| Browser Script Takeover | Lets the RinaDown userscript take over browser downloads at `http://127.0.0.1:<port>`. Includes a button to copy the userscript. | On |
 | aria2 RPC Compatible | Implements the aria2 JSON-RPC protocol (`addUri`, `getVersion`, `getGlobalStat`, `multicall`, …) at `/jsonrpc`, for "send to aria2" scripts or clients like AriaNg. | On |
 | Management API | An HTTP API for querying and controlling tasks at `/api/v1`, for MCP servers and automation scripts. Always requires the access token. | Off |
 
@@ -127,5 +127,5 @@ See the [API documentation](/api-docs) for the full endpoint reference.
 |---|---|---|
 | Version info | Shows the current version, plus the latest available version and its publish date once an update is found. | — |
 | Auto-check for Updates | Silently check GitHub Releases for a newer version shortly after startup. Also exposes manual Check Now / Download / Install & Restart actions. | On |
-| Max Log Size | Total size cap for FluxDown's log files (5/10/20/50/100 MB); the oldest logs are cleaned automatically once the cap is exceeded. | 10 MB |
+| Max Log Size | Total size cap for RinaDown's log files (5/10/20/50/100 MB); the oldest logs are cleaned automatically once the cap is exceeded. | 10 MB |
 | Export Logs | Package recent logs into a `.zip` for attaching to a bug report, or open the log folder directly. | — |

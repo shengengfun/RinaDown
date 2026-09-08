@@ -6,11 +6,11 @@ order: 4
 sourceHash: "4501af5b1d55"
 ---
 
-插件脚本能看到的一切：FluxDown 会调用的五个入口函数，和注入的 `flux` 对象。跨越 JS 边界的字段名全部是 camelCase。
+插件脚本能看到的一切：RinaDown 会调用的五个入口函数，和注入的 `flux` 对象。跨越 JS 边界的字段名全部是 camelCase。
 
 ## 入口函数
 
-入口就是普通的全局函数。`async` 函数和返回 Promise 都完全支持——FluxDown 会等待结果。
+入口就是普通的全局函数。`async` 函数和返回 Promise 都完全支持——RinaDown 会等待结果。
 
 ### `resolve(ctx)`
 
@@ -27,7 +27,7 @@ sourceHash: "4501af5b1d55"
 | `userAgent` | string | 生效的 User-Agent。 |
 | `extraHeaders` | object | 额外请求头，字符串键值。 |
 
-返回 `null` 或 `undefined` 表示放行（FluxDown 按 `ctx.url` 原样下载）。否则返回一个对象，除 `url` 外都可选：
+返回 `null` 或 `undefined` 表示放行（RinaDown 按 `ctx.url` 原样下载）。否则返回一个对象，除 `url` 外都可选：
 
 | 字段 | 类型 | 含义 |
 |---|---|---|
@@ -37,11 +37,11 @@ sourceHash: "4501af5b1d55"
 | `totalBytes` | number | 文件大小（字节），已知的话。 |
 | `extraHeaders` | object | 下载解析后直链时附带的请求头。 |
 | `ephemeral` | boolean | `true` = 直链是一次性的/有防盗链：跳过元数据探测（代价是续传一致性校验变弱）。默认 `false`：正常探测并保留基于 ETag 的续传校验。 |
-| `rangeSupported` | boolean | `true` = 你担保解析后的服务支持 HTTP Range 请求（如 googlevideo）。与 `ephemeral` 组合时，FluxDown 依旧跳过探测，但直接按多线程分段规划下载，而不是保守的单流启动。默认 `false`：没有探测时，Range 能力只能从首个响应学习。 |
-| `variants` | array | 多个画质/格式选项。存在且多于一项时，FluxDown 弹出选择对话框，用户选中后在下载前收敛为单一直链（headless 服务器或免打扰下载场景直接静默使用 `defaultVariantIndex`，与 HLS 画质选择完全一致）。每项：`{ label, url, audioUrl?, fileName?, totalBytes?, bandwidth?, width?, height?, container? }`——`label` 和 `url` 必填。`variants` 非空时顶层 `url` 允许为空。最多 50 项，每个 `label` ≤ 200 字符。 |
+| `rangeSupported` | boolean | `true` = 你担保解析后的服务支持 HTTP Range 请求（如 googlevideo）。与 `ephemeral` 组合时，RinaDown 依旧跳过探测，但直接按多线程分段规划下载，而不是保守的单流启动。默认 `false`：没有探测时，Range 能力只能从首个响应学习。 |
+| `variants` | array | 多个画质/格式选项。存在且多于一项时，RinaDown 弹出选择对话框，用户选中后在下载前收敛为单一直链（headless 服务器或免打扰下载场景直接静默使用 `defaultVariantIndex`，与 HLS 画质选择完全一致）。每项：`{ label, url, audioUrl?, fileName?, totalBytes?, bandwidth?, width?, height?, container? }`——`label` 和 `url` 必填。`variants` 非空时顶层 `url` 允许为空。最多 50 项，每个 `label` ≤ 200 字符。 |
 | `defaultVariantIndex` | number | 默认变体索引（60 秒超时 / 免打扰 / headless 时使用）。越界回退为 `0`。默认 `0`。 |
 
-解析完成后，FluxDown 会用**解析后的** URL 重新判定协议引擎——resolver 可以返回 HLS 播放列表、磁力链接或 FTP 地址，对应引擎会自动接管。
+解析完成后，RinaDown 会用**解析后的** URL 重新判定协议引擎——resolver 可以返回 HLS 播放列表、磁力链接或 FTP 地址，对应引擎会自动接管。
 
 错误行为是 fail-closed：抛异常、超时、返回值不合法、插件已卸载或被禁用，任务都进入错误状态。原始 URL 绝不会被悄悄下载。
 
@@ -88,7 +88,7 @@ resolve 出 `{ status, headers, body, truncated }`——`status` 是数字状态
 
 ### `flux.storage`
 
-插件私有的持久化键值存储，应用重启后仍在（存在 FluxDown 数据库里）。
+插件私有的持久化键值存储，应用重启后仍在（存在 RinaDown 数据库里）。
 
 - `flux.storage.get(key)` → `Promise<string | null>`
 - `flux.storage.set(key, value)` → `Promise<void>`——单个值超过 **64 KB**，或插件键数将超过 **100 个**时 reject。
@@ -124,19 +124,19 @@ try {
 
 ### `flux.info`
 
-`{ identity, version, appVersion }`——插件自己的 ID 和版本，以及承载它的 FluxDown 版本。
+`{ identity, version, appVersion }`——插件自己的 ID 和版本，以及承载它的 RinaDown 版本。
 
 ### `flux.logger` 与 `console`
 
-`flux.logger.info/warn/error(...)` 写入 FluxDown 日志文件。`console.log/info/warn/error/debug` 映射到同一处（`debug` 按 info 级别记）。多个参数用空格连接，非字符串会 JSON 序列化。每条日志截断在 4 KB。
+`flux.logger.info/warn/error(...)` 写入 RinaDown 日志文件。`console.log/info/warn/error/debug` 映射到同一处（`debug` 按 info 级别记）。多个参数用空格连接，非字符串会 JSON 序列化。每条日志截断在 4 KB。
 
 ### `flux.task.requestRetry(opts)`
 
-`flux.task.requestRetry({ delayMs: 5000 })`——请求 FluxDown 在延迟后重试失败的任务。只在 `onError` 里有意义；其他地方调用只记一条警告，什么也不做。重试消耗任务自己的自动重试额度，插件无法无限重试。
+`flux.task.requestRetry({ delayMs: 5000 })`——请求 RinaDown 在延迟后重试失败的任务。只在 `onError` 里有意义；其他地方调用只记一条警告，什么也不做。重试消耗任务自己的自动重试额度，插件无法无限重试。
 
 ### `flux.ffmpeg`
 
-**仅当** manifest 声明 `permissions: ["ffmpeg"]` 时可用——否则 `flux.ffmpeg` 为 `undefined`，请用 `if (flux.ffmpeg)` 判断。它运行 FluxDown 解析到的 ffmpeg（用户手动指定的路径 → 托管安装 → 系统 `PATH`），因此还要求 ffmpeg 确实存在（可在应用「设置 → 扩展 → 组件」页安装）。
+**仅当** manifest 声明 `permissions: ["ffmpeg"]` 时可用——否则 `flux.ffmpeg` 为 `undefined`，请用 `if (flux.ffmpeg)` 判断。它运行 RinaDown 解析到的 ffmpeg（用户手动指定的路径 → 托管安装 → 系统 `PATH`），因此还要求 ffmpeg 确实存在（可在应用「设置 → 扩展 → 组件」页安装）。
 
 - `flux.ffmpeg.available()` → `Promise<{ available, version, source }>`——探测生效的 ffmpeg。`source` 取 `"manual"` / `"managed"` / `"system"` / `"none"`。
 - `flux.ffmpeg.run(spec)` → `Promise<outcome>`——运行 ffmpeg。`spec`：
@@ -195,7 +195,7 @@ const info = JSON.parse(out.stdout);
 
 ### `flux.ytdlp`
 
-**仅当** manifest 声明 `permissions: ["ytdlp"]` 时可用——否则 `flux.ytdlp` 为 `undefined`，请用 `if (flux.ytdlp)` 判断。它运行 FluxDown 解析到的 yt-dlp（用户手动指定的路径 → 托管安装 → 系统 `PATH`），因此还要求 yt-dlp 确实存在（可在应用「设置 → 扩展 → 组件」页安装）。
+**仅当** manifest 声明 `permissions: ["ytdlp"]` 时可用——否则 `flux.ytdlp` 为 `undefined`，请用 `if (flux.ytdlp)` 判断。它运行 RinaDown 解析到的 yt-dlp（用户手动指定的路径 → 托管安装 → 系统 `PATH`），因此还要求 yt-dlp 确实存在（可在应用「设置 → 扩展 → 组件」页安装）。
 
 - `flux.ytdlp.available()` → `Promise<{ available, version, source }>`——探测生效的 yt-dlp。`source` 取 `"manual"` / `"managed"` / `"system"` / `"none"`。想轻量探测也可以直接 `run({ args: ['--version'] })` 看 `code === 0`。
 - `flux.ytdlp.run(spec)` → `Promise<outcome>`——运行 yt-dlp。`spec`：
@@ -208,7 +208,7 @@ const info = JSON.parse(out.stdout);
 
 resolve 出 `{ code, stdout, stderr, timedOut, truncatedStdout, truncatedStderr }`——`code` 是退出码（被杀死/无码时为 `-1`），`stdout`/`stderr` 会截断（256 KB / 64 KB），`timedOut` 为 `true` 表示被超时杀掉。
 
-**沙箱隔离。** 和 `flux.ffmpeg` 不同，`flux.ytdlp` 在**所有**上下文里都可用——`resolve` 和每个 hook——因为它不依赖产物文件。沙箱根目录不是任务的产物目录，而是 bridge 自持的每插件 scratch 目录（懒创建于 FluxDown 数据目录下），跨调用复用。它就是本次调用的工作目录，`subdir` 在其中划出子目录。读写的文件一律用**相对**名引用。这正是 `flux.fs` 读写的同一个工作区——喂给 yt-dlp cookie、配置或字幕文件的方式就是：调用前 `flux.fs.writeFile('cookies.txt', …)`，在 `args` 里以相对名引用该文件，调用结束后 `flux.fs.remove('cookies.txt')`。
+**沙箱隔离。** 和 `flux.ffmpeg` 不同，`flux.ytdlp` 在**所有**上下文里都可用——`resolve` 和每个 hook——因为它不依赖产物文件。沙箱根目录不是任务的产物目录，而是 bridge 自持的每插件 scratch 目录（懒创建于 RinaDown 数据目录下），跨调用复用。它就是本次调用的工作目录，`subdir` 在其中划出子目录。读写的文件一律用**相对**名引用。这正是 `flux.fs` 读写的同一个工作区——喂给 yt-dlp cookie、配置或字幕文件的方式就是：调用前 `flux.fs.writeFile('cookies.txt', …)`，在 `args` 里以相对名引用该文件，调用结束后 `flux.fs.remove('cookies.txt')`。
 
 yt-dlp 是网络工具，和 ffmpeg 的沙箱不同，URL 参数与出站网络访问都放行——从远程 URL 提取正是它的本职。会被拦的是那些能跳出 yt-dlp 本身或逃出沙箱的东西：
 
@@ -222,7 +222,7 @@ yt-dlp 是网络工具，和 ffmpeg 的沙箱不同，URL 参数与出站网络�
 
 `--ignore-config` 恒被前置注入，这样 yt-dlp 自己的配置文件（本可能夹带危险开关）也读不到。全部插件合计同时至多跑 2 个 yt-dlp 进程，每个子进程在超时或取消时被杀。
 
-FluxDown 会自动注入 `--ffmpeg-location`（指向解析到的托管/系统 ffmpeg），使合并（bestvideo+bestaudio）、`-x` 抽音、remux、recode 都能正常工作——插件自带的 `--ffmpeg-location` 仍会被拒（见上表），只信任宿主自己注入的路径。它还会自动注入 `--cache-dir <jail>/.cache`，把 yt-dlp 的缓存收在沙箱内，不外泄。
+RinaDown 会自动注入 `--ffmpeg-location`（指向解析到的托管/系统 ffmpeg），使合并（bestvideo+bestaudio）、`-x` 抽音、remux、recode 都能正常工作——插件自带的 `--ffmpeg-location` 仍会被拒（见上表），只信任宿主自己注入的路径。它还会自动注入 `--cache-dir <jail>/.cache`，把 yt-dlp 的缓存收在沙箱内，不外泄。
 
 例子——向 yt-dlp 要元数据 JSON，从中挑一条直链来 resolve：
 

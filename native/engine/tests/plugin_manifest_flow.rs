@@ -21,13 +21,13 @@ use std::net::TcpListener;
 use std::sync::Arc;
 use std::time::Duration;
 
-use fluxdown_engine::bt_downloader::BtConfig;
-use fluxdown_engine::download_manager::{CreateGroupSpec, GroupItemSpec, NewTaskSpec};
-use fluxdown_engine::events::{EngineEvent, EventSink};
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
+use rinadown_engine::bt_downloader::BtConfig;
+use rinadown_engine::download_manager::{CreateGroupSpec, GroupItemSpec, NewTaskSpec};
+use rinadown_engine::events::{EngineEvent, EventSink};
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::{Engine, EngineConfig, NoopSelection, NoopSink};
 
-const FILE_BODY: &[u8] = b"fluxdown plugin manifest flow integration payload!!\n";
+const FILE_BODY: &[u8] = b"rinadown plugin manifest flow integration payload!!\n";
 
 /// 本地 HTTP/1.1 服务器：支持 HEAD（Content-Length + Accept-Ranges）与 GET（全量），
 /// 忽略路径/查询串——二段解析改写出的不同 `?item=` URL 均返回同一固定内容。
@@ -194,7 +194,7 @@ async fn recv_preview_ready(
 /// 真实直链并完成下载；两文件落盘于 `组根/vids/`，组行存在，母任务 ID 不变。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn fission_end_to_end_creates_group_and_downloads_members() {
-    let work = std::env::temp_dir().join(format!("fluxdown-manifest-it-{}", uuid_like()));
+    let work = std::env::temp_dir().join(format!("rinadown-manifest-it-{}", uuid_like()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir work");
     let (port, _srv) = spawn_server();
     let real_url = format!("http://127.0.0.1:{port}/real");
@@ -299,7 +299,7 @@ async fn fission_end_to_end_creates_group_and_downloads_members() {
 /// 命中也不会被调用（立即无清单）。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn preview_is_read_only_and_gated_by_multi_declaration() {
-    let work = std::env::temp_dir().join(format!("fluxdown-manifest-it-{}", uuid_like()));
+    let work = std::env::temp_dir().join(format!("rinadown-manifest-it-{}", uuid_like()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir work");
     let (port, _srv) = spawn_server();
     let real_url = format!("http://127.0.0.1:{port}/real");
@@ -402,7 +402,7 @@ async fn preview_is_read_only_and_gated_by_multi_declaration() {
 /// 用 `start_paused` 避免真实网络下载，聚焦组/任务行的建立与清理。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn create_task_group_then_delete_group_cleans_up_rows() {
-    let work = std::env::temp_dir().join(format!("fluxdown-manifest-it-{}", uuid_like()));
+    let work = std::env::temp_dir().join(format!("rinadown-manifest-it-{}", uuid_like()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir work");
     let (port, _srv) = spawn_server();
     let real_url = format!("http://127.0.0.1:{port}/real");
@@ -493,7 +493,7 @@ async fn create_task_group_then_delete_group_cleans_up_rows() {
 /// 下载。
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn fission_over_threshold_pauses_all_members_without_downloading() {
-    let work = std::env::temp_dir().join(format!("fluxdown-manifest-it-{}", uuid_like()));
+    let work = std::env::temp_dir().join(format!("rinadown-manifest-it-{}", uuid_like()));
     tokio::fs::create_dir_all(&work).await.expect("mkdir work");
     let (port, _srv) = spawn_server();
     let real_url = format!("http://127.0.0.1:{port}/real");

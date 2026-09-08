@@ -27,7 +27,7 @@ const FETCH_TIMEOUT: Duration = Duration::from_secs(20);
 ///
 /// ```no_run
 /// # async fn run() {
-/// use fluxdown_engine::ed2k::kad::fetch_nodes_dat;
+/// use rinadown_engine::ed2k::kad::fetch_nodes_dat;
 /// let bytes = fetch_nodes_dat("https://upd.emule-security.org/nodes.dat")
 ///     .await
 ///     .unwrap_or_default();

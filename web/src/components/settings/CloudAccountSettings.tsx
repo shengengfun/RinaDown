@@ -31,7 +31,7 @@ const ME_QUERY_KEY = ['cloud', 'me']
 // 先闪一帧默认纯文本 pill 再跳成正式徽标。与桌面端 cloud_plans_catalog 对称。
 // ---------------------------------------------------------------------------
 
-const PLAN_CATALOG_CACHE_KEY = 'fluxdown.cloud.plansCatalog'
+const PLAN_CATALOG_CACHE_KEY = 'rinadown.cloud.plansCatalog'
 
 function readCatalogCache(): CatalogPlan[] {
   try {

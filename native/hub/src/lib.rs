@@ -40,7 +40,7 @@ async fn main() {
         // 同进程二次 isolate：logger 已由上次 runtime 装好，继续拉 actor。
         if !error.is_already_initialized() {
             eprintln!(
-                "FluxDown logger initialization failed: {}",
+                "RinaDown logger initialization failed: {}",
                 logger::format_error_chain(&error)
             );
             return;

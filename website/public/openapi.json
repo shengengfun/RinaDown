@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "FluxDown API",
-    "description": "FluxDown 桌面应用的本机 HTTP API。仅监听 `127.0.0.1`（默认端口 17800，可在 设置 → API 服务 中修改）。\n\n- **takeover**（脚本接管）：油猴脚本提交下载，进入快速下载确认流程；需 `X-FluxDown-Client` 头\n- **aria2**：aria2 JSON-RPC 兼容垫片，「发送到 aria2」类脚本与 AriaNg 可直接对接\n- **management**（管理 API）：任务查询/创建/暂停/恢复/删除与队列查询，供 MCP/自动化客户端使用；强制要求 token（`Authorization: Bearer <token>` 或 `X-FluxDown-Token` 头）",
+    "title": "RinaDown API",
+    "description": "RinaDown 桌面应用的本机 HTTP API。仅监听 `127.0.0.1`（默认端口 17800，可在 设置 → API 服务 中修改）。\n\n- **takeover**（脚本接管）：油猴脚本提交下载，进入快速下载确认流程；需 `X-RinaDown-Client` 头\n- **aria2**：aria2 JSON-RPC 兼容垫片，「发送到 aria2」类脚本与 AriaNg 可直接对接\n- **management**（管理 API）：任务查询/创建/暂停/恢复/删除与队列查询，供 MCP/自动化客户端使用；强制要求 token（`Authorization: Bearer <token>` 或 `X-RinaDown-Token` 头）",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -2744,7 +2744,7 @@
             }
           },
           "403": {
-            "description": "缺少 X-FluxDown-Client 头",
+            "description": "缺少 X-RinaDown-Client 头",
             "content": {
               "application/json": {
                 "schema": {
@@ -2806,7 +2806,7 @@
         "operationId": "jsonrpc",
         "responses": {
           "200": {
-            "description": "JSON-RPC 响应（错误在 envelope 内表达）。支持方法：aria2.addUri / aria2.getVersion / aria2.getGlobalStat / system.multicall / system.listMethods；token 可经 X-FluxDown-Token 头或 params[0]=\"token:xxx\" 传递"
+            "description": "JSON-RPC 响应（错误在 envelope 内表达）。支持方法：aria2.addUri / aria2.getVersion / aria2.getGlobalStat / system.multicall / system.listMethods；token 可经 X-RinaDown-Token 头或 params[0]=\"token:xxx\" 传递"
           }
         },
         "security": [
@@ -2821,7 +2821,7 @@
         "tags": [
           "mcp"
         ],
-        "summary": "MCP（Model Context Protocol）端点。强制 token 鉴权（Bearer /\nX-FluxDown-Token，复用管理 API 门禁）。请求返回 `200 application/json`\nJSON-RPC 响应；通知（无 `id`）返回 `202 Accepted` 空体。",
+        "summary": "MCP（Model Context Protocol）端点。强制 token 鉴权（Bearer /\nX-RinaDown-Token，复用管理 API 门禁）。请求返回 `200 application/json`\nJSON-RPC 响应；通知（无 `id`）返回 `202 Accepted` 空体。",
         "operationId": "mcp",
         "responses": {
           "200": {
@@ -4605,7 +4605,7 @@
       "tokenHeader": {
         "type": "apiKey",
         "in": "header",
-        "name": "X-FluxDown-Token"
+        "name": "X-RinaDown-Token"
       }
     }
   },

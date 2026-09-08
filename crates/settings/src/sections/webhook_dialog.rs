@@ -3,10 +3,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use fluxdown_protocol::{RpcErrorData, WebhookDeliveriesResponse, WebhookPresetDto, method};
-use fluxdown_ui_components::{ButtonVariant, button};
-use fluxdown_ui_i18n::Translator;
-use fluxdown_ui_theme::active_theme;
+use rinadown_protocol::{RpcErrorData, WebhookDeliveriesResponse, WebhookPresetDto, method};
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_i18n::Translator;
+use rinadown_ui_theme::active_theme;
 use gpui::{
     Anchor, App, AppContext as _, ClickEvent, ClipboardItem, Context, Div, Entity,
     InteractiveElement as _, IntoElement, ParentElement, Render, SharedString,
@@ -40,7 +40,7 @@ const SAMPLE_VARS: &[(&str, &str)] = &[
         "ubuntu-24.04.2-desktop-amd64.iso · 6.0 GB",
     ),
     ("{timestamp}", "2026-07-17T12:34:56Z"),
-    ("{instance.app}", "fluxdown"),
+    ("{instance.app}", "rinadown"),
     ("{instance.version}", "0.1.44"),
     ("{instance.host}", "DESKTOP"),
     ("{task.id}", "00000000-0000-4000-8000-000000000000"),
@@ -1075,11 +1075,11 @@ impl WebhookDialog {
         let mut lines = vec![
             format!("POST {url}"),
             format!("Content-Type: {content_type}"),
-            format!("X-FluxDown-Event: {first_event}"),
-            "X-FluxDown-Delivery: 5f2a91c7-…".to_owned(),
+            format!("X-RinaDown-Event: {first_event}"),
+            "X-RinaDown-Delivery: 5f2a91c7-…".to_owned(),
         ];
         if self.sign_enabled {
-            lines.push("X-FluxDown-Signature: t=1789647128,v1=9c41f2…".to_owned());
+            lines.push("X-RinaDown-Signature: t=1789647128,v1=9c41f2…".to_owned());
         }
         lines.push("─".repeat(28));
         lines.extend(self.preview_body(preset, cx).lines().map(str::to_owned));

@@ -1,13 +1,13 @@
 //! Chrome Native Messaging Host (NMH) manifest generation and registry registration.
 //!
-//! Registers `com.fluxdown.nmh` for Chrome, Edge, and Firefox so that the
-//! browser extension can use `chrome.runtime.connectNative("com.fluxdown.nmh")`
-//! to communicate with the FluxDown desktop app via the NMH relay binary.
+//! Registers `com.rinadown.nmh` for Chrome, Edge, and Firefox so that the
+//! browser extension can use `chrome.runtime.connectNative("com.rinadown.nmh")`
+//! to communicate with the RinaDown desktop app via the NMH relay binary.
 //!
 //! Registry keys (all HKCU — no admin required):
-//!   Chrome:  `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.fluxdown.nmh`
-//!   Edge:    `HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.fluxdown.nmh`
-//!   Firefox: `HKCU\Software\Mozilla\NativeMessagingHosts\com.fluxdown.nmh`
+//!   Chrome:  `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.rinadown.nmh`
+//!   Edge:    `HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.rinadown.nmh`
+//!   Firefox: `HKCU\Software\Mozilla\NativeMessagingHosts\com.rinadown.nmh`
 //!
 //! Each key's default value points to a JSON manifest file that describes the NMH.
 //!
@@ -21,7 +21,7 @@
 pub struct NmhTarget {
     /// 展示名，如 `"Chrome"` / `"Firefox"` / `"Brave (Flatpak)"`。
     pub label: String,
-    /// 注册位置：Windows = `HKCU\Software\...\com.fluxdown.nmh`；类 Unix = 清单文件绝对路径。
+    /// 注册位置：Windows = `HKCU\Software\...\com.rinadown.nmh`；类 Unix = 清单文件绝对路径。
     pub location: String,
     /// 该浏览器是否安装（配置根目录存在）。false 时 Doctor 只报 `info`，不算故障。
     pub installed: bool,
@@ -70,17 +70,17 @@ mod inner {
     use winreg::RegKey;
     use winreg::enums::{HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
 
-    const NMH_NAME: &str = "com.fluxdown.nmh";
-    const NMH_DESCRIPTION: &str = "FluxDown Native Messaging Host";
-    const NMH_EXE_NAME: &str = "fluxdown_nmh.exe";
+    const NMH_NAME: &str = "com.rinadown.nmh";
+    const NMH_DESCRIPTION: &str = "RinaDown Native Messaging Host";
+    const NMH_EXE_NAME: &str = "rinadown_nmh.exe";
 
     /// Manifest filename for Chrome/Edge (contains `allowed_origins`).
-    const MANIFEST_FILENAME_CHROMIUM: &str = "com.fluxdown.nmh.json";
+    const MANIFEST_FILENAME_CHROMIUM: &str = "com.rinadown.nmh.json";
     /// Manifest filename for Firefox (contains `allowed_extensions`, NO `allowed_origins`).
     /// Firefox schema validation (NativeManifests.sys.mjs via Schemas.normalize) rejects any
     /// field not in its native_manifest.json schema. `allowed_origins` is Chrome-only and
     /// causes Firefox to report "No such native application" (Bugzilla #1361459).
-    const MANIFEST_FILENAME_FIREFOX: &str = "com.fluxdown.nmh.firefox.json";
+    const MANIFEST_FILENAME_FIREFOX: &str = "com.rinadown.nmh.firefox.json";
 
     /// Chrome extension ID — pinned via `key` in wxt.config.ts manifest.
     const CHROME_EXTENSION_ID: &str = "chrome-extension://meleenglfggcmcajknpeeeiobnpfmahc/";
@@ -93,7 +93,7 @@ mod inner {
     const EDGE_EXTENSION_ID: &str = "chrome-extension://nglkkjbogjghekbhhcnccnpfedjbdhhd/";
 
     /// Firefox extension ID (matches `browser_specific_settings.gecko.id` in manifest).
-    const FIREFOX_EXTENSION_ID: &str = "fluxdown@fluxdown.app";
+    const FIREFOX_EXTENSION_ID: &str = "rinadown@rinadown.app";
 
     /// Chromium (Chrome/Edge) NMH manifest — uses `allowed_origins`.
     #[derive(Serialize)]
@@ -168,7 +168,7 @@ mod inner {
         Err(io::Error::new(
             io::ErrorKind::NotFound,
             format!(
-                "{} not found. Build it with: cargo build -p fluxdown_nmh",
+                "{} not found. Build it with: cargo build -p rinadown_nmh",
                 NMH_EXE_NAME
             ),
         ))
@@ -553,7 +553,7 @@ mod inner {
 
         /// 本机注册表冒烟：Firefox 键被外部删除后 `needs_update()` 必须自愈判定。
         ///
-        /// 依赖真实 HKCU 注册表与已构建的 `fluxdown_nmh.exe`（`cargo build -p fluxdown_nmh`），
+        /// 依赖真实 HKCU 注册表与已构建的 `rinadown_nmh.exe`（`cargo build -p rinadown_nmh`），
         /// 会改写本机 NMH 注册（指向 workspace target 目录，安装版启动时会自行纠正），
         /// 故标记 ignore，手动执行：
         /// `cargo test -p hub -- --ignored firefox_key_self_heal`
@@ -595,21 +595,21 @@ mod inner {
     use std::io;
     use std::path::{Path, PathBuf};
 
-    const NMH_NAME: &str = "com.fluxdown.nmh";
-    const NMH_DESCRIPTION: &str = "FluxDown Native Messaging Host";
-    const NMH_EXE_NAME: &str = "fluxdown_nmh";
+    const NMH_NAME: &str = "com.rinadown.nmh";
+    const NMH_DESCRIPTION: &str = "RinaDown Native Messaging Host";
+    const NMH_EXE_NAME: &str = "rinadown_nmh";
     /// Shell wrapper script registered in the NMH manifest.
     /// Provides a stable path even for AppImage builds where the real binary
     /// lives at a random FUSE mount point that changes on every launch.
-    const NMH_WRAPPER_NAME: &str = "fluxdown_nmh.sh";
-    const MANIFEST_FILENAME_CHROMIUM: &str = "com.fluxdown.nmh.json";
-    const MANIFEST_FILENAME_FIREFOX: &str = "com.fluxdown.nmh.json";
+    const NMH_WRAPPER_NAME: &str = "rinadown_nmh.sh";
+    const MANIFEST_FILENAME_CHROMIUM: &str = "com.rinadown.nmh.json";
+    const MANIFEST_FILENAME_FIREFOX: &str = "com.rinadown.nmh.json";
     const CHROME_EXTENSION_ID: &str = "chrome-extension://meleenglfggcmcajknpeeeiobnpfmahc/";
     /// Edge Add-ons store extension ID — differs from Chrome (Edge ignores the
     /// manifest `key`) and must be whitelisted explicitly, else Edge store users
     /// get "forbidden" on connectNative → stuck on "未连接".
     const EDGE_EXTENSION_ID: &str = "chrome-extension://nglkkjbogjghekbhhcnccnpfedjbdhhd/";
-    const FIREFOX_EXTENSION_ID: &str = "fluxdown@fluxdown.app";
+    const FIREFOX_EXTENSION_ID: &str = "rinadown@rinadown.app";
 
     #[derive(Serialize)]
     struct NmhManifestChromium {
@@ -763,13 +763,13 @@ mod inner {
         Err(io::Error::new(
             io::ErrorKind::NotFound,
             format!(
-                "{} not found. Build it with: cargo build -p fluxdown_nmh",
+                "{} not found. Build it with: cargo build -p rinadown_nmh",
                 NMH_EXE_NAME
             ),
         ))
     }
 
-    /// Stable wrapper script path: ~/.local/share/fluxdown/fluxdown_nmh.sh
+    /// Stable wrapper script path: ~/.local/share/rinadown/rinadown_nmh.sh
     ///
     /// NMH manifests always point to this wrapper rather than the real binary.
     /// This decouples the manifest from AppImage mount points (which change on
@@ -778,7 +778,7 @@ mod inner {
         home_dir().map(|h| {
             h.join(".local")
                 .join("share")
-                .join("fluxdown")
+                .join("rinadown")
                 .join(NMH_WRAPPER_NAME)
         })
     }
@@ -878,7 +878,7 @@ mod inner {
         // profile root exists must have a manifest pointing at the wrapper AND
         // containing the Edge origin (content versioning: rewrite manifests
         // predating Edge support). A single missing/stale manifest — e.g. a
-        // browser installed after FluxDown first registered — must trigger
+        // browser installed after RinaDown first registered — must trigger
         // re-register; the old `.any()` let one healthy browser mask the rest.
         let chromium_ok = chromium_nmh_dirs()
             .iter()
@@ -1125,23 +1125,23 @@ mod inner {
     use std::io;
     use std::path::{Path, PathBuf};
 
-    const NMH_NAME: &str = "com.fluxdown.nmh";
-    const NMH_DESCRIPTION: &str = "FluxDown Native Messaging Host";
-    const NMH_EXE_NAME: &str = "fluxdown_nmh";
+    const NMH_NAME: &str = "com.rinadown.nmh";
+    const NMH_DESCRIPTION: &str = "RinaDown Native Messaging Host";
+    const NMH_EXE_NAME: &str = "rinadown_nmh";
     /// Shell wrapper script name registered in NMH manifest.
     /// Chrome/Firefox spawn this shell (a system-signed binary) which then
-    /// exec's the actual fluxdown_nmh binary, bypassing macOS AMFI's
+    /// exec's the actual rinadown_nmh binary, bypassing macOS AMFI's
     /// requirement that processes spawned by Hardened-Runtime apps must
     /// carry a trusted Developer ID signature (adhoc-only binaries are
     /// rejected with "Unrecoverable CT signature issue").
-    const NMH_WRAPPER_NAME: &str = "fluxdown_nmh.sh";
-    const MANIFEST_FILENAME: &str = "com.fluxdown.nmh.json";
+    const NMH_WRAPPER_NAME: &str = "rinadown_nmh.sh";
+    const MANIFEST_FILENAME: &str = "com.rinadown.nmh.json";
     const CHROME_EXTENSION_ID: &str = "chrome-extension://meleenglfggcmcajknpeeeiobnpfmahc/";
     /// Edge Add-ons store extension ID — differs from Chrome (Edge ignores the
     /// manifest `key`) and must be whitelisted explicitly, else Edge store users
     /// get "forbidden" on connectNative → stuck on "未连接".
     const EDGE_EXTENSION_ID: &str = "chrome-extension://nglkkjbogjghekbhhcnccnpfedjbdhhd/";
-    const FIREFOX_EXTENSION_ID: &str = "fluxdown@fluxdown.app";
+    const FIREFOX_EXTENSION_ID: &str = "rinadown@rinadown.app";
 
     #[derive(Serialize)]
     struct NmhManifestChromium {
@@ -1290,7 +1290,7 @@ mod inner {
         Err(io::Error::new(
             io::ErrorKind::NotFound,
             format!(
-                "{} not found. Build it with: cargo build -p fluxdown_nmh",
+                "{} not found. Build it with: cargo build -p rinadown_nmh",
                 NMH_EXE_NAME
             ),
         ))
@@ -1302,7 +1302,7 @@ mod inner {
     /// are spawned by Hardened Runtime processes such as Chrome or Firefox.
     /// `/bin/sh` is a system binary with an Apple-signed certificate and is
     /// always permitted. By registering the *shell script* as the NMH path,
-    /// the browser spawns `/bin/sh`, which in turn exec's `fluxdown_nmh`.
+    /// the browser spawns `/bin/sh`, which in turn exec's `rinadown_nmh`.
     /// The shell inherits the NMH stdin/stdout pipe and transparently relays
     /// it to the binary — zero overhead, no extra process.
     fn write_wrapper_script(nmh_exe: &Path) -> Result<PathBuf, io::Error> {
@@ -1315,7 +1315,7 @@ mod inner {
         let dir = home
             .join("Library")
             .join("Application Support")
-            .join("fluxdown");
+            .join("rinadown");
         std::fs::create_dir_all(&dir)?;
         let script_path = dir.join(NMH_WRAPPER_NAME);
         let exe_str = nmh_exe.to_string_lossy();
@@ -1397,7 +1397,7 @@ mod inner {
         let wrapper_path = home_dir().map(|h| {
             h.join("Library")
                 .join("Application Support")
-                .join("fluxdown")
+                .join("rinadown")
                 .join(NMH_WRAPPER_NAME)
         });
 
@@ -1427,7 +1427,7 @@ mod inner {
         // profile root exists must have a manifest pointing at the wrapper AND
         // containing the Edge origin (content versioning: rewrite manifests
         // predating Edge support). A single missing/stale manifest — e.g. Edge
-        // installed after FluxDown first registered — must trigger re-register;
+        // installed after RinaDown first registered — must trigger re-register;
         // the old `.any()` let one healthy browser mask all the others.
         let chromium_ok = chromium_nmh_dirs()
             .iter()
@@ -1551,7 +1551,7 @@ mod inner {
         let wp = home
             .join("Library")
             .join("Application Support")
-            .join("fluxdown")
+            .join("rinadown")
             .join(NMH_WRAPPER_NAME);
         let wrapper_str = wp.to_string_lossy().into_owned();
         let wrapper_issue = if !wp.exists() {
@@ -1651,7 +1651,7 @@ mod inner {
             let wrapper = home
                 .join("Library")
                 .join("Application Support")
-                .join("fluxdown")
+                .join("rinadown")
                 .join(NMH_WRAPPER_NAME);
             let _ = std::fs::remove_file(wrapper);
         }

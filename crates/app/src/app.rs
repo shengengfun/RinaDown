@@ -6,15 +6,15 @@ use std::{
     sync::Arc,
 };
 
-use fluxdown_ui_account::AccountView;
-use fluxdown_ui_downloads::{
+use rinadown_ui_account::AccountView;
+use rinadown_ui_downloads::{
     DOWNLOAD_ICON_PATH, DownloadView, NewDownloadContext, NewDownloadView,
 };
-use fluxdown_ui_extensions::ExtensionsView;
-use fluxdown_ui_i18n::{I18nCatalog, I18nError, Translator, keys};
-use fluxdown_ui_rss::RssView;
-use fluxdown_ui_settings::{SettingsContentSlots, SettingsStore, SettingsView, component_locale};
-use fluxdown_ui_shell::{
+use rinadown_ui_extensions::ExtensionsView;
+use rinadown_ui_i18n::{I18nCatalog, I18nError, Translator, keys};
+use rinadown_ui_rss::RssView;
+use rinadown_ui_settings::{SettingsContentSlots, SettingsStore, SettingsView, component_locale};
+use rinadown_ui_shell::{
     AuxiliaryWindowView, RouteId, ShellAction, ShellRoute, ShellView, auxiliary_window_options,
     main_window_options,
 };
@@ -37,7 +37,7 @@ const MI_SANS_MEDIUM: &[u8] = include_bytes!("../../../assets/fonts/MiSans-Mediu
 const MI_SANS_SEMIBOLD: &[u8] = include_bytes!("../../../assets/fonts/MiSans-Semibold.ttf");
 
 struct ClientProjection {
-    last_snapshot: Option<fluxdown_protocol::AgentSnapshot>,
+    last_snapshot: Option<rinadown_protocol::AgentSnapshot>,
     account: Option<WeakEntity<AccountView>>,
     rss: Option<WeakEntity<RssView>>,
     extensions: Option<WeakEntity<ExtensionsView>>,
@@ -53,12 +53,12 @@ pub(crate) fn run() -> Result<(), I18nError> {
         Ok(Some(lock)) => Some(lock),
         Ok(None) => None,
         Err(error) => {
-            eprintln!("FluxDown desktop instance lock unavailable: {error:#}");
+            eprintln!("RinaDown desktop instance lock unavailable: {error:#}");
             None
         }
     };
     let agent_config = AgentClientConfig {
-        rpc_url: env::var("FLUXDOWN_AGENT_URL")
+        rpc_url: env::var("RINADOWN_AGENT_URL")
             .unwrap_or_else(|_| "ws://127.0.0.1:17800/rpc".to_owned()),
         bearer_path: token_path,
     };
@@ -77,7 +77,7 @@ pub(crate) fn run() -> Result<(), I18nError> {
     let (agent_client, mut agent_events) = match AgentClient::start(agent_config, bootstrap) {
         Ok(client) => client,
         Err(error) => {
-            eprintln!("failed to start FluxDown agent client: {error:#}");
+            eprintln!("failed to start RinaDown agent client: {error:#}");
             return Ok(());
         }
     };
@@ -106,12 +106,12 @@ pub(crate) fn run() -> Result<(), I18nError> {
             Cow::Borrowed(MI_SANS_MEDIUM),
             Cow::Borrowed(MI_SANS_SEMIBOLD),
         ]) {
-            eprintln!("failed to load FluxDown UI fonts: {error:#}");
+            eprintln!("failed to load RinaDown UI fonts: {error:#}");
             return;
         }
 
         gpui_component::init(cx);
-        fluxdown_ui_theme::init(cx);
+        rinadown_ui_theme::init(cx);
         gpui_component::set_locale(&locale);
         let translator = cx.new(|_| translator);
         let bounds = Bounds::centered(None, size(px(1120.), px(760.)), cx);
@@ -177,8 +177,8 @@ pub(crate) fn run() -> Result<(), I18nError> {
                             });
                         }
                         AgentClientEvent::Event(frame) => {
-                            if let fluxdown_protocol::ServiceEvent::Agent(
-                                fluxdown_protocol::AgentEvent::PreferencesChanged(prefs),
+                            if let rinadown_protocol::ServiceEvent::Agent(
+                                rinadown_protocol::AgentEvent::PreferencesChanged(prefs),
                             ) = &frame.event
                             {
                                 let values = prefs.values.clone();
@@ -259,7 +259,7 @@ pub(crate) fn run() -> Result<(), I18nError> {
                         });
                     }
                     if let AgentClientEvent::Fatal(error) = &event {
-                        eprintln!("fatal FluxDown agent error: {:?}", error.code);
+                        eprintln!("fatal RinaDown agent error: {:?}", error.code);
                     }
                 }
             })
@@ -310,7 +310,7 @@ pub(crate) fn run() -> Result<(), I18nError> {
             }
             cx.new(|cx| Root::new(shell, window, cx))
         }) {
-            eprintln!("failed to open FluxDown desktop window: {error:#}");
+            eprintln!("failed to open RinaDown desktop window: {error:#}");
             return;
         }
 
@@ -326,7 +326,7 @@ fn apply_preferences(
     translator: &Entity<Translator>,
     cx: &mut App,
 ) {
-    fluxdown_ui_theme::apply_appearance_preferences(values, cx);
+    rinadown_ui_theme::apply_appearance_preferences(values, cx);
     if let Some(locale) = values
         .get("general.locale")
         .and_then(serde_json::Value::as_str)
@@ -355,7 +355,7 @@ fn capture_calls(
     for url in urls {
         let url = launch::normalize_capture_url(&url);
         let future = client.call::<serde_json::Value, serde_json::Value>(
-            fluxdown_protocol::method::AGENT_CAPTURE_SUBMIT,
+            rinadown_protocol::method::AGENT_CAPTURE_SUBMIT,
             Some(serde_json::json!({ "request": { "url": url }, "silent": true })),
         );
         calls.push((url, future));
@@ -363,7 +363,7 @@ fn capture_calls(
     for file in files {
         let path = file.display().to_string();
         let future = client.call::<serde_json::Value, serde_json::Value>(
-            fluxdown_protocol::method::AGENT_CAPTURE_SUBMIT_TORRENT_FILE,
+            rinadown_protocol::method::AGENT_CAPTURE_SUBMIT_TORRENT_FILE,
             Some(serde_json::json!({ "path": path, "silent": true })),
         );
         calls.push((path, future));
@@ -407,7 +407,7 @@ fn forward_urls_and_exit(
     }
     let bootstrap = Arc::new(ServiceBootstrap::new());
     let Ok((client, _events)) = AgentClient::start(config.clone(), bootstrap) else {
-        eprintln!("failed to reach the running FluxDown instance");
+        eprintln!("failed to reach the running RinaDown instance");
         return;
     };
     let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
@@ -490,7 +490,7 @@ fn show_settings_window(
         cx.new(|cx| Root::new(window_view, window, cx))
     }) {
         Ok(handle) => settings_window.set(Some(handle)),
-        Err(error) => eprintln!("failed to open FluxDown settings window: {error:#}"),
+        Err(error) => eprintln!("failed to open RinaDown settings window: {error:#}"),
     }
 }
 
@@ -534,18 +534,18 @@ fn show_new_download_window(
         cx.new(|cx| Root::new(window_view, window, cx))
     }) {
         Ok(handle) => new_download_window.set(Some(handle)),
-        Err(error) => eprintln!("failed to open FluxDown new download window: {error:#}"),
+        Err(error) => eprintln!("failed to open RinaDown new download window: {error:#}"),
     }
 }
 
 fn agent_token_path() -> std::path::PathBuf {
-    if let Some(path) = env::var_os("FLUXDOWN_AGENT_TOKEN_FILE") {
+    if let Some(path) = env::var_os("RINADOWN_AGENT_TOKEN_FILE") {
         return path.into();
     }
-    if let Some(path) = env::var_os("FLUXDOWN_AGENT_DATA_DIR") {
+    if let Some(path) = env::var_os("RINADOWN_AGENT_DATA_DIR") {
         return std::path::PathBuf::from(path).join("agent.token");
     }
-    directories::ProjectDirs::from("dev", "zerx", "FluxDown")
+    directories::ProjectDirs::from("dev", "zerx", "RinaDown")
         .map(|project| project.data_dir().join("agent").join("agent.token"))
         .unwrap_or_else(|| std::path::PathBuf::from("agent.token"))
 }

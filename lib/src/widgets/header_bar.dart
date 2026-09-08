@@ -844,7 +844,7 @@ class _TitlebarToolButtons extends StatelessWidget {
 
   Widget _buildRow(BuildContext context, SettingsProvider? settings) {
     final s = LocaleScope.of(context);
-    final themeProvider = FluxDownApp.of(context);
+    final themeProvider = RinaDownApp.of(context);
     final showPause = settings?.showTitlebarPauseAll ?? true;
     final showResume = settings?.showTitlebarResumeAll ?? true;
     final showSettings = settings?.showTitlebarSettings ?? true;

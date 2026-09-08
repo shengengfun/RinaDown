@@ -3,23 +3,23 @@
 //!
 //! 两个消费口：
 //! - 运行时：`GET /api/v1/openapi.json`（本机 API 服务器，无鉴权）
-//! - 构建期：`cargo run -p fluxdown_api --example gen_openapi` 输出到 stdout，
+//! - 构建期：`cargo run -p rinadown_api --example gen_openapi` 输出到 stdout，
 //!   重定向到 `website/public/openapi.json` 供官网 Scalar 文档页渲染
 
 use utoipa::openapi::security::{ApiKey, ApiKeyValue, Http, HttpAuthScheme, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
-/// FluxDown 本机 HTTP API 的 OpenAPI 文档聚合。
+/// RinaDown 本机 HTTP API 的 OpenAPI 文档聚合。
 #[derive(OpenApi)]
 #[openapi(
     info(
-        title = "FluxDown API",
-        description = "FluxDown 桌面应用的本机 HTTP API。仅监听 `127.0.0.1`（默认端口 17800，\
+        title = "RinaDown API",
+        description = "RinaDown 桌面应用的本机 HTTP API。仅监听 `127.0.0.1`（默认端口 17800，\
 可在 设置 → API 服务 中修改）。\n\n\
-- **takeover**（脚本接管）：油猴脚本提交下载，进入快速下载确认流程；需 `X-FluxDown-Client` 头\n\
+- **takeover**（脚本接管）：油猴脚本提交下载，进入快速下载确认流程；需 `X-RinaDown-Client` 头\n\
 - **aria2**：aria2 JSON-RPC 兼容垫片，「发送到 aria2」类脚本与 AriaNg 可直接对接\n\
 - **management**（管理 API）：任务查询/创建/暂停/恢复/删除与队列查询，供 MCP/自动化客户端使用；\
-强制要求 token（`Authorization: Bearer <token>` 或 `X-FluxDown-Token` 头）",
+强制要求 token（`Authorization: Bearer <token>` 或 `X-RinaDown-Token` 头）",
         license(name = "MIT", identifier = "MIT")
     ),
     servers((url = "http://127.0.0.1:17800", description = "本机 API 服务（默认端口）")),
@@ -93,7 +93,7 @@ use utoipa::{Modify, OpenApi};
 )]
 pub struct ApiDoc;
 
-/// 注入两种鉴权方案：`Authorization: Bearer` 与 `X-FluxDown-Token` 头。
+/// 注入两种鉴权方案：`Authorization: Bearer` 与 `X-RinaDown-Token` 头。
 struct SecurityAddon;
 
 impl Modify for SecurityAddon {
@@ -105,7 +105,7 @@ impl Modify for SecurityAddon {
         );
         components.add_security_scheme(
             "tokenHeader",
-            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-FluxDown-Token"))),
+            SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("X-RinaDown-Token"))),
         );
     }
 }
@@ -115,7 +115,7 @@ impl Modify for SecurityAddon {
 /// # Examples
 ///
 /// ```
-/// let json = fluxdown_api::openapi::openapi_json();
+/// let json = rinadown_api::openapi::openapi_json();
 /// assert!(json.contains("\"openapi\""));
 /// assert!(json.contains("/api/v1/tasks"));
 /// ```
@@ -209,6 +209,6 @@ mod tests {
     fn spec_serializes_with_security_schemes() {
         let json = super::openapi_json();
         assert!(json.contains("bearerAuth"));
-        assert!(json.contains("X-FluxDown-Token"));
+        assert!(json.contains("X-RinaDown-Token"));
     }
 }

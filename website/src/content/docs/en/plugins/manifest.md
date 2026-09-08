@@ -17,7 +17,7 @@ order: 3
 | `description` | no | string | Shown in the plugin list. |
 | `homepage` | no | string | Project/author URL. |
 | `icon` | no | string | Path relative to the plugin folder. No `..`, no absolute paths, no drive letters, no leading `/` or `\`. |
-| `minAppVersion` | no | string | Three-part version. If the running FluxDown is older, the plugin is skipped at load (logged, not an error). |
+| `minAppVersion` | no | string | Three-part version. If the running RinaDown is older, the plugin is skipped at load (logged, not an error). |
 | `resolvers` | no | array | **At most one entry** in v1. See below. |
 | `hooks` | no | object | See below. |
 | `permissions` | no | array | Capability grants. v1 accepts `"ffmpeg"` and `"ytdlp"`. Unknown values are rejected. |
@@ -63,7 +63,7 @@ A plugin may declare a resolver, hooks, or both. A manifest with neither is vali
 | `events` | yes | Non-empty subset of `onStart`, `onError`, `onDone`, `onMetaProbed`. Anything else is rejected. |
 | `match` | no | Optional URL filter, same pattern rules. If present, `urls` must be non-empty. Omitted = the hooks fire for every task. |
 
-Caveat: if the same plugin also declares a resolver, `onMetaProbed` never fires for its tasks — resolver tasks skip the metadata probe entirely. FluxDown logs a warning if you subscribe to it anyway.
+Caveat: if the same plugin also declares a resolver, `onMetaProbed` never fires for its tasks — resolver tasks skip the metadata probe entirely. RinaDown logs a warning if you subscribe to it anyway.
 
 
 ## `permissions`
@@ -79,7 +79,7 @@ Extra host capabilities a plugin opts into. Empty or omitted = the base sandbox 
 { "permissions": ["ffmpeg", "ytdlp"] }
 ```
 
-Unknown values fail the whole manifest, so an older FluxDown that doesn't know a permission rejects the plugin rather than silently ignoring it — pair a new permission with a `minAppVersion` bump.
+Unknown values fail the whole manifest, so an older RinaDown that doesn't know a permission rejects the plugin rather than silently ignoring it — pair a new permission with a `minAppVersion` bump.
 
 ## `settings[]`
 

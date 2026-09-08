@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()],
   server: {
     proxy: {
-      // dev 同源代理到 fluxdown_server，规避 CORS（生产由 ServeDir 同源托管）。
+      // dev 同源代理到 rinadown_server，规避 CORS（生产由 ServeDir 同源托管）。
       '/api': {
         target: 'http://localhost:18080',
         changeOrigin: true,

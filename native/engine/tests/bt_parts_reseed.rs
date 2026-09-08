@@ -21,17 +21,17 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use fluxdown_engine::bt_partfile::{
-    PartsFileMeta, SidecarWriteRequest, load_seed_factory, write_sidecar,
-};
 use librqbit::{
     AddTorrent, AddTorrentOptions, AddTorrentResponse, CreateTorrentOptions, Session,
     SessionOptions, create_torrent,
 };
+use rinadown_engine::bt_partfile::{
+    PartsFileMeta, SidecarWriteRequest, load_seed_factory, write_sidecar,
+};
 
 fn unique_dir(tag: &str) -> PathBuf {
     std::env::temp_dir().join(format!(
-        "fluxdown_parts_reseed_{tag}_{}_{}",
+        "rinadown_parts_reseed_{tag}_{}_{}",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

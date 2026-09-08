@@ -1,10 +1,10 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
-project(flux_down LANGUAGES CXX)
+project(rina_down LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "flux_down")
+set(BINARY_NAME "rina_down")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -127,34 +127,34 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/tray_win_light.ico"
   DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
 
-# === fluxdown_nmh: NMH relay binary ===
+# === rinadown_nmh: NMH relay binary ===
 # Build the Native Messaging Host relay binary alongside the app so that
-# nmh_registry::find_nmh_exe() always finds it next to flux_down.exe
+# nmh_registry::find_nmh_exe() always finds it next to rina_down.exe
 # (search path #1), covering Debug / Profile / Release and CI release builds.
 set(_NMH_WORKSPACE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/..")
-add_custom_target(fluxdown_nmh ALL
-  COMMAND cargo build -p fluxdown_nmh --release
+add_custom_target(rinadown_nmh ALL
+  COMMAND cargo build -p rinadown_nmh --release
   WORKING_DIRECTORY "${_NMH_WORKSPACE_DIR}"
-  COMMENT "Building fluxdown_nmh NMH relay binary"
+  COMMENT "Building rinadown_nmh NMH relay binary"
   VERBATIM
 )
-add_dependencies(${BINARY_NAME} fluxdown_nmh)
-install(PROGRAMS "${_NMH_WORKSPACE_DIR}/target/release/fluxdown_nmh.exe"
+add_dependencies(${BINARY_NAME} rinadown_nmh)
+install(PROGRAMS "${_NMH_WORKSPACE_DIR}/target/release/rinadown_nmh.exe"
   DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime
 )
 
-# === fluxdown_updater: auto-update helper binary ===
+# === rinadown_updater: auto-update helper binary ===
 # Build the updater helper binary alongside the app so that
-# update_service can find it next to flux_down.exe.
-add_custom_target(fluxdown_updater ALL
-  COMMAND cargo build -p fluxdown_updater --release
+# update_service can find it next to rina_down.exe.
+add_custom_target(rinadown_updater ALL
+  COMMAND cargo build -p rinadown_updater --release
   WORKING_DIRECTORY "${_NMH_WORKSPACE_DIR}"
-  COMMENT "Building fluxdown_updater helper binary"
+  COMMENT "Building rinadown_updater helper binary"
   VERBATIM
 )
-add_dependencies(${BINARY_NAME} fluxdown_updater)
-install(PROGRAMS "${_NMH_WORKSPACE_DIR}/target/release/fluxdown_updater.exe"
+add_dependencies(${BINARY_NAME} rinadown_updater)
+install(PROGRAMS "${_NMH_WORKSPACE_DIR}/target/release/rinadown_updater.exe"
   DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime
 )

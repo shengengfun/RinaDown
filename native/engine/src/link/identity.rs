@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn sign_verify_roundtrip() {
         let id = LinkIdentity::generate();
-        let msg = b"fluxdown-link-transcript";
+        let msg = b"rinadown-link-transcript";
         let sig = id.sign(msg);
         assert!(LinkIdentity::verify(&id.public_bytes(), msg, &sig));
         // 篡改消息 → 验签失败。

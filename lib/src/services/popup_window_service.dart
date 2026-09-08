@@ -1,6 +1,6 @@
 /// 外部唤起独立快速下载小窗 — 主引擎侧服务。
 ///
-/// 经 `fluxdown/popup_host` 通道请求原生宿主显示独立小窗
+/// 经 `rinadown/popup_host` 通道请求原生宿主显示独立小窗
 /// （原生窗口承载第二个 Flutter 引擎，见 popup-contract）：
 /// - `show(payloadJson)`：投递表单载荷并显示小窗（置顶、不占任务栏、
 ///   不抢主窗口前台 — 这正是独立小窗对主窗口内对话框的核心优势）；
@@ -60,7 +60,7 @@ class PopupWindowService {
 
   static final PopupWindowService instance = PopupWindowService._();
 
-  static const _channel = MethodChannel('fluxdown/popup_host');
+  static const _channel = MethodChannel('rinadown/popup_host');
 
   ThemeProvider? _themeProvider;
   GlobalKey<NavigatorState>? _navigatorKey;

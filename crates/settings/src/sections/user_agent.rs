@@ -1,6 +1,6 @@
 //! 全局 User-Agent：预设下拉 + 自定义输入，与 `lib/src/models/ua_presets.dart` 同基线。
 
-use fluxdown_ui_theme::active_theme;
+use rinadown_ui_theme::active_theme;
 use gpui::{
     App, AppContext as _, Entity, IntoElement as _, ParentElement, SharedString, Styled,
     Subscription, Window, px,
@@ -93,13 +93,13 @@ pub(crate) fn field(ctx: &SectionContext) -> SettingField<SharedString> {
                 };
                 let value_for_click = value.clone();
                 let click_store = store.clone();
-                fluxdown_ui_components::button(
+                rinadown_ui_components::button(
                     SharedString::from(format!("ua-preset-{value}")),
                     label.clone(),
                     if selected {
-                        fluxdown_ui_components::ButtonVariant::Primary
+                        rinadown_ui_components::ButtonVariant::Primary
                     } else {
-                        fluxdown_ui_components::ButtonVariant::Secondary
+                        rinadown_ui_components::ButtonVariant::Secondary
                     },
                     cx,
                 )

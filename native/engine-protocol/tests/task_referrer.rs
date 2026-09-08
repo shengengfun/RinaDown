@@ -1,6 +1,6 @@
 //! `TaskDto` 必须在 wire 上保留任务来源页。
 
-use fluxdown_engine::model::TaskInfo;
+use rinadown_engine::model::TaskInfo;
 
 #[test]
 fn task_dto_json_carries_referrer() -> Result<(), serde_json::Error> {
@@ -38,7 +38,7 @@ fn task_dto_json_carries_referrer() -> Result<(), serde_json::Error> {
         origin_url: String::new(),
         auto_route: String::new(),
     };
-    let dto = fluxdown_engine_protocol::task_info_to_dto(info);
+    let dto = rinadown_engine_protocol::task_info_to_dto(info);
     assert_eq!(dto.referrer, "https://example.com/page");
     let json = serde_json::to_string(&dto)?;
     assert!(json.contains(r#""referrer":"https://example.com/page""#));

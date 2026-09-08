@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flux_down/src/models/site_auth_store.dart';
+import 'package:rina_down/src/models/site_auth_store.dart';
 
 void main() {
   group('siteKeyFromUrl', () {

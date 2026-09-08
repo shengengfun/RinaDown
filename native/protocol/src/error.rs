@@ -12,7 +12,7 @@ pub const METHOD_NOT_FOUND_CODE: i32 = -32601;
 pub const INVALID_PARAMS_CODE: i32 = -32602;
 /// JSON-RPC 内部错误。
 pub const INTERNAL_ERROR_CODE: i32 = -32603;
-/// FluxDown 应用错误使用的 JSON-RPC code。
+/// RinaDown 应用错误使用的 JSON-RPC code。
 pub const APPLICATION_ERROR_CODE: i32 = -32000;
 
 /// 稳定应用错误码。
@@ -32,7 +32,7 @@ pub enum ApplicationErrorCode {
     Internal,
 }
 
-/// FluxDown 应用错误的机器可读详情。
+/// RinaDown 应用错误的机器可读详情。
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
@@ -69,7 +69,7 @@ pub struct RpcErrorObject {
 }
 
 impl RpcErrorObject {
-    /// 创建带稳定 FluxDown 应用错误详情的错误对象。
+    /// 创建带稳定 RinaDown 应用错误详情的错误对象。
     #[must_use]
     pub fn application(message: impl Into<String>, data: RpcErrorData) -> Self {
         Self {

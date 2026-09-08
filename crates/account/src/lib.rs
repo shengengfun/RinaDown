@@ -4,7 +4,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use fluxdown_ui_i18n::Translator;
+use rinadown_ui_i18n::Translator;
 use gpui::{
     AppContext as _, Context, Entity, IntoElement, ParentElement, Render, Styled, Window, div,
     prelude::FluentBuilder as _,
@@ -18,7 +18,7 @@ use gpui_component::{
 };
 
 pub type PortFuture<T> =
-    Pin<Box<dyn Future<Output = Result<T, fluxdown_protocol::RpcErrorData>> + Send + 'static>>;
+    Pin<Box<dyn Future<Output = Result<T, rinadown_protocol::RpcErrorData>> + Send + 'static>>;
 
 pub enum AccountCommand {
     Auth {
@@ -53,8 +53,8 @@ pub trait AccountPort: Send + Sync {
 
 pub struct AccountController {
     port: Arc<dyn AccountPort>,
-    session: Option<fluxdown_protocol::AgentSessionDto>,
-    devices: Vec<fluxdown_protocol::CloudDevice>,
+    session: Option<rinadown_protocol::AgentSessionDto>,
+    devices: Vec<rinadown_protocol::CloudDevice>,
     stale: bool,
 }
 
@@ -69,21 +69,21 @@ impl AccountController {
         }
     }
 
-    pub fn replace_snapshot(&mut self, snapshot: &fluxdown_protocol::AgentSnapshot) {
+    pub fn replace_snapshot(&mut self, snapshot: &rinadown_protocol::AgentSnapshot) {
         self.session.clone_from(&snapshot.session);
         self.devices.clone_from(&snapshot.cloud_devices);
         self.stale = false;
     }
 
-    pub fn apply_event(&mut self, event: &fluxdown_protocol::ServiceEvent) {
-        let fluxdown_protocol::ServiceEvent::Agent(event) = event else {
+    pub fn apply_event(&mut self, event: &rinadown_protocol::ServiceEvent) {
+        let rinadown_protocol::ServiceEvent::Agent(event) = event else {
             return;
         };
         match event {
-            fluxdown_protocol::AgentEvent::SessionChanged(session) => {
+            rinadown_protocol::AgentEvent::SessionChanged(session) => {
                 self.session.clone_from(session.as_ref())
             }
-            fluxdown_protocol::AgentEvent::CloudDevicesChanged(devices) => {
+            rinadown_protocol::AgentEvent::CloudDevicesChanged(devices) => {
                 self.devices.clone_from(devices)
             }
             _ => {}
@@ -94,11 +94,11 @@ impl AccountController {
         self.stale = true;
     }
     #[must_use]
-    pub fn session(&self) -> Option<&fluxdown_protocol::AgentSessionDto> {
+    pub fn session(&self) -> Option<&rinadown_protocol::AgentSessionDto> {
         self.session.as_ref()
     }
     #[must_use]
-    pub fn devices(&self) -> &[fluxdown_protocol::CloudDevice] {
+    pub fn devices(&self) -> &[rinadown_protocol::CloudDevice] {
         &self.devices
     }
     #[must_use]
@@ -155,7 +155,7 @@ impl AccountView {
 
     pub fn replace_snapshot(
         &mut self,
-        snapshot: &fluxdown_protocol::AgentSnapshot,
+        snapshot: &rinadown_protocol::AgentSnapshot,
         cx: &mut Context<Self>,
     ) {
         self.last_error = None;
@@ -163,7 +163,7 @@ impl AccountView {
         cx.notify();
     }
 
-    pub fn apply_event(&mut self, event: &fluxdown_protocol::ServiceEvent, cx: &mut Context<Self>) {
+    pub fn apply_event(&mut self, event: &rinadown_protocol::ServiceEvent, cx: &mut Context<Self>) {
         self.controller.apply_event(event);
         cx.notify();
     }
@@ -195,9 +195,9 @@ impl AccountView {
             serde_json::json!({"account": account, "password": password})
         };
         let method = if verify {
-            fluxdown_protocol::method::AGENT_AUTH_LOGIN_VERIFY
+            rinadown_protocol::method::AGENT_AUTH_LOGIN_VERIFY
         } else {
-            fluxdown_protocol::method::AGENT_AUTH_LOGIN
+            rinadown_protocol::method::AGENT_AUTH_LOGIN
         };
         let future = self
             .controller
@@ -210,11 +210,11 @@ impl AccountView {
                     Ok(value) => {
                         this.last_error = None;
                         this.verification_required =
-                            serde_json::from_value::<fluxdown_protocol::AgentLoginResult>(value)
+                            serde_json::from_value::<rinadown_protocol::AgentLoginResult>(value)
                                 .is_ok_and(|result| {
                                     matches!(
                                 result,
-                                fluxdown_protocol::AgentLoginResult::DeviceVerificationRequired {
+                                rinadown_protocol::AgentLoginResult::DeviceVerificationRequired {
                                     ..
                                 }
                             )
@@ -330,7 +330,7 @@ impl Render for AccountView {
                                         .on_click(cx.listener(|this, _, _, cx| {
                                             let future =
                                                 this.controller.port.execute(AccountCommand::Device {
-                                                    method: fluxdown_protocol::method::AGENT_DEVICE_LIST,
+                                                    method: rinadown_protocol::method::AGENT_DEVICE_LIST,
                                                     params: serde_json::json!({}),
                                                 });
                                             this.spawn_action(future, cx);
@@ -345,7 +345,7 @@ impl Render for AccountView {
                                         .on_click(cx.listener(|this, _, _, cx| {
                                             let future =
                                                 this.controller.port.execute(AccountCommand::Auth {
-                                                    method: fluxdown_protocol::method::AGENT_AUTH_LOGOUT,
+                                                    method: rinadown_protocol::method::AGENT_AUTH_LOGOUT,
                                                     params: serde_json::json!({}),
                                                 });
                                             this.spawn_action(future, cx);

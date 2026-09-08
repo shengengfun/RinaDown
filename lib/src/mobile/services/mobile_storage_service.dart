@@ -9,7 +9,7 @@ import '../mobile_ui.dart';
 
 const _tag = 'MobileStorage';
 
-/// Android 存储桥（对应 MainActivity.kt 的 `com.fluxdown/storage` channel）。
+/// Android 存储桥（对应 MainActivity.kt 的 `com.rinadown/storage` channel）。
 ///
 /// - 目录选择走系统文件管理器（SAF），Kotlin 侧将 tree URI 映射为
 ///   Rust 引擎可 std::fs 直写的文件系统路径；
@@ -18,7 +18,7 @@ const _tag = 'MobileStorage';
 class MobileStorageService {
   MobileStorageService._();
 
-  static const _channel = MethodChannel('com.fluxdown/storage');
+  static const _channel = MethodChannel('com.rinadown/storage');
 
   /// 当前平台是否支持系统目录选择器
   static bool get supported => Platform.isAndroid;

@@ -105,7 +105,7 @@ export default function ExtensionSection() {
               className="flex flex-wrap gap-3 pt-2"
             >
               <a
-                href="https://chromewebstore.google.com/detail/fluxdown/meleenglfggcmcajknpeeeiobnpfmahc"
+                href="https://chromewebstore.google.com/detail/rinadown/meleenglfggcmcajknpeeeiobnpfmahc"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-[#06b6d4]/10 border border-[#06b6d4]/30 px-5 py-2.5 text-sm font-semibold text-[#06b6d4] hover:bg-[#06b6d4]/20 transition-colors"
@@ -121,7 +121,7 @@ export default function ExtensionSection() {
                 {t("ext.addToChrome")}
               </a>
               <a
-                href="https://microsoftedge.microsoft.com/addons/detail/fluxdown/nglkkjbogjghekbhhcnccnpfedjbdhhd"
+                href="https://microsoftedge.microsoft.com/addons/detail/rinadown/nglkkjbogjghekbhhcnccnpfedjbdhhd"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-[#0078d4]/10 border border-[#0078d4]/30 px-5 py-2.5 text-sm font-semibold text-[#3b9eff] hover:bg-[#0078d4]/20 transition-colors"
@@ -137,7 +137,7 @@ export default function ExtensionSection() {
                 {t("ext.addToEdge")}
               </a>
               <a
-                href="https://addons.mozilla.org/firefox/addon/fluxdown/"
+                href="https://addons.mozilla.org/firefox/addon/rinadown/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-[#ff7139]/10 border border-[#ff7139]/30 px-5 py-2.5 text-sm font-semibold text-[#ff7139] hover:bg-[#ff7139]/20 transition-colors"

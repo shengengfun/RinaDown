@@ -15,8 +15,8 @@
 // Windows-with-native-bindings and not part of this renderer's contract).
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/services/win32_toast/toast_card_renderer.dart';
-import 'package:flux_down/src/theme/flux_theme_tokens.dart';
+import 'package:rina_down/src/services/win32_toast/toast_card_renderer.dart';
+import 'package:rina_down/src/theme/flux_theme_tokens.dart';
 
 ToastCardSpec _spec() => ToastCardSpec(
   title: 'Download complete',

@@ -8,18 +8,18 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use base64::Engine as _;
-use fluxdown_api::service::ApiError;
-use fluxdown_engine::Engine;
-use fluxdown_engine::bt_downloader::{BtConfig, BtMseMode};
-use fluxdown_engine::db::Db;
-use fluxdown_engine::download_manager::{
+use rinadown_api::service::ApiError;
+use rinadown_engine::Engine;
+use rinadown_engine::bt_downloader::{BtConfig, BtMseMode};
+use rinadown_engine::db::Db;
+use rinadown_engine::download_manager::{
     CreateGroupSpec, NewTaskSpec, ResolveOutcome, ResolvePreviewOutcome, TaskDone,
 };
-use fluxdown_engine::log_info;
-use fluxdown_engine::proxy_config::ProxyConfig;
-use fluxdown_engine::rss::RssValidateOutcome;
-use fluxdown_engine::rss::model::RssSourceInfo;
-use fluxdown_protocol::daemon::CreateTaskRequest;
+use rinadown_engine::log_info;
+use rinadown_engine::proxy_config::ProxyConfig;
+use rinadown_engine::rss::RssValidateOutcome;
+use rinadown_engine::rss::model::RssSourceInfo;
+use rinadown_protocol::daemon::CreateTaskRequest;
 use tokio::sync::{mpsc, oneshot};
 use tokio::time::MissedTickBehavior;
 
@@ -240,7 +240,7 @@ pub enum ActorCmd {
     },
     /// 投递日志快照（内存环形缓冲，只能问引擎要，DB 里没有）。
     WebhookDeliveries {
-        ack: oneshot::Sender<Vec<fluxdown_engine::webhook::WebhookDelivery>>,
+        ack: oneshot::Sender<Vec<rinadown_engine::webhook::WebhookDelivery>>,
     },
     /// 清空投递日志。
     WebhookClear {
@@ -255,7 +255,7 @@ pub enum ActorCmd {
     /// 范式：actor 只交出 dispatcher 句柄，10s 网络往返在 spawn 里等。
     WebhookTest {
         endpoint_json: String,
-        ack: oneshot::Sender<Box<fluxdown_engine::webhook::WebhookDelivery>>,
+        ack: oneshot::Sender<Box<rinadown_engine::webhook::WebhookDelivery>>,
     },
 }
 
@@ -288,7 +288,7 @@ pub async fn run_actor(
     // Seeding evaluation timer: check ratio/time limits and stop seeders
     // that have exceeded the configured thresholds at the shared interval.
     let mut seeding_interval =
-        tokio::time::interval(fluxdown_engine::bt_seeding::SEEDING_EVAL_INTERVAL);
+        tokio::time::interval(rinadown_engine::bt_seeding::SEEDING_EVAL_INTERVAL);
     seeding_interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
     // RSS 轮询节拍：与 `queue_schedule_tick` 同款——宿主只提供节拍，到期
@@ -415,7 +415,7 @@ async fn handle_cmd(cmd: ActorCmd, engine: &mut Engine) {
                     method: req.method,
                     body: req
                         .body
-                        .map(fluxdown_engine_protocol::request_body_to_engine),
+                        .map(rinadown_engine_protocol::request_body_to_engine),
                     audio_url: req.audio_url,
                     start_paused: req.start_paused,
                     http_user: req.http_user,
@@ -658,12 +658,21 @@ async fn handle_cmd(cmd: ActorCmd, engine: &mut Engine) {
                 referrer,
                 user_agent,
                 extra_headers,
+                // 与 hub 一致：B2 resolve-preview 无 video 位时走通用 resolver。
+                false,
             );
             tokio::spawn(async move {
                 let outcome = rx.await.unwrap_or(ResolvePreviewOutcome {
                     name: String::new(),
                     items: Vec::new(),
                     error: "resolve preview worker dropped".to_string(),
+                    variants: Vec::new(),
+                    file_name: String::new(),
+                    total_bytes: 0,
+                    resolver_identity: String::new(),
+                    audio_url: String::new(),
+                    range_supported: false,
+                    ephemeral: false,
                 });
                 let _ = ack.send(outcome);
             });
@@ -730,7 +739,7 @@ async fn handle_cmd(cmd: ActorCmd, engine: &mut Engine) {
             // 与 `RssValidate` 同款：10s 网络往返绝不在 actor 内 await。
             let dispatcher = engine.manager.webhook();
             tokio::spawn(async move {
-                let spec: fluxdown_engine::webhook::EndpointSpec =
+                let spec: rinadown_engine::webhook::EndpointSpec =
                     serde_json::from_str(&endpoint_json).unwrap_or_default();
                 let _ = ack.send(Box::new(dispatcher.test_endpoint(spec).await));
             });
@@ -845,7 +854,7 @@ async fn apply_config(engine: &mut Engine, keys: &[String]) {
                     engine.manager.set_missing_file_auto_delete(v == "delete");
                 }
             }
-            k if k == fluxdown_engine::webhook::CONFIG_KEY_ENDPOINTS => {
+            k if k == rinadown_engine::webhook::CONFIG_KEY_ENDPOINTS => {
                 if let Some(v) = all.get(key) {
                     engine.manager.set_webhook_endpoints(v);
                 }
@@ -940,7 +949,7 @@ async fn apply_config(engine: &mut Engine, keys: &[String]) {
             "log_max_size_mb" => {
                 if let Some(mb) = all.get(key).and_then(|v| v.parse::<u64>().ok()) {
                     log_info!("[server-actor] log_max_size_mb -> {}", mb);
-                    fluxdown_engine::logger::set_max_total_bytes(mb * 1024 * 1024);
+                    rinadown_engine::logger::set_max_total_bytes(mb * 1024 * 1024);
                 }
             }
             // 服务器自身配置（token/端口/子开关）重启生效；其余键无运行时动作。
@@ -1014,12 +1023,12 @@ pub fn bt_config_from_map(cfg: &HashMap<String, String>) -> BtConfig {
             .get("bt_seed_limit_operator")
             .map(|v| {
                 if v.eq_ignore_ascii_case("and") {
-                    fluxdown_engine::bt_seeding::SeedingLimitOperator::And
+                    rinadown_engine::bt_seeding::SeedingLimitOperator::And
                 } else {
-                    fluxdown_engine::bt_seeding::SeedingLimitOperator::Or
+                    rinadown_engine::bt_seeding::SeedingLimitOperator::Or
                 }
             })
-            .unwrap_or(fluxdown_engine::bt_seeding::SeedingLimitOperator::Or),
+            .unwrap_or(rinadown_engine::bt_seeding::SeedingLimitOperator::Or),
         seed_then_action: cfg
             .get("bt_seed_then_action")
             .cloned()
@@ -1045,13 +1054,13 @@ pub fn bt_config_from_map(cfg: &HashMap<String, String>) -> BtConfig {
 pub async fn refresh_tracker_sub(
     db: &Db,
     cmd_tx: &mpsc::Sender<ActorCmd>,
-) -> fluxdown_engine::tracker_subscription::FetchOutcome {
+) -> rinadown_engine::tracker_subscription::FetchOutcome {
     let cfg = db.get_all_config().await.unwrap_or_default();
     let urls = cfg
         .get("bt_tracker_sub_urls")
         .cloned()
-        .unwrap_or_else(fluxdown_engine::tracker_subscription::default_subscription_urls);
-    let outcome = fluxdown_engine::tracker_subscription::fetch_subscriptions(&urls).await;
+        .unwrap_or_else(rinadown_engine::tracker_subscription::default_subscription_urls);
+    let outcome = rinadown_engine::tracker_subscription::fetch_subscriptions(&urls).await;
     if outcome.is_success() {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1122,9 +1131,9 @@ pub fn ed2k_server_sub_startup_plan(cfg: &HashMap<String, String>, now: i64) -> 
         .and_then(|v| v.parse::<i64>().ok())
         .unwrap_or(0);
     let version_stale =
-        cache_version < fluxdown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION;
+        cache_version < rinadown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION;
     let stale_by_age = now.saturating_sub(updated_at)
-        > fluxdown_engine::ed2k::server_subscription::REFRESH_INTERVAL_SECS;
+        > rinadown_engine::ed2k::server_subscription::REFRESH_INTERVAL_SECS;
     Ed2kSubStartupPlan {
         invalidate_cache: version_stale,
         refresh: sub_enabled && (version_stale || stale_by_age),
@@ -1142,14 +1151,14 @@ pub fn ed2k_server_sub_startup_plan(cfg: &HashMap<String, String>, now: i64) -> 
 /// 全部源失败时不改动缓存，保留上次成功的列表。
 pub async fn refresh_ed2k_server_sub(
     db: &Db,
-) -> fluxdown_engine::ed2k::server_subscription::ServerFetchOutcome {
+) -> rinadown_engine::ed2k::server_subscription::ServerFetchOutcome {
     let cfg = db.get_all_config().await.unwrap_or_default();
     let urls = cfg
         .get("ed2k_server_sub_urls")
         .cloned()
-        .unwrap_or_else(fluxdown_engine::ed2k::server_subscription::default_server_met_urls);
+        .unwrap_or_else(rinadown_engine::ed2k::server_subscription::default_server_met_urls);
     let outcome =
-        fluxdown_engine::ed2k::server_subscription::fetch_server_subscriptions(&urls).await;
+        rinadown_engine::ed2k::server_subscription::fetch_server_subscriptions(&urls).await;
     if outcome.is_success() {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -1173,7 +1182,7 @@ pub async fn refresh_ed2k_server_sub(
         if let Err(e) = db
             .set_config(
                 "ed2k_server_sub_cache_version",
-                &fluxdown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION.to_string(),
+                &rinadown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION.to_string(),
             )
             .await
         {
@@ -1197,7 +1206,7 @@ pub fn spawn_ed2k_nodes_dat_refresh(db: Db) {
         if url.is_empty() {
             return;
         }
-        match fluxdown_engine::ed2k::kad::fetch_nodes_dat(&url).await {
+        match rinadown_engine::ed2k::kad::fetch_nodes_dat(&url).await {
             Ok(bytes) => {
                 let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
                 let now = std::time::SystemTime::now()
@@ -1347,8 +1356,8 @@ mod tests {
 
     #[test]
     fn ed2k_server_sub_startup_plan_covers_version_staleness_freshness_and_opt_out() {
-        const CUR: i64 = fluxdown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION;
-        const INTERVAL: i64 = fluxdown_engine::ed2k::server_subscription::REFRESH_INTERVAL_SECS;
+        const CUR: i64 = rinadown_engine::ed2k::server_subscription::CACHE_FORMAT_VERSION;
+        const INTERVAL: i64 = rinadown_engine::ed2k::server_subscription::REFRESH_INTERVAL_SECS;
         let now = 1_800_000_000_i64;
 
         // 缓存格式版本落后：即使时间戳刚刚更新过，也必须清空缓存并重取

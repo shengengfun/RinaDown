@@ -1,5 +1,5 @@
 /**
- * FluxDown Website i18n
+ * RinaDown Website i18n
  *
  * - 默认跟随浏览器语言
  * - 支持中文(zh)和英文(en)
@@ -15,7 +15,7 @@ import type { Messages } from "./locales";
 /** locale 代码（"en"、"zh"、"ja"…），可用集合由 locales/*.json 自动发现 */
 export type Locale = string;
 
-const STORAGE_KEY = "fluxdown-locale";
+const STORAGE_KEY = "rinadown-locale";
 
 /** 检测浏览器语言 */
 export function detectLocale(): Locale {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-FluxDown 平台发布通知脚本
+RinaDown 平台发布通知脚本
 用法: python3 send_notify.py [--config notify_config.json] [--dry-run] [--resume]
 
 改进：
@@ -22,13 +22,13 @@ from pathlib import Path
 
 # ── SMTP 配置 ────────────────────────────────────────────────────────────────
 # 凭据一律来自环境变量，禁止硬编码：
-#   FLUXDOWN_SMTP_USER  发件邮箱
-#   FLUXDOWN_SMTP_PASS  SMTP 授权码
-SMTP_HOST = os.environ.get("FLUXDOWN_SMTP_HOST", "smtp.163.com")
-SMTP_PORT = int(os.environ.get("FLUXDOWN_SMTP_PORT", "465"))
-SMTP_USER = os.environ.get("FLUXDOWN_SMTP_USER", "")
-SMTP_PASS = os.environ.get("FLUXDOWN_SMTP_PASS", "")
-SENDER_NAME = "FluxDown"
+#   RINADOWN_SMTP_USER  发件邮箱
+#   RINADOWN_SMTP_PASS  SMTP 授权码
+SMTP_HOST = os.environ.get("RINADOWN_SMTP_HOST", "smtp.163.com")
+SMTP_PORT = int(os.environ.get("RINADOWN_SMTP_PORT", "465"))
+SMTP_USER = os.environ.get("RINADOWN_SMTP_USER", "")
+SMTP_PASS = os.environ.get("RINADOWN_SMTP_PASS", "")
+SENDER_NAME = "RinaDown"
 
 # ── 发送策略 ─────────────────────────────────────────────────────────────────
 BATCH_SIZE = 8  # 每批发送数量（每批结束后重新连接）
@@ -75,9 +75,9 @@ def build_text(
 ) -> str:
     """纯文本回退版本"""
     items = "\n".join(f"  • {item}" for item in changelog)
-    return f"""FluxDown {platform} v{version} 正式发布！
+    return f"""RinaDown {platform} v{version} 正式发布！
 
-你好！感谢订阅 FluxDown {platform} 平台发布通知。
+你好！感谢订阅 RinaDown {platform} 平台发布通知。
 
 本次更新亮点：
 {items}
@@ -85,8 +85,8 @@ def build_text(
 立即下载：{download_url}
 
 ---
-© 2025 FluxDown · zerx-lab · https://fluxdown.zerx.dev
-如有问题或建议：https://fluxdown.zerx.dev/feedback
+© 2025 RinaDown · zerx-lab · https://rinadown.zerx.dev
+如有问题或建议：https://rinadown.zerx.dev/feedback
 """
 
 
@@ -97,7 +97,7 @@ def build_message(
     download_url: str,
     changelog: list[str],
 ) -> MIMEMultipart:
-    subject = f"FluxDown {platform} v{version} 正式发布 🎉"
+    subject = f"RinaDown {platform} v{version} 正式发布 🎉"
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = f"{SENDER_NAME} <{SMTP_USER}>"
@@ -119,7 +119,7 @@ def new_smtp_conn() -> smtplib.SMTP_SSL:
     """建立并登录一个新的 SMTP_SSL 连接"""
     if not SMTP_USER or not SMTP_PASS:
         print(
-            "[错误] 未设置 FLUXDOWN_SMTP_USER / FLUXDOWN_SMTP_PASS 环境变量",
+            "[错误] 未设置 RINADOWN_SMTP_USER / RINADOWN_SMTP_PASS 环境变量",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -211,7 +211,7 @@ def save_progress(progress_path: Path, sent: set[str]) -> None:
 
 # ── 主流程 ───────────────────────────────────────────────────────────────────
 def main() -> None:
-    parser = argparse.ArgumentParser(description="FluxDown 平台发布通知脚本")
+    parser = argparse.ArgumentParser(description="RinaDown 平台发布通知脚本")
     parser.add_argument(
         "--config",
         default=Path(__file__).parent / "notify_config.json",
@@ -252,7 +252,7 @@ def main() -> None:
     pending = [addr for addr in recipients if addr not in already_sent]
 
     print(f"╔══════════════════════════════════════════╗")
-    print(f"  FluxDown 发布通知脚本")
+    print(f"  RinaDown 发布通知脚本")
     print(f"  平台: {platform}  版本: v{version}")
     print(f"  收件人: {len(recipients)} 位  待发: {len(pending)} 位")
     print(f"  批大小: {BATCH_SIZE}  间隔: {INTERVAL_SEC}s  批停顿: {BATCH_PAUSE_SEC}s")

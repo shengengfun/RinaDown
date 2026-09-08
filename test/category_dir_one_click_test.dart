@@ -14,7 +14,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flux_down/src/models/custom_category.dart';
+import 'package:rina_down/src/models/custom_category.dart';
 
 void main() {
   group('sanitizeCategoryDirName', () {
