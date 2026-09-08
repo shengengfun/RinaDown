@@ -28,6 +28,7 @@ import 'src/services/resolve_variant_service.dart';
 import 'src/services/bt_file_selection_service.dart';
 import 'src/services/analytics_service.dart';
 import 'src/services/app_icon_service.dart';
+import 'src/services/clipboard_watch_service.dart';
 import 'src/services/log_service.dart';
 import 'src/services/kv_store.dart';
 import 'src/services/notification_service.dart';
@@ -39,6 +40,7 @@ import 'src/theme/app_theme.dart';
 import 'src/theme/flux_theme_tokens.dart';
 import 'src/theme/theme_provider.dart';
 import 'src/widgets/feedback_dialog.dart';
+import 'src/widgets/new_download_dialog.dart';
 import 'src/widgets/ui_scale_widget.dart';
 import 'src/widgets/update_changelog_dialog.dart';
 
@@ -407,6 +409,9 @@ class _FluxDownAppState extends State<FluxDownApp>
     // 设置托盘退出回调 — 统一走优雅退出流程
     TrayService.instance.onExitApp = _performGracefulExit;
 
+    // 托盘「新建下载…」— 恢复主窗后弹新建下载对话框
+    TrayService.instance.onNewDownload = _openNewDownloadFromTray;
+
     // 初始化外部下载服务 — 监听浏览器扩展的下载请求
     ExternalDownloadService.init(
       settingsProvider: _settingsForExternal,
@@ -440,6 +445,9 @@ class _FluxDownAppState extends State<FluxDownApp>
 
     // 悬浮球服务 — 配置加载完成后初始化（S0.5 初始化钩子）
     _initFloatingBallAfterConfigLoad();
+
+    // 剪贴板监听服务 — 主开关来自 Rust config，同样等配置加载完成后初始化
+    _initClipboardWatchAfterConfigLoad();
 
     // 启动时最小化到托盘：配置加载完成后按设置决定是否隐藏主窗口
     // （原生层 first_frame_cb 默认会显示窗口，此处按用户设置补做隐藏）
@@ -548,6 +556,17 @@ class _FluxDownAppState extends State<FluxDownApp>
     if (mounted) setState(() {});
     // 语言变更后刷新托盘菜单
     TrayService.instance.refreshMenu();
+  }
+
+  /// 托盘「新建下载…」：先恢复主窗口，再经根 Navigator 弹出新建下载对话框。
+  /// 与更新失败弹窗同款模式（用 `_navigatorKey.currentContext`），无 HomePage
+  /// context 耦合；HomePage 尚未挂载（globalInstance 为空）时静默跳过。
+  void _openNewDownloadFromTray() {
+    final ctx = _navigatorKey.currentContext;
+    final controller = DownloadController.globalInstance;
+    if (ctx == null || controller == null) return;
+    unawaited(restoreMainWindow());
+    showNewDownloadDialog(ctx, controller, _settingsForExternal);
   }
 
   /// 当 UpdateService 状态变化时，检查是否应该弹出更新日志弹窗 / 更新失败提示。
@@ -676,6 +695,39 @@ class _FluxDownAppState extends State<FluxDownApp>
       _settingsForExternal.removeListener(listener);
     }
 
+    listener = () {
+      if (_settingsForExternal.loaded) {
+        cleanup();
+        if (mounted) doInit();
+      }
+    };
+    _settingsForExternal.addListener(listener);
+    timeout = Timer(const Duration(seconds: 10), () {
+      cleanup();
+      if (mounted) doInit();
+    });
+  }
+
+  /// 等配置加载完成后初始化剪贴板监听（主开关 clipboardWatchEnabled 来自
+  /// Rust config，须先就绪；与悬浮球同款「等配置加载」监听模式）。
+  void _initClipboardWatchAfterConfigLoad() {
+    void doInit() {
+      ClipboardWatchService.instance.init(
+        settings: _settingsForExternal,
+        navigatorKey: _navigatorKey,
+      );
+    }
+
+    if (_settingsForExternal.loaded) {
+      doInit();
+      return;
+    }
+    late final void Function() listener;
+    Timer? timeout;
+    void cleanup() {
+      timeout?.cancel();
+      _settingsForExternal.removeListener(listener);
+    }
     listener = () {
       if (_settingsForExternal.loaded) {
         cleanup();

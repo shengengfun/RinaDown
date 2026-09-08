@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -7,6 +8,8 @@ import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../i18n/locale_provider.dart';
+import '../models/download_controller.dart';
+import '../models/download_task.dart';
 import '../models/settings_provider.dart';
 import 'floating_ball/floating_ball_service.dart';
 import 'log_service.dart';
@@ -81,6 +84,17 @@ class TrayService with TrayListener {
   /// 回调中应等待待处理通知、销毁托盘、再销毁窗口。
   Future<void> Function()? onExitApp;
 
+  /// 托盘「新建下载…」回调 — 由外部（_FluxDownAppState）注入：恢复主窗并
+  /// 弹出新建下载对话框。
+  VoidCallback? onNewDownload;
+
+  /// 2s 定时器：主窗隐藏期间刷新托盘 tooltip 与菜单状态行。
+  Timer? _statusTimer;
+  String _lastStatus = '';
+
+  /// 最近一次主动弹出右键菜单的时刻（Windows），期间跳过菜单重建防抖。
+  DateTime? _lastPopupAt;
+
   /// 初始化系统托盘图标和菜单
   Future<void> init() async {
     logInfo(_tag, 'init called, _initialized=$_initialized');
@@ -131,48 +145,102 @@ class TrayService with TrayListener {
       await trayManager.setToolTip('FluxDown');
     }
 
-    final menu = Menu(
-      items: [
-        MenuItem(key: 'show_window', label: currentS.trayShowWindow),
-        MenuItem.checkbox(
-          key: 'toggle_ball',
-          label: currentS.trayShowFloatingBall,
-          checked:
-              SettingsProvider.globalInstance?.floatingBallEnabled ?? false,
-        ),
-        MenuItem.separator(),
-        MenuItem(key: 'exit_app', label: currentS.trayExit),
-      ],
-    );
-    await trayManager.setContextMenu(menu);
+    await _applyContextMenu();
     trayManager.addListener(this);
+    _lastStatus = _statusLine();
+    _startStatusTimer();
     logInfo(_tag, 'init done');
   }
 
-  /// 刷新托盘菜单文字（语言切换后调用）
+  /// 刷新托盘菜单文字（语言切换后调用）。状态行随当前任务实时计算。
   Future<void> refreshMenu() async {
     if (!_initialized) return;
     logInfo(_tag, 'refreshMenu called');
-    final menu = Menu(
+    await _applyContextMenu();
+    logInfo(_tag, 'refreshMenu done');
+  }
+
+  /// 组装当前托盘菜单（状态行 + 全局操作）。
+  Menu _buildMenu() {
+    final s = currentS;
+    return Menu(
       items: [
-        MenuItem(key: 'show_window', label: currentS.trayShowWindow),
+        MenuItem(label: _statusLine(), disabled: true),
+        MenuItem.separator(),
+        MenuItem(key: 'new_download', label: s.newDownload),
+        MenuItem(key: 'pause_all', label: s.pauseAll),
+        MenuItem(key: 'resume_all', label: s.resumeAll),
+        MenuItem.separator(),
         MenuItem.checkbox(
           key: 'toggle_ball',
-          label: currentS.trayShowFloatingBall,
+          label: s.trayShowFloatingBall,
           checked:
               SettingsProvider.globalInstance?.floatingBallEnabled ?? false,
         ),
+        MenuItem(key: 'show_window', label: s.trayShowWindow),
         MenuItem.separator(),
-        MenuItem(key: 'exit_app', label: currentS.trayExit),
+        MenuItem(key: 'exit_app', label: s.trayExit),
       ],
     );
-    await trayManager.setContextMenu(menu);
-    logInfo(_tag, 'refreshMenu done');
+  }
+
+  Future<void> _applyContextMenu() async {
+    await trayManager.setContextMenu(_buildMenu());
+  }
+
+  /// 状态行文案：空闲或「下载中 N · X/s」（菜单头部与 tooltip 共用）。
+  String _statusLine() {
+    final d = DownloadController.globalInstance;
+    final active = d?.activeCount ?? 0;
+    if (active == 0) return currentS.trayStatusIdle;
+    return currentS.trayStatusActive(
+      active,
+      DownloadTask.formatBytes(d?.totalDownloadSpeed ?? 0),
+    );
+  }
+
+  /// 主窗隐藏期间低频刷新 tooltip / 菜单状态行。状态文本无变化跳过；
+  /// 主动弹右键菜单后 1.5s 内跳过菜单重建（避免关掉正在打开的菜单）。
+  void _startStatusTimer() {
+    _stopStatusTimer();
+    _statusTimer = Timer.periodic(
+      const Duration(seconds: 2),
+      (_) => _tickStatus(),
+    );
+  }
+
+  void _stopStatusTimer() {
+    _statusTimer?.cancel();
+    _statusTimer = null;
+  }
+
+  void _tickStatus() {
+    if (!_initialized || _isExiting) return;
+    final text = _statusLine();
+    if (text == _lastStatus) return;
+    _lastStatus = text;
+    if (!Platform.isLinux) {
+      unawaited(
+        trayManager.setToolTip(text).catchError((Object e) {
+          logError(_tag, 'setToolTip failed', e);
+        }),
+      );
+    }
+    windowManager.isVisible().then((visible) {
+      if (!_initialized || _isExiting || visible) return;
+      final popped = _lastPopupAt;
+      if (popped != null &&
+          DateTime.now().difference(popped).inMilliseconds < 1500) {
+        return; // 弹层菜单可能仍打开，重建会关闭它
+      }
+      refreshMenu();
+    });
   }
 
   /// 销毁托盘图标
   Future<void> destroy() async {
     logInfo(_tag, 'destroy called, _initialized=$_initialized');
+    _stopStatusTimer();
     trayManager.removeListener(this);
     await trayManager.destroy();
     _initialized = false;
@@ -299,6 +367,9 @@ class TrayService with TrayListener {
   void onTrayIconRightMouseDown() {
     logInfo(_tag, 'onTrayIconRightMouseDown, _isExiting=$_isExiting');
     if (_isExiting) return;
+    // 弹菜单前先刷新（状态行/可点项随最新任务状态）；期间防抖菜单重建
+    _lastPopupAt = DateTime.now();
+    refreshMenu();
     trayManager.popUpContextMenu();
   }
 
@@ -313,6 +384,14 @@ class TrayService with TrayListener {
     );
     if (_isExiting) return;
     switch (menuItem.key) {
+      case 'new_download':
+        onNewDownload?.call();
+      case 'pause_all':
+        DownloadController.globalInstance?.pauseAll();
+        refreshMenu();
+      case 'resume_all':
+        DownloadController.globalInstance?.resumeAll();
+        refreshMenu();
       case 'show_window':
         _showWindow();
       case 'toggle_ball':

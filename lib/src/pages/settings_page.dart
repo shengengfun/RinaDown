@@ -30,6 +30,7 @@ import '../models/ua_presets.dart';
 import '../models/webhook_endpoint.dart';
 import '../models/webhook_provider.dart';
 import '../services/app_icon_service.dart';
+import '../services/clipboard_platforms.dart';
 import '../services/cloud/cloud_auth_service.dart';
 import '../services/cloud/cloud_client.dart';
 import '../services/cloud/config_sync_service.dart';
@@ -242,14 +243,13 @@ List<SettingsSearchItem> get settingsSearchItems {
       keywords: s.searchKeywordsFloatingBall,
       icon: LucideIcons.circleDot,
     ),
-    if (Platform.isLinux)
-      SettingsSearchItem(
-        category: SettingsCategory.general,
-        label: s.clipboardWatch,
-        description: s.clipboardWatchDesc,
-        keywords: s.searchKeywordsClipboardWatch,
-        icon: LucideIcons.clipboard,
-      ),
+    SettingsSearchItem(
+      category: SettingsCategory.general,
+      label: s.clipboardWatch,
+      description: s.clipboardParseDesc,
+      keywords: s.searchKeywordsClipboardWatch,
+      icon: LucideIcons.clipboard,
+    ),
     SettingsSearchItem(
       category: SettingsCategory.general,
       label: s.torrentFileAssociation,
@@ -369,6 +369,13 @@ List<SettingsSearchItem> get settingsSearchItems {
       description: s.rememberLastSaveDirDesc,
       keywords: s.searchKeywordsSaveDir,
       icon: LucideIcons.history,
+    ),
+    SettingsSearchItem(
+      category: SettingsCategory.download,
+      label: s.deleteToRecycleBin,
+      description: s.deleteToRecycleBinDesc,
+      keywords: s.searchKeywordsRecycleBin,
+      icon: LucideIcons.trash2,
     ),
     SettingsSearchItem(
       category: SettingsCategory.download,
@@ -2188,16 +2195,51 @@ class _GeneralContent extends StatelessWidget {
                       },
                     ),
                   ),
-                if (Platform.isLinux && ballDegraded)
+                if (Platform.isWindows ||
+                    Platform.isMacOS ||
+                    (Platform.isLinux && ballDegraded))
                   _SettingRow(
                     label: s.clipboardWatch,
-                    description: s.clipboardWatchDesc,
+                    description: (Platform.isLinux && ballDegraded)
+                        ? s.clipboardWatchDesc
+                        : s.clipboardParseDesc,
                     child: ShadSwitch(
                       value: settingsProvider.clipboardWatchEnabled,
                       onChanged: (v) =>
                           settingsProvider.setClipboardWatchEnabled(v),
                     ),
                   ),
+                if (settingsProvider.clipboardWatchEnabled &&
+                    (Platform.isWindows || Platform.isMacOS)) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    s.clipboardPlatformsTitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.of(context).textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    s.clipboardPlatformsDesc,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.of(context).textMuted,
+                    ),
+                  ),
+                  for (final def in kClipboardPlatforms)
+                    _SettingRow(
+                      label: s.clipboardPlatformName(def.id),
+                      description: def.hosts.join(', '),
+                      child: ShadSwitch(
+                        value: settingsProvider
+                            .isClipboardPlatformEnabled(def.id),
+                        onChanged: (v) => settingsProvider
+                            .setClipboardPlatformEnabled(def.id, v),
+                      ),
+                    ),
+                ],
                 _SettingRow(
                   label: s.torrentFileAssociation,
                   description: s.torrentFileAssociationDesc,
@@ -3434,6 +3476,15 @@ class _DownloadContent extends StatelessWidget {
                     value: settingsProvider.rememberLastSaveDir,
                     onChanged: (v) =>
                         settingsProvider.setRememberLastSaveDir(v),
+                  ),
+                ),
+                _SettingRow(
+                  label: s.deleteToRecycleBin,
+                  description: s.deleteToRecycleBinDesc,
+                  child: ShadSwitch(
+                    value: settingsProvider.deleteToRecycleBin,
+                    onChanged: (v) =>
+                        settingsProvider.setDeleteToRecycleBin(v),
                   ),
                 ),
               ],

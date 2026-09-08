@@ -7,6 +7,7 @@ import 'package:launch_at_startup/launch_at_startup.dart';
 import 'package:rinf/rinf.dart';
 
 import '../bindings/bindings.dart';
+import '../services/clipboard_platforms.dart';
 import '../services/log_service.dart';
 import 'custom_category.dart';
 import 'speed_unit.dart';
@@ -58,7 +59,9 @@ class SettingsProvider extends ChangeNotifier {
   double _floatingBallX = -1; // 绝对像素坐标；-1 哨兵 = 未设置（用默认停靠）
   double _floatingBallY = -1;
   bool _floatingBallActiveOnly = false; // 仅下载时显示，其余隐藏（默认关=常显）
-  bool _clipboardWatchEnabled = false; // 仅 Linux Wayland 降级分支展示
+  bool _clipboardWatchEnabled = false; // 剪贴板监听主开关（Windows/mac 轮询；Linux Wayland 降级读剪贴板）
+  // 剪贴板「可解析音视频链接」启用平台集合（设备本地，config 表 opaque，逗号分隔）
+  Set<String> _clipboardParsePlatforms = kDefaultClipboardParsePlatforms;
 
   // 侧边栏区块显示设置
   bool _showSidebarStatus = true; // 显示状态区块
@@ -205,10 +208,13 @@ class SettingsProvider extends ChangeNotifier {
   String _lastDialogThreads = '';
 
   // 下载位置自动使用上次保存的位置（开启后新建下载默认目录跟随上次下载的目录）
-  bool _rememberLastSaveDir = false;
+  bool _rememberLastSaveDir = true; // 默认开启（易用性：随开随用）
 
   // 上次下载确认时使用的保存目录（'' = 未记录）
   String _lastSaveDir = '';
+
+  // 删除任务并删除文件时，把最终文件移入系统回收站（Windows；默认开）
+  bool _deleteToRecycleBin = true;
 
   // 新建下载对话框上次选择的目标设备（'' = 本机/未记录，非空 = 远程 deviceId）
   String _lastTargetDevice = '';
@@ -303,6 +309,16 @@ class SettingsProvider extends ChangeNotifier {
   double get floatingBallY => _floatingBallY;
   bool get floatingBallActiveOnly => _floatingBallActiveOnly;
   bool get clipboardWatchEnabled => _clipboardWatchEnabled;
+
+  /// 「删除任务并删除文件」是否移入系统回收站（仅 Windows 生效，默认开）。
+  bool get deleteToRecycleBin => _deleteToRecycleBin;
+
+  /// 剪贴板监听启用的平台 id 集合。
+  Set<String> get clipboardParsePlatforms =>
+      Set.unmodifiable(_clipboardParsePlatforms);
+
+  bool isClipboardPlatformEnabled(String id) =>
+      _clipboardParsePlatforms.contains(id);
 
   // 侧边栏显示 Getters
   bool get showSidebarStatus => _showSidebarStatus;
@@ -716,6 +732,27 @@ class SettingsProvider extends ChangeNotifier {
     _clipboardWatchEnabled = value;
     notifyListeners();
     _saveToRust('clipboard_watch_enabled', value.toString());
+  }
+
+  /// 删除任务时是否把最终文件移入系统回收站（引擎 config 键 delete_to_recycle_bin）。
+  void setDeleteToRecycleBin(bool value) {
+    if (_deleteToRecycleBin == value) return;
+    _deleteToRecycleBin = value;
+    notifyListeners();
+    _saveToRust('delete_to_recycle_bin', value.toString());
+  }
+
+  /// 增删剪贴板监听平台（引擎 config 键 clipboard_parse_platforms，逗号分隔）。
+  void setClipboardPlatformEnabled(String id, bool enabled) {
+    final next = Set<String>.of(_clipboardParsePlatforms);
+    if (enabled) {
+      if (!next.add(id)) return;
+    } else if (!next.remove(id)) {
+      return;
+    }
+    _clipboardParsePlatforms = Set.unmodifiable(next);
+    notifyListeners();
+    _saveToRust('clipboard_parse_platforms', next.join(','));
   }
 
   void setNotifyOnComplete(bool value) {
@@ -2046,6 +2083,16 @@ class SettingsProvider extends ChangeNotifier {
           _floatingBallActiveOnly = entry.value == 'true'; // 默认 false
         case 'clipboard_watch_enabled':
           _clipboardWatchEnabled = entry.value == 'true'; // 默认 false
+        case 'clipboard_parse_platforms':
+          if (entry.value.trim().isNotEmpty) {
+            _clipboardParsePlatforms = Set.unmodifiable(
+              entry.value
+                  .split(',')
+                  .map((e) => e.trim())
+                  .where((e) => e.isNotEmpty)
+                  .toSet(),
+            );
+          }
         case 'log_max_size_mb':
           _logMaxSizeMb = int.tryParse(entry.value) ?? 10;
           LogService.instance.maxTotalBytes = _logMaxSizeMb * 1024 * 1024;
@@ -2105,6 +2152,8 @@ class SettingsProvider extends ChangeNotifier {
           _rememberLastSaveDir = entry.value == 'true';
         case 'last_save_dir':
           _lastSaveDir = entry.value;
+        case 'delete_to_recycle_bin':
+          _deleteToRecycleBin = entry.value != 'false'; // 默认 true
         case 'reveal_file_cmd':
           _revealFileCmd = entry.value;
           revealFileCmdPresent = true;

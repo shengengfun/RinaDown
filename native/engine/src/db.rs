@@ -471,6 +471,7 @@ fn acquire_engine_file_lease(data_dir: &Path) -> Result<EngineWriteGuard, DbErro
     let lock_path: PathBuf = data_dir.join("engine.lock");
     let file = OpenOptions::new()
         .create(true)
+        .truncate(false)
         .read(true)
         .write(true)
         .open(&lock_path)?;

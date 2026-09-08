@@ -856,6 +856,26 @@ class S {
   String get clipboardWatchDesc => _r('clipboardWatchDesc');
   String get clipboardUrlDetectedTitle => _r('clipboardUrlDetectedTitle');
   String get clipboardUrlDetectedBody => _r('clipboardUrlDetectedBody');
+  String get clipboardParseDesc => _r('clipboardParseDesc');
+  String get clipboardPlatformsTitle => _r('clipboardPlatformsTitle');
+  String get clipboardPlatformsDesc => _r('clipboardPlatformsDesc');
+  String get clipboardParseAction => _r('clipboardParseAction');
+  String get clipboardQuickAction => _r('clipboardQuickAction');
+  String get clipboardIgnoreAction => _r('clipboardIgnoreAction');
+  String clipboardParseOfferTitle(String platform) =>
+      _r('clipboardParseOfferTitle', {'platform': platform});
+  String clipboardParseOfferBody(String url) =>
+      _r('clipboardParseOfferBody', {'url': url});
+  String clipboardPlatformName(String id) => switch (id) {
+    'douyin' => _r('clipboardPlatformDouyin'),
+    'bilibili' => _r('clipboardPlatformBilibili'),
+    'youtube' => _r('clipboardPlatformYoutube'),
+    'xigua' => _r('clipboardPlatformXigua'),
+    'xiaohongshu' => _r('clipboardPlatformXiaohongshu'),
+    'twitter' => _r('clipboardPlatformTwitter'),
+    'weibo' => _r('clipboardPlatformWeibo'),
+    _ => id,
+  };
   String get trayShowFloatingBall => _r('trayShowFloatingBall');
   String get hideFloatingBall => _r('hideFloatingBall');
   String get torrentFileAssociation => _r('torrentFileAssociation');
@@ -1096,6 +1116,10 @@ class S {
   String get selectDefaultSaveDir => _r('selectDefaultSaveDir');
   String get rememberLastSaveDir => _r('rememberLastSaveDir');
   String get rememberLastSaveDirDesc => _r('rememberLastSaveDirDesc');
+  String get deleteToRecycleBin => _r('deleteToRecycleBin');
+  String get deleteToRecycleBinDesc => _r('deleteToRecycleBinDesc');
+  List<String> get searchKeywordsRecycleBin =>
+      _r('searchKeywordsRecycleBin').split(',');
   String get defaultThreads => _r('defaultThreads');
   String get defaultThreadsDesc => _r('defaultThreadsDesc');
   String get autoMaxConnections => _r('autoMaxConnections');
@@ -1714,6 +1738,9 @@ class S {
   // ─────────────────────────────────────────────
   String get trayShowWindow => _r('trayShowWindow');
   String get trayExit => _r('trayExit');
+  String get trayStatusIdle => _r('trayStatusIdle');
+  String trayStatusActive(int count, String speed) =>
+      _r('trayStatusActive', {'count': count, 'speed': speed});
 
   // ─────────────────────────────────────────────
   // 应用菜单与桌面标题栏

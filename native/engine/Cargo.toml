@@ -64,7 +64,7 @@ fs2 = "0.4.3"
 librqbit = { version = "9", default-features = false, features = ["default-tls"] }
 reqwest = { version = "0.12", features = ["stream", "native-tls", "cookies", "json", "socks"] }
 # 固定 0.59：0.61 引入 windows-link(raw-dylib)，与 cdylib 构建在 CI 上不兼容
-windows-sys = { version = "0.59", features = ["Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl"] }
+windows-sys = { version = "0.59", features = ["Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Ioctl", "Win32_UI_Shell"] }
 winreg = "0.55"
 
 [target."cfg(not(windows))".dependencies]

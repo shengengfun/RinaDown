@@ -3,6 +3,7 @@ import 'package:shadcn_ui/shadcn_ui.dart';
 
 import '../bindings/bindings.dart';
 import '../i18n/locale_provider.dart';
+import '../models/settings_provider.dart';
 import '../services/file_picker_service.dart';
 import '../services/recent_dirs.dart';
 import '../services/resolve_preview_client.dart';
@@ -10,21 +11,25 @@ import '../theme/app_colors.dart';
 import '../theme/app_metrics.dart';
 import 'dir_picker_field.dart';
 
-void showVideoParseDialog(BuildContext context) {
+void showVideoParseDialog(BuildContext context, {String initialUrl = ''}) {
   showShadDialog(
     context: context,
     barrierColor: AppColors.of(context).dialogBarrier,
     animateIn: const [],
     animateOut: const [],
-    builder: (_) => const _VideoParseDialogContent(),
+    builder: (_) => _VideoParseDialogContent(initialUrl: initialUrl),
   );
 }
 
 class _VideoParseDialogContent extends StatefulWidget {
-  const _VideoParseDialogContent();
+  /// 预填的视频链接（剪贴板嗅探等外部入口）。
+  final String initialUrl;
+
+  const _VideoParseDialogContent({this.initialUrl = ''});
 
   @override
-  State<_VideoParseDialogContent> createState() => _VideoParseDialogContentState();
+  State<_VideoParseDialogContent> createState() =>
+      _VideoParseDialogContentState();
 }
 
 class _VideoParseDialogContentState extends State<_VideoParseDialogContent> {
@@ -35,6 +40,16 @@ class _VideoParseDialogContentState extends State<_VideoParseDialogContent> {
   int _selected = 0;
   bool _loading = false;
   String _error = '';
+
+  /// 用户是否手动改过保存目录（改过后不再被解析结果自动覆盖）。
+  bool _saveDirUserModified = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final u = widget.initialUrl.trim();
+    if (u.isNotEmpty) _url.text = u;
+  }
 
   @override
   void dispose() {
@@ -71,13 +86,31 @@ class _VideoParseDialogContentState extends State<_VideoParseDialogContent> {
       _selected = 0;
       if (result == null) {
         _error = '解析失败，请确认链接可访问，并已安装 yt-dlp 组件。';
+      } else {
+        // 解析成功：默认目录 = 按文件格式命中的分类目录；无分类命中时
+        // 回落到「上次使用/默认」目录（跟随全局记忆设置）。手动改过则保留。
+        final settings = SettingsProvider.globalInstance;
+        if (!_saveDirUserModified && settings != null) {
+          final name = result.fileName;
+          final byCategory = settings.resolveCategorySaveDir(name, url: url);
+          _saveDir.text = byCategory.isNotEmpty
+              ? byCategory
+              : settings.effectiveDefaultSaveDir;
+        }
       }
     });
   }
 
   Future<void> _pickDir() async {
-    final selected = await FilePickerService.pickDirectory(dialogTitle: '选择下载目录');
-    if (selected != null && mounted) setState(() => _saveDir.text = selected);
+    final selected =
+        await FilePickerService.pickDirectory(dialogTitle: '选择下载目录');
+    if (selected != null && mounted) {
+      setState(() {
+        _saveDir.text = selected;
+        _saveDirUserModified = true;
+      });
+      SettingsProvider.globalInstance?.recordLastSaveDir(selected);
+    }
   }
 
   void _download() {
@@ -86,7 +119,13 @@ class _VideoParseDialogContentState extends State<_VideoParseDialogContent> {
     if (result == null || url.isEmpty || result.variants.isEmpty) return;
     final option = result.variants[_selected.clamp(0, result.variants.length - 1)];
     final dir = _saveDir.text.trim();
-    if (dir.isNotEmpty) RecentDirs.instance.push(dir);
+    if (dir.isNotEmpty) {
+      RecentDirs.instance.push(dir);
+      // 手动选择的目录记为「上次使用」，供下次新建/解析默认目录使用
+      if (_saveDirUserModified) {
+        SettingsProvider.globalInstance?.recordLastSaveDir(dir);
+      }
+    }
     CreateTask(
       url: url,
       saveDir: _saveDir.text.trim(),
@@ -156,8 +195,12 @@ class _VideoParseDialogContentState extends State<_VideoParseDialogContent> {
             enabled: !_loading,
             onTap: _pickDir,
             onPathSelected: (dir) {
-              setState(() => _saveDir.text = dir);
+              setState(() {
+                _saveDir.text = dir;
+                _saveDirUserModified = true;
+              });
               RecentDirs.instance.push(dir);
+              SettingsProvider.globalInstance?.recordLastSaveDir(dir);
             },
           ),
           if (_error.isNotEmpty) ...[

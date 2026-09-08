@@ -36,6 +36,7 @@ pub mod model;
 pub mod plugin;
 mod proc;
 pub mod proxy_config;
+pub mod recycle;
 /// `ProxyMode::Auto` 路由决策的跨重启先验（host 级采样结论持久化）。
 pub mod route_health;
 /// RSS 订阅自动下载（feed 轮询 → 规则过滤 → 建任务）。

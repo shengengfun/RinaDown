@@ -125,3 +125,6 @@ assets/screenshot/
 .worktrees/
 website-v2/
 .tmp*
+
+# Incomplete / partial downloads (FluxDown downloader artifacts)
+*.fdownloading

@@ -457,6 +457,19 @@ fn task_owns_final_file(status: i32) -> bool {
 /// 任务是否启动过（进入过启动序幕，`file_name` 已 dedup 落库）。
 ///
 /// 用于 DASH 音轨 sidecar（`<stem>.audio.m4a`）的删除守卫：sidecar 可能
+/// 「删除进回收站」开关是否生效（仅 Windows；默认开；其他平台恒 false）。
+/// 引擎把 Dart 侧偏好存进 config 表（键 `delete_to_recycle_bin`）。
+async fn delete_recycle_enabled(db: &crate::db::Db) -> bool {
+    cfg!(windows)
+        && db
+            .get_config("delete_to_recycle_bin")
+            .await
+            .ok()
+            .flatten()
+            .map(|v| v != "false")
+            .unwrap_or(true)
+}
+
 /// 在任务完成前就已 rename 到位，启动过的任务其派生路径归本任务命名
 /// 空间，删除文件时应当清理；从未启动的任务连 sidecar 也不曾产生，
 /// 跳过以免撞上同名旧任务遗留的文件。
@@ -1818,6 +1831,8 @@ impl DownloadManager {
     /// spawn 一个转发任务 await 结果并 emit [`EngineEvent::ResolvePreviewReady`]
     /// （语义与重构前一致；`plugins` feature 关闭时同样立即收到空 outcome，
     /// 宿主无需 `cfg` 分叉）。
+    // 参数即请求面字段（7 个显式 + &self），按 RPC 面保形不重构，lint 达阈值故显式豁免。
+    #[allow(clippy::too_many_arguments)]
     pub async fn begin_resolve_preview(
         &self,
         preview_id: String,
@@ -1828,8 +1843,14 @@ impl DownloadManager {
         extra_headers: HashMap<String, String>,
         video: bool,
     ) {
-        let rx =
-            self.spawn_resolve_preview(url.clone(), cookies, referrer, user_agent, extra_headers, video);
+        let rx = self.spawn_resolve_preview(
+            url.clone(),
+            cookies,
+            referrer,
+            user_agent,
+            extra_headers,
+            video,
+        );
         let sink = self.sink.clone();
         tokio::spawn(async move {
             let outcome = rx.await.unwrap_or_else(|_| {
@@ -1904,15 +1925,20 @@ impl DownloadManager {
                     name: res.file_name.clone().unwrap_or_else(|| url.clone()),
                     items: Vec::new(),
                     error: String::new(),
-                    variants: res.variants.iter().enumerate().map(|(i, v)| crate::model::ResolveVariantOption {
-                        index: i as i32,
-                        label: v.label.clone(),
-                        container: v.container.clone(),
-                        bandwidth: v.bandwidth,
-                        width: v.width,
-                        height: v.height,
-                        total_bytes: v.total_bytes.unwrap_or(0),
-                    }).collect(),
+                    variants: res
+                        .variants
+                        .iter()
+                        .enumerate()
+                        .map(|(i, v)| crate::model::ResolveVariantOption {
+                            index: i as i32,
+                            label: v.label.clone(),
+                            container: v.container.clone(),
+                            bandwidth: v.bandwidth,
+                            width: v.width,
+                            height: v.height,
+                            total_bytes: v.total_bytes.unwrap_or(0),
+                        })
+                        .collect(),
                     file_name: res.file_name.unwrap_or_default(),
                     total_bytes: res.total_bytes.unwrap_or(0),
                     resolver_identity: identity,
@@ -1929,9 +1955,13 @@ impl DownloadManager {
                             .map(manifest_item_to_info)
                             .collect(),
                         error: String::new(),
-                        variants: Vec::new(), file_name: String::new(), total_bytes: 0,
-                        resolver_identity: String::new(), audio_url: String::new(),
-                        range_supported: false, ephemeral: false,
+                        variants: Vec::new(),
+                        file_name: String::new(),
+                        total_bytes: 0,
+                        resolver_identity: String::new(),
+                        audio_url: String::new(),
+                        range_supported: false,
+                        ephemeral: false,
                     },
                     None => ResolvePreviewOutcome::empty(),
                 },
@@ -3529,11 +3559,7 @@ impl DownloadManager {
     /// 优先级：任务级 `speed_limit_bps` > 0（读取 DB）> 队列级 > 全局。
     /// 任务级限速在任务本次启动期固定（后续修改于下次启动/续传生效，
     /// 与任务级做种上传限速同语义）。
-    async fn effective_limiter_for(
-        &mut self,
-        task_id: &str,
-        queue_id: &str,
-    ) -> SpeedLimiter {
+    async fn effective_limiter_for(&mut self, task_id: &str, queue_id: &str) -> SpeedLimiter {
         let db = self.db.clone();
         let task_speed = db
             .load_task_by_id(task_id)
@@ -6885,6 +6911,7 @@ impl DownloadManager {
         self.auto_failover_attempts.remove(task_id);
         self.retry_scheduled.remove(task_id);
         self.clear_pending_resolve(task_id);
+        let recycle_files = delete_recycle_enabled(&self.db).await;
 
         // Remove from pending queue if queued.
         if let Some(pos) = self.pending_queue.iter().position(|q| q.task_id == task_id) {
@@ -7060,18 +7087,22 @@ impl DownloadManager {
                     }
                 }
 
-                if delete_files
-                    && owns_final
-                    && is_safe_file_name(&t.file_name)
-                    && let Err(e) = tokio::fs::remove_file(&path).await
-                    && e.kind() != std::io::ErrorKind::NotFound
-                {
-                    log_info!(
-                        "[manager] delete_task {}: remove file {} failed: {}",
-                        task_id,
-                        path.display(),
-                        e
-                    );
+                if delete_files && owns_final && is_safe_file_name(&t.file_name) {
+                    let res = if recycle_files {
+                        crate::recycle::remove_user_file(&path).await
+                    } else {
+                        tokio::fs::remove_file(&path).await
+                    };
+                    if let Err(e) = res
+                        && e.kind() != std::io::ErrorKind::NotFound
+                    {
+                        log_info!(
+                            "[manager] delete_task {}: remove file {} failed: {}",
+                            task_id,
+                            path.display(),
+                            e
+                        );
+                    }
                 }
             }
         }
@@ -7151,6 +7182,7 @@ impl DownloadManager {
             task_ids.len(),
             delete_files
         );
+        let recycle_files = delete_recycle_enabled(&self.db).await;
 
         // 1. Remove from pending queue in one pass.
         self.pending_queue
@@ -7341,6 +7373,7 @@ impl DownloadManager {
                             .await
                             .unwrap_or_default()
                             .is_some();
+                    let recycle = recycle_files;
                     cleanup_futs.push(tokio::spawn(async move {
                         // Wait for this task's download handle (10s per-task timeout).
                         // 超时后 abort 外层 future，加速纯 async 任务释放连接/句柄，
@@ -7392,18 +7425,22 @@ impl DownloadManager {
                             }
                         }
 
-                        if delete_files
-                            && owns_final
-                            && is_safe_file_name(&file_name)
-                            && let Err(e) = tokio::fs::remove_file(&path).await
-                            && e.kind() != std::io::ErrorKind::NotFound
-                        {
-                            log_info!(
-                                "[manager] delete_tasks_batch {}: remove file {} failed: {}",
-                                tid_owned,
-                                path.display(),
-                                e
-                            );
+                        if delete_files && owns_final && is_safe_file_name(&file_name) {
+                            let res = if recycle {
+                                crate::recycle::remove_user_file(&path).await
+                            } else {
+                                tokio::fs::remove_file(&path).await
+                            };
+                            if let Err(e) = res
+                                && e.kind() != std::io::ErrorKind::NotFound
+                            {
+                                log_info!(
+                                    "[manager] delete_tasks_batch {}: remove file {} failed: {}",
+                                    tid_owned,
+                                    path.display(),
+                                    e
+                                );
+                            }
                         }
 
                         // Signal completion

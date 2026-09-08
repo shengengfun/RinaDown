@@ -74,6 +74,9 @@ class Win32BallWindow {
   /// 卡片展开态下任意按下（左/右）→ 交 Service 收起卡片并吞掉本次交互。
   void Function()? onCardPressed;
 
+  /// 卡片展开态下在某文件行内左键按下 → 行级动作（Service 依行序映射任务）。
+  void Function(int rowIndex)? onCardRowPressed;
+
   int _hwnd = 0;
   int _memDC = 0;
   int _hBitmap = 0;
@@ -115,6 +118,7 @@ class Win32BallWindow {
   DateTime? _hoverLeaveAt; // 卡片态下光标离开后的收起判定时刻
   BallCardSide? _cardSide; // 非 null = 卡片展开中
   HoverCardLayout? _cardLayout; // 当前卡片几何
+  int _cardRowCount = 0; // 当前卡片展示的文件行数（命中测试用）
   // 球 cell 左上角物理锚点（卡片展开期间窗口左上 = 锚点 − 球偏移）
   int _cardAnchorX = 0;
   int _cardAnchorY = 0;
@@ -300,6 +304,7 @@ class Win32BallWindow {
   void presentHoverCard({
     required BallImage image,
     required HoverCardLayout layout,
+    required int rowCount,
   }) {
     if (_hwnd == 0) return;
     final offX = (layout.ballOffX * scale).round();
@@ -309,6 +314,7 @@ class Win32BallWindow {
     final anchorY = _screenY + _cardOffY.round();
     _cardSide = layout.side;
     _cardLayout = layout;
+    _cardRowCount = rowCount;
     _cardOffX = offX.toDouble();
     _cardOffY = offY.toDouble();
     _cardAnchorX = anchorX;
@@ -326,6 +332,7 @@ class Win32BallWindow {
     if (_hwnd == 0) return;
     _cardSide = null;
     _cardLayout = null;
+    _cardRowCount = 0;
     _cardOffX = 0;
     _cardOffY = 0;
     _hoverLeaveAt = null;
@@ -544,9 +551,27 @@ class Win32BallWindow {
     final justReleased = _prevMouseDown && !isDown;
     _prevMouseDown = isDown;
 
-    // ── 卡片展开态：任何按下只收卡片，不触发球的拖动/点击/右键菜单 ──
+    // ── 卡片展开态：行内左键按下 → 行级动作（不收起）；空白/头部按下或右键
+    //    仍只收卡片，不触发球的拖动/点击/右键菜单 ──
     if (_cardSide != null && pointerHover) {
-      if (justPressed || rightJustPressed) {
+      if (justPressed) {
+        final layout = _cardLayout;
+        if (layout != null && _cardRowCount > 0) {
+          final row = hoverCardRowHitTest(
+            layout: layout,
+            rowCount: _cardRowCount,
+            windowLogicalX: (mx - _screenX) / scale,
+            windowLogicalY: (my - _screenY) / scale,
+          );
+          if (row != null) {
+            onCardRowPressed?.call(row);
+            return; // 行点击：不收起，交 Service 处理（如暂停该任务）
+          }
+        }
+        onCardPressed?.call();
+        return;
+      }
+      if (rightJustPressed) {
         onCardPressed?.call();
         return;
       }

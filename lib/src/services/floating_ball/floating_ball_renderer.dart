@@ -79,10 +79,10 @@ Future<void> ensureBallLogoLoaded() async {
 // =============================================================================
 
 /// 球体直径
-const double kBallDiameter = 44;
+const double kBallDiameter = 48;
 
 /// 窗口逻辑尺寸（含 6px 阴影出血 × 2）
-const double kBallWindowSize = 56;
+const double kBallWindowSize = 60;
 
 /// 阴影出血
 const double kBallShadowPad = (kBallWindowSize - kBallDiameter) / 2;
@@ -245,6 +245,30 @@ HoverCardLayout layoutHoverCard({
     cardOffsetX: cLeft - minX,
     cardOffsetY: cTop - minY,
   );
+}
+
+/// 卡片行命中测试：给定整帧内逻辑坐标（相对窗口位图左上，逻辑 px），返回
+/// 命中的文件行下标（0..rowCount-1）；未命中任何行（头部/空白/球体区域）返回
+/// null。供 Win32BallWindow 在卡片展开态把「行内按下」映射为行级动作。
+int? hoverCardRowHitTest({
+  required HoverCardLayout layout,
+  required int rowCount,
+  required double windowLogicalX,
+  required double windowLogicalY,
+}) {
+  if (rowCount <= 0) return null;
+  final px = windowLogicalX - layout.cardOffsetX;
+  final py = windowLogicalY - layout.cardOffsetY;
+  final cw = layout.cardLogicalSize.width;
+  final ch = layout.cardLogicalSize.height;
+  if (px < 0 || px >= cw || py < 0 || py >= ch) return null;
+  // 行区起点 = 内边距 + 头部 + 间距（与 _HoverCardPanel 布局一致）
+  final rowsTop = _kCardPadV + _kHeaderH + _kHeaderGap;
+  final rowsBottom = rowsTop + rowCount * _kCardRowH;
+  if (py < rowsTop || py >= rowsBottom) return null;
+  final row = ((py - rowsTop) / _kCardRowH).floor();
+  if (row < 0 || row >= rowCount) return null;
+  return row;
 }
 
 /// 渲染「球 + 正在下载列表卡片」整帧位图。
@@ -416,6 +440,13 @@ class _HoverCardPanel extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 6),
+                  // 行内可点击提示（点击 = 暂停该任务）
+                  Icon(
+                    LucideIcons.pause,
+                    size: 11,
+                    color: tokens.textMuted.withValues(alpha: 0.65),
+                  ),
                 ],
               ),
             ),
@@ -500,8 +531,10 @@ class _BallWidget extends StatelessWidget {
               width: kBallDiameter,
               height: kBallDiameter,
               decoration: BoxDecoration(
+                // idle-logo 态也保留柔和投影（透明填充仅呈现外圈光晕；此前
+                // logo 铺满整球时无任何投影，观感偏平）。
                 color: logoFillsBall
-                    ? null
+                    ? Colors.transparent
                     : (isDragTarget ? accent.withValues(alpha: 0.92) : bg),
                 shape: BoxShape.circle,
                 border: logoFillsBall
@@ -514,9 +547,9 @@ class _BallWidget extends StatelessWidget {
                       ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withValues(alpha: 0.28),
+                    blurRadius: 9,
+                    offset: const Offset(0, 2.5),
                   ),
                 ],
               ),

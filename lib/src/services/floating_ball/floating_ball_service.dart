@@ -72,6 +72,7 @@ class FloatingBallService {
   bool _cardOpen = false; // 卡片是否展示中
   bool _collapsePending = false; // 收起过渡在途（防中间态帧盖错几何）
   List<String> _cardNames = const []; // 卡片上次渲染的文件名（去重/顺序比较用）
+  List<String> _cardTaskIds = const []; // 卡片当前可见行的 taskId（与行序一致）
 
   /// 有效设置实例 — 优先 globalInstance（HomePage 主实例，设置页读写的
   /// 就是它）；init 注入的 _settingsForExternal 仅作 fallback。
@@ -153,6 +154,7 @@ class FloatingBallService {
           ..onContextMenu = _onBallContextMenu
           ..onHoverChanged = _onBallHoverChanged
           ..onCardPressed = _onBallCardPressed
+          ..onCardRowPressed = _onHoverCardRowPressed
           ..onDpiChanged = (_) => _rerenderAll();
         win.create(x: x, y: y);
         await _renderAndPush(); // 未 show 也先备好位图，show 瞬间无空白帧
@@ -225,6 +227,7 @@ class FloatingBallService {
     _cardOpen = false;
     _collapsePending = false;
     _cardNames = const [];
+    _cardTaskIds = const [];
     if (Platform.isWindows) {
       // RevokeDragDrop 在 C++ destroyBall 分支处理
       if (Win32BallWindow.instance.isCreated) {
@@ -531,11 +534,12 @@ class FloatingBallService {
   // hover 卡片（Windows「正在下载」文件列表）
   // ===========================================================================
 
-  /// 取当前正在下载/准备/续传任务的文件名（下载列表数据源，同 detail_panel）。
-  List<String> _activeFileNames() {
+  /// 取当前正在下载/准备/续传任务的 (taskId, fileName) 条目（下载列表数据源，
+  /// 同 detail_panel；顺序稳定，卡片行命中测试据此映射任务）。
+  List<({String id, String name})> _activeHoverEntries() {
     final downloads = DownloadController.globalInstance;
     if (downloads == null) return const [];
-    final names = <String>[];
+    final entries = <({String id, String name})>[];
     for (final t in downloads.tasks) {
       if (t.status != TaskStatus.downloading &&
           t.status != TaskStatus.preparing &&
@@ -544,9 +548,9 @@ class FloatingBallService {
       }
       final name = t.fileName.trim();
       if (name.isEmpty) continue;
-      names.add(name);
+      entries.add((id: t.id, name: name));
     }
-    return names;
+    return entries;
   }
 
   static bool _sameNameList(List<String> a, List<String> b) {
@@ -581,6 +585,16 @@ class FloatingBallService {
     unawaited(_collapseHoverCard());
   }
 
+  /// 卡片展开态下在某文件行内点击 → 暂停该任务（不收起卡片；任务离活跃集后
+  /// 由数据变化驱动刷新/自动收起）。
+  void _onHoverCardRowPressed(int rowIndex) {
+    if (!_enabled) return;
+    if (rowIndex < 0 || rowIndex >= _cardTaskIds.length) return;
+    final taskId = _cardTaskIds[rowIndex];
+    logInfo(_tag, 'hover card row $rowIndex pressed → pause task $taskId');
+    DownloadController.globalInstance?.pauseTask(taskId);
+  }
+
   /// 尝试打开 hover 卡片。条件：Windows + 已建窗 + 非贴边 + 可见 +
   /// 存在下载中文件 + 仍处于悬停。不满足即静默返回。
   Future<void> _showHoverCard() async {
@@ -591,19 +605,20 @@ class FloatingBallService {
     if (!win.isCreated || !_nativeVisible) return;
     if (_hoverCardBlocked(win)) return; // 收起态/动画中不弹卡
 
-    final names = _activeFileNames();
-    if (names.isEmpty) return;
+    final entries = _activeHoverEntries();
+    if (entries.isEmpty) return;
+    final allNames = [for (final e in entries) e.name];
 
-    final visibleRows = math.min(names.length, kHoverCardMaxRows);
-    final cardSize = hoverCardLogicalSize(visibleRows: visibleRows);
+    final visibleRows = math.min(entries.length, kHoverCardMaxRows);
+    final visible = entries.length > visibleRows
+        ? entries.sublist(0, visibleRows)
+        : entries;
+    final cardSize = hoverCardLogicalSize(visibleRows: visible.length);
     final layout = win.prepareHoverCardLayout(cardSize);
-    final visible = names.length > visibleRows
-        ? names.sublist(0, visibleRows)
-        : names;
     final image = await _buildHoverCardFrame(
       layout: layout,
-      headerText: currentS.fgServiceActiveTitle(names.length),
-      fileNames: visible,
+      headerText: currentS.fgServiceActiveTitle(entries.length),
+      fileNames: [for (final e in visible) e.name],
     );
     if (image == null) return;
 
@@ -613,11 +628,16 @@ class FloatingBallService {
     if (_hoverCardBlocked(win)) return;
     if (!_hovering || _cardOpen) return;
 
-    win.presentHoverCard(image: image, layout: layout);
+    win.presentHoverCard(
+      image: image,
+      layout: layout,
+      rowCount: visible.length,
+    );
     _cardOpen = true;
-    _cardNames = names;
+    _cardNames = allNames;
+    _cardTaskIds = [for (final e in visible) e.id];
     _syncWaveTicker(); // 卡片展开 → 暂停波浪动画
-    logInfo(_tag, 'hover card open: ${names.length} file(s)');
+    logInfo(_tag, 'hover card open: ${entries.length} file(s)');
   }
 
   /// 卡片已展开时的刷新/收起：文件名集变化 → 重渲染；文件清空/离开 →
@@ -630,33 +650,39 @@ class FloatingBallService {
       await _collapseHoverCard();
       return;
     }
-    final names = _activeFileNames();
-    if (names.isEmpty) {
+    final entries = _activeHoverEntries();
+    if (entries.isEmpty) {
       await _collapseHoverCard();
       return;
     }
-    if (_sameNameList(_cardNames, names)) return; // 无实质变化
+    final allNames = [for (final e in entries) e.name];
+    if (_sameNameList(_cardNames, allNames)) return; // 无实质变化
 
-    final visibleRows = math.min(names.length, kHoverCardMaxRows);
-    final cardSize = hoverCardLogicalSize(visibleRows: visibleRows);
+    final visibleRows = math.min(entries.length, kHoverCardMaxRows);
+    final visible = entries.length > visibleRows
+        ? entries.sublist(0, visibleRows)
+        : entries;
+    final cardSize = hoverCardLogicalSize(visibleRows: visible.length);
     final layout = win.prepareHoverCardLayout(cardSize);
-    final visible = names.length > visibleRows
-        ? names.sublist(0, visibleRows)
-        : names;
     final image = await _buildHoverCardFrame(
       layout: layout,
-      headerText: currentS.fgServiceActiveTitle(names.length),
-      fileNames: visible,
+      headerText: currentS.fgServiceActiveTitle(entries.length),
+      fileNames: [for (final e in visible) e.name],
     );
     if (image == null) return;
 
     if (!_enabled || !_hovering || !_nativeVisible) return;
     if (!win.isCreated || _hoverCardBlocked(win)) return;
-    if (!_cardOpen || _sameNameList(_cardNames, names)) return; // 已被并发收/刷
+    if (!_cardOpen || _sameNameList(_cardNames, allNames)) return; // 已被并发收/刷
 
-    win.presentHoverCard(image: image, layout: layout);
-    _cardNames = names;
-    logInfo(_tag, 'hover card refreshed: ${names.length} file(s)');
+    win.presentHoverCard(
+      image: image,
+      layout: layout,
+      rowCount: visible.length,
+    );
+    _cardNames = allNames;
+    _cardTaskIds = [for (final e in visible) e.id];
+    logInfo(_tag, 'hover card refreshed: ${entries.length} file(s)');
   }
 
   /// 收起卡片：渲染一帧正常小球后原子性恢复球-only 几何并贴入。
@@ -666,6 +692,7 @@ class FloatingBallService {
     try {
       _cardOpen = false;
       _cardNames = const [];
+      _cardTaskIds = const [];
       if (!Platform.isWindows) return;
       final win = Win32BallWindow.instance;
       if (!win.isCreated) return;
