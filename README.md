@@ -8,13 +8,13 @@
 
 *A blazing fast, multi-protocol download manager — the free & open-source IDM alternative.*
 
-[![Latest Release](https://img.shields.io/github/v/release/zerx-lab/RinaDown?style=flat-square&color=06b6d4&label=release)](https://github.com/zerx-lab/RinaDown/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/zerx-lab/RinaDown/total?style=flat-square&color=22c55e)](https://github.com/zerx-lab/RinaDown/releases)
+[![Latest release](https://img.shields.io/badge/latest_release-%E2%86%93-06b6d4?style=flat-square)](../../releases/latest)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux%20%7C%20NAS%20%7C%20Android-8b5cf6?style=flat-square)](#installation)
-[![Rust](https://img.shields.io/badge/engine-Rust-f74c00?style=flat-square&logo=rust)](native/engine)
-[![Flutter](https://img.shields.io/badge/UI-Flutter-02569B?style=flat-square&logo=flutter)](lib)
-[![MCP Server](https://glama.ai/mcp/servers/zerx-lab/RinaDown/badges/score.svg)](https://glama.ai/mcp/servers/zerx-lab/RinaDown)
+[![Engine: Rust](https://img.shields.io/badge/engine-Rust%20%2B%20Tokio-f74c00?style=flat-square&logo=rust)](native/engine)
+[![UI: Flutter](https://img.shields.io/badge/UI-Flutter-02569B?style=flat-square&logo=flutter)](lib)
+[![Desktop: GPUI](https://img.shields.io/badge/desktop-GPUI-1F6FEB?style=flat-square)](crates/app)
+[![Interfaces](https://img.shields.io/badge/interfaces-REST%20%C2%B7%20MCP%20%C2%B7%20aria2-22c55e?style=flat-square)](native/api)
 
 [![Awesome Rust](https://img.shields.io/badge/Awesome-Rust-orange?logo=rust&style=flat-square)](https://github.com/rust-unofficial/awesome-rust#utilities)
 [![Awesome Windows](https://img.shields.io/badge/Awesome-Windows-0078D4?style=flat-square)](https://github.com/thechampagne/awesome-windows#utilities)
@@ -25,7 +25,7 @@
 [![Unraid CA](https://img.shields.io/badge/Unraid-CA-F15A2C?style=flat-square)](https://github.com/selfhosters/unRAID-CA-templates/blob/master/templates/rinadown.xml)
 [![Chinese Indie Dev](https://img.shields.io/badge/Chinese%20Indie-Dev-ef4444?style=flat-square)](https://github.com/1c7/chinese-independent-developer)
 
-[**Website**](https://rinadown.zerx.dev) · [**Download**](https://rinadown.zerx.dev/#download) · [**Changelog**](https://rinadown.zerx.dev/changelog) · [**FAQ**](https://rinadown.zerx.dev/faq) · [**Feedback**](https://rinadown.zerx.dev/feedback)
+[**Website**](https://rinadown.zerx.dev) · [**Download**](https://rinadown.zerx.dev/#download) · [**Docs**](https://rinadown.zerx.dev/docs/) · [**Changelog**](https://rinadown.zerx.dev/changelog) · [**FAQ**](https://rinadown.zerx.dev/faq) · [**Feedback**](https://rinadown.zerx.dev/feedback)
 
 **English** | [简体中文](README.zh-CN.md)
 
@@ -35,12 +35,14 @@
 
 ## Highlights
 
-- **Up to 10x faster** — Rust + Tokio engine with IDM-style dynamic segmentation
-- **Multi-protocol** — HTTP/HTTPS, FTP, BitTorrent, eD2K, HLS & DASH streaming
-- **Browser integration** — Chrome / Edge / Firefox extension with a 3-layer interception engine
-- **AI-agent ready** — built-in MCP (Model Context Protocol) server: let Claude, Cursor & other AI clients manage your downloads
-- **Resume anywhere** — full download state persisted in SQLite; survive crashes and reboots
-- **Beautiful UI** — light/dark themes, 13 color schemes, responsive three-pane layout
+- **Up to 10x faster** — a from-scratch Rust + Tokio engine with IDM-style *dynamic* segmentation
+- **Multi-protocol** — HTTP/HTTPS, FTP, BitTorrent (DHT / UPnP / magnet), eD2K, HLS & DASH streaming
+- **One engine, many hosts** — the same `rinadown_engine` drives the desktop app, the Android app, a headless NAS server and a CLI
+- **Browser integration** — Chrome / Edge / Firefox extension with a 3-layer interception engine, plus a userscript and a native-messaging relay
+- **AI-agent ready** — built-in MCP (Model Context Protocol) server with 12 tools, alongside a REST API and an aria2-compatible JSON-RPC endpoint
+- **Resume anywhere** — every byte persisted in SQLite (WAL); crashes, power loss and reboots never cost you progress
+- **Extensible** — sandboxed JavaScript plugins with a decentralized market, plus managed ffmpeg / yt-dlp components
+- **Beautiful UI** — light/dark themes, 13 character accent colors + custom, responsive three-pane layout
 - **Clean & private** — free and open source, no ads, no tracking, no account required, local-first
 
 ## Features
@@ -48,14 +50,19 @@
 | Feature | Description |
 |---|---|
 | **Rust-Powered Engine** | Built on Rust and Tokio with zero-cost abstractions — memory-safe concurrency at maximum throughput |
-| **Smart Segmentation** | Segments split dynamically at runtime; idle threads rescue slow segments, just like IDM — but smarter |
+| **Dynamic Segmentation** | Segments split at runtime and idle connections rescue slow segments, just like IDM — but self-tuning |
 | **Multi-Protocol** | Dedicated engines for HTTP/HTTPS, FTP, BitTorrent (DHT/UPnP/magnet), eD2K (server + Kad DHT source finding, MD4 verification), HLS (AES-decrypt) and DASH |
-| **Speed Control** | Token-bucket global rate limiting — download in the background without killing your browsing |
-| **Resume Anywhere** | Every byte tracked in SQLite with WAL; power loss never costs you progress |
+| **Speed Control** | Token-bucket global rate limiting plus per-queue limits — download in the background without killing your browsing |
+| **Resume Anywhere** | Every byte tracked in SQLite with WAL (PostgreSQL is supported for the headless server); power loss never costs you progress |
+| **Queues, Groups & Categories** | Named queues with their own concurrency, speed limit and target directory; task groups for batch operations; auto-organized category folders |
+| **Headless & Remote** | `rinadownd` runs standalone on a NAS or VPS and is driven over a versioned local JSON-RPC protocol — the desktop app is an optional client, not a requirement |
+| **Open Interfaces** | REST management API, MCP server and aria2-compatible JSON-RPC serve every client: CLI, web UI, browser extension, userscript and your own scripts |
+| **Plugin System** | Sandboxed JavaScript plugins turn pages and playlists into real download sources; a Git-indexed market keeps plugin discovery decentralized |
+| **RSS & Automation** | Scheduled RSS polling creates tasks unattended, with per-feed filters, queues and destination directories |
+| **Webhooks** | Task lifecycle events pushed to your own HTTP endpoints, so RinaDown can trigger anything downstream |
 | **Browser Integration** | Three-layer download interception, streaming media sniffing, Alt+Click bypass, right-click send |
-| **MCP Server** | Built-in Model Context Protocol endpoint (Streamable HTTP) with 12 tools — AI agents can add, monitor and control downloads |
 | **Beautiful Interface** | shadcn-style widgets, IDM-style segment visualization, named queues, system tray |
-| **Clean & Private** | Zero ads, zero telemetry lock-in, zero accounts — your data never leaves your machine |
+| **Clean & Private** | Zero ads, zero telemetry lock-in, zero accounts — your data stays on your machine |
 
 ## RinaDown vs. IDM
 
@@ -73,7 +80,7 @@
 
 ## Installation
 
-Grab the latest build from [**GitHub Releases**](https://github.com/zerx-lab/RinaDown/releases/latest) or [**rinadown.zerx.dev**](https://rinadown.zerx.dev/#download):
+Grab the latest build from [**rinadown.zerx.dev**](https://rinadown.zerx.dev/#download) or from the [**latest release**](../../releases/latest) of this repository:
 
 | Platform | Packages |
 |---|---|
@@ -81,7 +88,7 @@ Grab the latest build from [**GitHub Releases**](https://github.com/zerx-lab/Rin
 | **macOS** (Intel / Apple Silicon) | `.dmg` · portable `.tar.gz` |
 | **Linux** (x64) | `.AppImage` · `.deb` · Arch `.pkg.tar.zst` · portable `.tar.gz` |
 | **Android** (arm64-v8a / armeabi-v7a / x86_64) | per-ABI `.apk` · universal `.apk` |
-| **NAS / Server** (headless, x64 / ARM64) | [Docker](https://ghcr.io/zerx-lab/rinadown-server) · Synology DSM 6/7 `.spk` · QNAP `.qpkg` · OpenWrt `.ipk` · Unraid CA template · CasaOS / ZimaOS app store |
+| **NAS / Server** (headless, x64 / ARM64) | Docker image (GHCR) · Synology DSM 6/7 `.spk` · QNAP `.qpkg` · OpenWrt `.ipk` · Unraid CA template · CasaOS / ZimaOS app store — see the [server docs](https://rinadown.zerx.dev/docs/) |
 
 ### Browser Extension
 
@@ -129,31 +136,60 @@ RinaDown ships a built-in **MCP server** so AI agents (Claude Desktop, Cursor, C
 
 The MCP layer is implemented in [`native/api/src/mcp.rs`](native/api/src/mcp.rs) on top of the same `ApiHost` trait that powers the REST management API and aria2-compatible JSON-RPC.
 
+## Plugins & Components
+
+RinaDown is extensible without patching the core:
+
+- **JavaScript plugins** — sandboxed QuickJS plugins turn a page, playlist or manifest into one or more concrete download sources (HLS quality ladders, site-specific extractors, …). A plugin declares the permissions it needs (`ffmpeg`, `ytdlp`), runs under memory, interrupt and timeout limits, and is circuit-broken after repeated failures instead of taking the app down with it.
+- **Decentralized market** — plugins are discovered through a Git-versioned JSON index. Anyone can fork it and point the app at their own index; multiple index sources fail over automatically and every entry is content-addressed (`sha256` of the archive).
+- **Managed components** — ffmpeg and yt-dlp are installed, versioned and updated as first-class managed components, which is what powers video parsing and stream muxing.
+
+Plugin support is feature-gated (`plugins`, `components`) and compiled out of mobile and CLI builds — with the gate closed, the download path is unchanged.
+
 ## Architecture
 
-Flutter renders the UI; a zero-FFI Rust engine does the heavy lifting. The two talk through [Rinf](https://rinf.cunarist.org) signals, and the browser extension connects via Native Messaging.
+**One engine, many hosts, many clients.** Every download lives in [`rinadown_engine`](native/engine) — a Rust crate with no FFI, UI or HTTP dependencies — and talks to the outside world through exactly three traits:
+
+| Trait | Direction | Responsibility |
+|---|---|---|
+| `EventSink` | engine → host | progress, segment splits, queue and group changes |
+| `HostSelection` | engine → host | asks the host to decide: HLS quality, BitTorrent file selection, plugin variant |
+| `ApiHost` | client → engine | the capability surface behind the REST / MCP / aria2 endpoints |
+
+The API layer only ever sees `&dyn ApiHost`, so a single HTTP surface serves every host. The PC desktop additionally ships a three-process local chain — `rinadown-desktop` → `rinadown-agent` → `rinadownd` — where `rinadownd` is a pure download core owning tasks, queues, RSS and plugins, and `rinadown-agent` is the UI gateway owning accounts, cloud sync, device pairing and the browser-capture endpoint. The two speak the versioned JSON-RPC protocol defined in [`native/protocol/`](native/protocol).
 
 ```mermaid
-flowchart TD
-    EXT["Browser Extension (WXT)"] -->|Native Messaging| NMH["rinadown_nmh"]
-    NMH -->|Named Pipe / Unix socket| HUB
-    UI["Flutter UI (shadcn_ui)"] <-->|Rinf signals| HUB["hub — FFI adapter"]
-    HUB --> ENGINE["rinadown_engine"]
-    ENGINE --> HTTP["HTTP/HTTPS"]
-    ENGINE --> FTP["FTP"]
-    ENGINE --> BT["BitTorrent"]
-    ENGINE --> ED2K["eD2K"]
-    ENGINE --> HLS["HLS / DASH"]
-    ENGINE --> DB[("SQLite")]
+flowchart LR
+    AGENT["rinadown-agent<br/>gateway · account · sync · capture"]
+    DAEMON["rinadownd<br/>pure download core"]
+    ENGINE["rinadown_engine · Rust + Tokio"]
+    EXT["Browser extension"] --> NMH["rinadown_nmh relay"] --> AGENT
+    UI["Desktop / mobile UI"] --> AGENT
+    US["Userscript"] --> AGENT
+    WEB["Web UI"] --> AGENT
+    CLI["CLI"] --> AGENT
+    AI["AI agents (MCP)"] --> AGENT
+    AGENT -->|JSON-RPC| DAEMON --> ENGINE
+    ENGINE --> P1["HTTP / HTTPS · FTP"]
+    ENGINE --> P2["BitTorrent · eD2K"]
+    ENGINE --> P3["HLS / DASH"]
+    ENGINE --> DB[("SQLite · PostgreSQL")]
 ```
 
 | Layer | Tech | Path |
 |---|---|---|
-| UI | Flutter + shadcn_ui | [`lib/`](lib) |
-| FFI bridge | Rinf (Dart ↔ Rust signals) | [`native/hub/`](native/hub) |
-| Download engine | Rust + Tokio (zero FFI deps) | [`native/engine/`](native/engine) |
+| Download engine | Rust + Tokio, zero FFI / UI deps | [`native/engine/`](native/engine) |
+| Download core (`rinadownd`) | tasks, queues, groups, RSS, plugins, webhooks | [`native/daemon/`](native/daemon) |
+| UI gateway (`rinadown-agent`) | accounts, cloud sync, remote tasks, browser capture | [`native/agent/`](native/agent) |
+| Local protocol | versioned JSON-RPC wire types | [`native/protocol/`](native/protocol) |
+| HTTP surface | REST · MCP · aria2-compatible JSON-RPC | [`native/api/`](native/api) |
+| Desktop shell | GPUI (Rust-native) | [`crates/app/`](crates/app) |
+| Flutter app | Flutter + shadcn_ui over Rinf signals | [`lib/`](lib) · [`native/hub/`](native/hub) |
+| Headless server | standalone HTTP host with the Web UI embedded | [`native/server/`](native/server) |
 | Browser extension | WXT + TypeScript | [`rinaDown/`](rinaDown) |
-| Website | Astro + React | [`website/`](website) |
+| Userscript | Tampermonkey-compatible | [`userscript/`](userscript) |
+| Web UI | React SPA (Vite), compiled into the server binary | [`web/`](web) |
+| Website & docs | Astro + React | [`website/`](website) |
 
 ## Building from Source
 
@@ -161,7 +197,7 @@ flowchart TD
 
 ```shell
 # Clone the development branch (main = active development, stable = stable releases)
-git clone -b main https://github.com/zerx-lab/RinaDown.git
+git clone -b main <this-repository-url> RinaDown
 cd RinaDown
 
 # Check your environment
@@ -180,6 +216,9 @@ flutter run
 
 # Build a release
 flutter build windows --release   # or: macos / linux
+
+# Build the native desktop chain (GPUI shell + gateway + download core)
+cargo build --release -p rinadown_ui_app -p rinadown_agent -p rinadown_daemon
 ```
 
 <details>
@@ -202,16 +241,19 @@ The NMH relay binary (`rinadown_nmh`) is built automatically by CMake during `fl
 <summary><b>Running tests</b></summary>
 
 ```shell
-flutter test                          # Dart tests
-cargo test -p rinadown_engine        # Rust engine tests
-cargo test -p hub                    # FFI adapter tests
+flutter test                                  # Dart / Flutter tests
+cargo nextest run -p rinadown_engine          # engine: protocols, segmentation, DB
+cargo test -p rinadown_api                    # HTTP API: REST, MCP, aria2, OpenAPI drift
+cargo test -p rinadown_server                 # headless server
+cargo test -p rinadown_cli                    # CLI
 ```
 
 </details>
 
 ## Contributing & Community
 
-- **Bug reports / feature requests** — [GitHub Issues](https://github.com/zerx-lab/RinaDown/issues) or the in-app feedback dialog
+- **Bug reports / feature requests** — open an [issue](../../issues) or use the in-app feedback dialog
+- **Docs & translations** — the website documentation lives in this repository; every page has an *Edit this page* link
 - **QQ Group** — [832143651](https://rinadown.zerx.dev/qq-group)
 
 Pull requests are welcome! Branch off `main` and target `main` — it is the development branch, while `stable` only tracks stable releases (maintainers advance it from `main`). Before submitting, please make sure:
@@ -223,6 +265,11 @@ flutter analyze                                     # Dart
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
+## Contributors
+
+- **DeepSeek** — AI pair-programming partner: the Rust engine internals, the Flutter / GPUI UI layers, the browser extension and these docs were written in an ongoing collaboration with [DeepSeek](https://www.deepseek.com).
+- **Everyone else** — thank you! See the [contributors graph](../../graphs/contributors) for the full list.
+
 ## License
 
 Distributed under the [GNU Affero General Public License v3.0](LICENSE).
@@ -230,7 +277,5 @@ Distributed under the [GNU Affero General Public License v3.0](LICENSE).
 <div align="center">
 
 **If RinaDown saves you time, consider giving it a Star — it helps more people discover the project.**
-
-Made by [zerx-lab](https://github.com/zerx-lab)
 
 </div>
