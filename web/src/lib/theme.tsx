@@ -4,14 +4,26 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
-/** 预设强调色（对齐桌面端色彩方案的常用项）；名称走 i18n，不在此写死文案。 */
+/** 预设强调色（虹咲学园角色应援色，与桌面端 `AppColorScheme` 同基线、同顺序）；
+ *  名称走 i18n，不在此写死文案。 */
 export const ACCENT_PRESETS = [
-  { nameKey: 'set.appearance.accentBlue', light: '#2e6bf6', dark: '#4d82f8' },
-  { nameKey: 'set.appearance.accentGreen', light: '#16a34a', dark: '#22c55e' },
-  { nameKey: 'set.appearance.accentPurple', light: '#7c3aed', dark: '#8b5cf6' },
-  { nameKey: 'set.appearance.accentOrange', light: '#ea580c', dark: '#f97316' },
-  { nameKey: 'set.appearance.accentRose', light: '#e11d48', dark: '#f43f5e' },
+  { nameKey: 'set.appearance.accentAyumu', color: '#ED7D95' },
+  { nameKey: 'set.appearance.accentKasumi', color: '#E7D600' },
+  { nameKey: 'set.appearance.accentShizuku', color: '#01B7ED' },
+  { nameKey: 'set.appearance.accentKarin', color: '#485EC6' },
+  { nameKey: 'set.appearance.accentAi', color: '#FF5800' },
+  { nameKey: 'set.appearance.accentKanata', color: '#A664A0' },
+  { nameKey: 'set.appearance.accentSetsuna', color: '#D81C2F' },
+  { nameKey: 'set.appearance.accentEmma', color: '#84C36E' },
+  { nameKey: 'set.appearance.accentRina', color: '#9CA5B9' },
+  { nameKey: 'set.appearance.accentShioriko', color: '#37B484' },
+  { nameKey: 'set.appearance.accentMia', color: '#A9A898' },
+  { nameKey: 'set.appearance.accentLanzhu', color: '#F69992' },
+  { nameKey: 'set.appearance.accentYu', color: '#1D1D1D' },
 ] as const
+
+/** 默认强调色索引（钟岚珠 F69992），与桌面端 `AppColorScheme.fallback` 一致。 */
+const DEFAULT_ACCENT = 11
 
 const MODE_KEY = 'rinadown.theme'
 const ACCENT_KEY = 'rinadown.accent'
@@ -23,7 +35,7 @@ interface ThemeCtx {
   setAccent: (i: number) => void
 }
 
-const Ctx = createContext<ThemeCtx>({ mode: 'system', setMode: () => {}, accent: 0, setAccent: () => {} })
+const Ctx = createContext<ThemeCtx>({ mode: 'system', setMode: () => {}, accent: DEFAULT_ACCENT, setAccent: () => {} })
 
 function systemDark(): boolean {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -32,8 +44,8 @@ function systemDark(): boolean {
 function apply(mode: ThemeMode, accent: number) {
   const dark = mode === 'dark' || (mode === 'system' && systemDark())
   document.documentElement.classList.toggle('dark', dark)
-  const preset = ACCENT_PRESETS[accent] ?? ACCENT_PRESETS[0]
-  document.documentElement.style.setProperty('--accent', dark ? preset.dark : preset.light)
+  const preset = ACCENT_PRESETS[accent] ?? ACCENT_PRESETS[DEFAULT_ACCENT]
+  document.documentElement.style.setProperty('--accent', preset.color)
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -41,7 +53,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     () => (localStorage.getItem(MODE_KEY) as ThemeMode) || 'system',
   )
   const [accent, setAccentState] = useState<number>(() =>
-    parseInt(localStorage.getItem(ACCENT_KEY) ?? '0', 10),
+    parseInt(localStorage.getItem(ACCENT_KEY) ?? String(DEFAULT_ACCENT), 10),
   )
 
   useEffect(() => {

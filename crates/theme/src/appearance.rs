@@ -16,7 +16,7 @@ pub const THEME_MODE_KEY: &str = "appearance.theme_mode";
 pub const DARK_THEME_KEY: &str = "appearance.dark_theme";
 /// 云同步目录键：同 [`DARK_THEME_KEY`]，亮色槽位。
 pub const LIGHT_THEME_KEY: &str = "appearance.light_theme";
-/// 云同步目录键：`AppColorScheme.name`（`blue` | `green` | `violet` | `rose` | `custom`）。
+/// 云同步目录键：`AppColorScheme.name`（虹咲学园角色应援色，见 [`AccentScheme`]）。
 pub const COLOR_SCHEME_KEY: &str = "appearance.color_scheme";
 /// 云同步目录键：ARGB 整数（Flutter `Color.toARGB32()`）。
 pub const CUSTOM_COLOR_KEY: &str = "appearance.custom_color";
@@ -114,36 +114,67 @@ impl BuiltinThemeId {
     }
 }
 
-/// 与 Flutter `AppColorScheme` 同名的强调色方案。
+/// 与 Flutter `AppColorScheme` 同名的强调色方案 —— 虹咲学园角色应援色，
+/// 默认「钟岚珠」(`F69992`)。wire 名称即 Dart enum `.name`（角色名拼音小写）。
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AccentScheme {
+    Ayumu,
+    Kasumi,
+    Shizuku,
+    Karin,
+    Ai,
+    Kanata,
+    Setsuna,
+    Emma,
+    Rina,
+    Shioriko,
+    Mia,
     #[default]
-    Blue,
-    Green,
-    Violet,
-    Rose,
+    Lanzhu,
+    Yu,
     Custom,
 }
 
 impl AccentScheme {
     /// 全部方案，顺序即 Flutter UI 显示顺序。
-    pub const ALL: [Self; 5] = [
-        Self::Blue,
-        Self::Green,
-        Self::Violet,
-        Self::Rose,
+    pub const ALL: [Self; 14] = [
+        Self::Ayumu,
+        Self::Kasumi,
+        Self::Shizuku,
+        Self::Karin,
+        Self::Ai,
+        Self::Kanata,
+        Self::Setsuna,
+        Self::Emma,
+        Self::Rina,
+        Self::Shioriko,
+        Self::Mia,
+        Self::Lanzhu,
+        Self::Yu,
         Self::Custom,
     ];
+
+    /// 默认方案（钟岚珠）。
+    pub const DEFAULT: Self = Self::Lanzhu;
 
     /// Dart enum `.name`。
     #[must_use]
     pub fn wire_name(self) -> &'static str {
         match self {
-            Self::Blue => "blue",
-            Self::Green => "green",
-            Self::Violet => "violet",
-            Self::Rose => "rose",
+            Self::Ayumu => "ayumu",
+            Self::Kasumi => "kasumi",
+            Self::Shizuku => "shizuku",
+            Self::Karin => "karin",
+            Self::Ai => "ai",
+            Self::Kanata => "kanata",
+            Self::Setsuna => "setsuna",
+            Self::Emma => "emma",
+            Self::Rina => "rina",
+            Self::Shioriko => "shioriko",
+            Self::Mia => "mia",
+            Self::Lanzhu => "lanzhu",
+            Self::Yu => "yu",
             Self::Custom => "custom",
         }
     }
@@ -155,14 +186,23 @@ impl AccentScheme {
             .find(|scheme| scheme.wire_name() == value)
     }
 
-    /// i18n 文案键（`colorBlue` 等）。
+    /// i18n 文案键（`colorAyumu` 等）。
     #[must_use]
     pub fn label_key(self) -> &'static str {
         match self {
-            Self::Blue => "colorBlue",
-            Self::Green => "colorGreen",
-            Self::Violet => "colorViolet",
-            Self::Rose => "colorRose",
+            Self::Ayumu => "colorAyumu",
+            Self::Kasumi => "colorKasumi",
+            Self::Shizuku => "colorShizuku",
+            Self::Karin => "colorKarin",
+            Self::Ai => "colorAi",
+            Self::Kanata => "colorKanata",
+            Self::Setsuna => "colorSetsuna",
+            Self::Emma => "colorEmma",
+            Self::Rina => "colorRina",
+            Self::Shioriko => "colorShioriko",
+            Self::Mia => "colorMia",
+            Self::Lanzhu => "colorLanzhu",
+            Self::Yu => "colorYu",
             Self::Custom => "colorCustom",
         }
     }
@@ -171,10 +211,19 @@ impl AccentScheme {
     #[must_use]
     pub fn preset_argb(self) -> u32 {
         match self {
-            Self::Blue => 0xFF3B_82F6,
-            Self::Green => 0xFF22_C55E,
-            Self::Violet => 0xFF8B_5CF6,
-            Self::Rose => 0xFFF4_3F5E,
+            Self::Ayumu => 0xFFED_7D95,
+            Self::Kasumi => 0xFFE7_D600,
+            Self::Shizuku => 0xFF01_B7ED,
+            Self::Karin => 0xFF48_5EC6,
+            Self::Ai => 0xFFFF_5800,
+            Self::Kanata => 0xFFA6_64A0,
+            Self::Setsuna => 0xFFD8_1C2F,
+            Self::Emma => 0xFF84_C36E,
+            Self::Rina => 0xFF9C_A5B9,
+            Self::Shioriko => 0xFF37_B484,
+            Self::Mia => 0xFFA9_A898,
+            Self::Lanzhu => 0xFFF6_9992,
+            Self::Yu => 0xFF1D_1D1D,
             Self::Custom => DEFAULT_CUSTOM_COLOR,
         }
     }
@@ -230,7 +279,7 @@ impl Default for AppearancePreferences {
             theme_mode: ThemePreference::System,
             dark_theme: BuiltinThemeId::DefaultDark,
             light_theme: BuiltinThemeId::DefaultLight,
-            color_scheme: AccentScheme::Blue,
+            color_scheme: AccentScheme::DEFAULT,
             custom_color: DEFAULT_CUSTOM_COLOR,
             ui_scale_percent: 100,
         }
@@ -441,7 +490,7 @@ mod tests {
         assert_eq!(prefs.theme_mode, ThemePreference::System);
         assert_eq!(prefs.dark_theme, BuiltinThemeId::DefaultDark);
         assert_eq!(prefs.light_theme, BuiltinThemeId::DefaultLight);
-        assert_eq!(prefs.color_scheme, AccentScheme::Blue);
+        assert_eq!(prefs.color_scheme, AccentScheme::Lanzhu);
         assert_eq!(prefs.custom_color, 0xFFAB_CDEF);
         assert_eq!(prefs.ui_scale_percent, 100);
     }

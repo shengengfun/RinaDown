@@ -104,13 +104,7 @@ export function LoginScreen() {
       <div className="login-bg" />
       <div className="login-card">
         <span className="login-logo">
-          <svg viewBox="30 30 452 452" role="img" xmlns="http://www.w3.org/2000/svg">
-            <rect x="56" y="56" width="400" height="400" rx="88" fill="#3B82F6" />
-            <path
-              d="M 226 131 Q 226 119 238 119 L 274 119 Q 286 119 286 131 L 286 296 L 331 251 Q 340 242 349 251 L 363 265 Q 372 274 363 283 L 265 381 Q 256 390 247 381 L 149 283 Q 140 274 149 265 L 163 251 Q 172 242 181 251 L 226 296 Z"
-              fill="#F2F4F8"
-            />
-          </svg>
+          <img src="/logo.png" alt="RinaDown" />
         </span>
         <h2>{mode === 'setup' ? t('setup.title') : t('login.title')}</h2>
         <p className="login-sub">{mode === 'setup' ? t('setup.subtitle') : t('login.subtitle')}</p>

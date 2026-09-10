@@ -235,16 +235,8 @@ class _SidebarState extends State<Sidebar> {
                     ),
                   );
                 }
-                // 暗色主题：蓝色箭头 + 透明背景（无白色圆角矩形，避免在深色侧边栏上显得突兀）
-                // 亮色主题：完整圆角图标（白底 + 蓝色箭头）
-                if (c.tokens.appearance == Brightness.dark) {
-                  return Image.asset(
-                    'assets/logo/logo_on_dark.png',
-                    width: 22,
-                    height: 22,
-                    filterQuality: FilterQuality.medium,
-                  );
-                }
+                // 亮/暗主题共用同一张应用 logo（PNG 自带圆角透明边，
+                // 深色侧边栏上也不会显突兀），无需再区分主题。
                 return ClipRRect(
                   borderRadius: m.brMd,
                   child: Image.asset(
@@ -261,9 +253,9 @@ class _SidebarState extends State<Sidebar> {
               TextSpan(
                 children: [
                   TextSpan(
-                    text: 'Flux',
+                    text: 'Rina',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: c.accent,
                       letterSpacing: 0.3,
@@ -272,7 +264,7 @@ class _SidebarState extends State<Sidebar> {
                   TextSpan(
                     text: 'Down',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 15,
                       fontWeight: FontWeight.w500,
                       color: c.textPrimary,
                       letterSpacing: 0.3,

@@ -10306,15 +10306,24 @@ class _ThemeModeCardState extends State<_ThemeModeCard> {
 }
 
 // ─────────────────────────────────────────────
-// 主题色选择器（4 预设 + 自定义色盘）
+// 主题色选择器（虹咲角色应援色 + 自定义色盘）
 // ─────────────────────────────────────────────
 
-/// 预设色列表（排除 custom）
+/// 预设色列表（虹咲学园 13 位角色应援色，排除 custom）
 const _presetSchemes = [
-  AppColorScheme.blue,
-  AppColorScheme.green,
-  AppColorScheme.violet,
-  AppColorScheme.rose,
+  AppColorScheme.ayumu,
+  AppColorScheme.kasumi,
+  AppColorScheme.shizuku,
+  AppColorScheme.karin,
+  AppColorScheme.ai,
+  AppColorScheme.kanata,
+  AppColorScheme.setsuna,
+  AppColorScheme.emma,
+  AppColorScheme.rina,
+  AppColorScheme.shioriko,
+  AppColorScheme.mia,
+  AppColorScheme.lanzhu,
+  AppColorScheme.yu,
 ];
 
 class _ColorSchemeSelector extends StatelessWidget {
@@ -10330,7 +10339,7 @@ class _ColorSchemeSelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── 色点行：4 预设 + 1 自定义 ──
+        // ── 色点行：13 角色色 + 1 自定义 ──
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -11016,7 +11025,7 @@ class _AboutContent extends StatelessWidget {
             c,
             LucideIcons.circleAlert,
             AppColors.red,
-            svc.errorMessage,
+            svc.errorIsTimeout ? s.updateCheckTimeout : svc.errorMessage,
           ),
         if (status == UpdateStatus.available)
           _statusRow(

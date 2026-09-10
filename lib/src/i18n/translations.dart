@@ -1100,12 +1100,21 @@ class S {
   String get themeMore => _r('themeMore');
 
   // ─────────────────────────────────────────────
-  // 主题色名称
+  // 主题色名称 — 虹咲学园角色应援色
   // ─────────────────────────────────────────────
-  String get colorBlue => _r('colorBlue');
-  String get colorGreen => _r('colorGreen');
-  String get colorViolet => _r('colorViolet');
-  String get colorRose => _r('colorRose');
+  String get colorAyumu => _r('colorAyumu');
+  String get colorKasumi => _r('colorKasumi');
+  String get colorShizuku => _r('colorShizuku');
+  String get colorKarin => _r('colorKarin');
+  String get colorAi => _r('colorAi');
+  String get colorKanata => _r('colorKanata');
+  String get colorSetsuna => _r('colorSetsuna');
+  String get colorEmma => _r('colorEmma');
+  String get colorRina => _r('colorRina');
+  String get colorShioriko => _r('colorShioriko');
+  String get colorMia => _r('colorMia');
+  String get colorLanzhu => _r('colorLanzhu');
+  String get colorYu => _r('colorYu');
   String get colorCustom => _r('colorCustom');
 
   // ─────────────────────────────────────────────
@@ -1535,6 +1544,7 @@ class S {
   String get extensionEdgeStore => _r('extensionEdgeStore');
   String get extensionOfflinePackages => _r('extensionOfflinePackages');
   String get upToDate => _r('upToDate');
+  String get updateCheckTimeout => _r('updateCheckTimeout');
   String newVersionFound(String v) => _r('newVersionFound', {'v': v});
   String get updateNow => _r('updateNow');
   String get updateLater => _r('updateLater');

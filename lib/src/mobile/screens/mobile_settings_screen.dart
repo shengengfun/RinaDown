@@ -321,7 +321,10 @@ class MobileSettingsScreen extends StatelessWidget {
       UpdateStatus.downloading => (_downloadPercent(svc.progress), null),
       UpdateStatus.readyToInstall => (s.installAndRestart, svc.installUpdate),
       UpdateStatus.upToDate => (s.upToDate, svc.checkForUpdate),
-      UpdateStatus.error => (svc.errorMessage, svc.checkForUpdate),
+      UpdateStatus.error => (
+        svc.errorIsTimeout ? s.updateCheckTimeout : svc.errorMessage,
+        svc.checkForUpdate,
+      ),
       UpdateStatus.idle => (null, svc.checkForUpdate),
     };
     return _Row(

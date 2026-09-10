@@ -33,7 +33,7 @@ static const wchar_t kFlutterWindowClass[] = L"FLUTTER_RUNNER_WIN32_WINDOW";
 // Window title (must match CreateCentered call below).
 static const wchar_t kWindowTitle[] = L"RinaDown";
 // Magic identifier for WM_COPYDATA to distinguish our messages.
-static const ULONG_PTR kCopyDataId = 0x464C5558; // "FLUX" in hex
+static const ULONG_PTR kCopyDataId = 0x52494E41; // "RINA" in hex
 
 // Build a single UTF-8 string from command-line arguments, separated by '\n'.
 static std::string JoinArguments(const std::vector<std::string>& args) {

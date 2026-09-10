@@ -3,7 +3,7 @@
 
 #define MyAppName "RinaDown"
 #define MyAppPublisher "RinaDown"
-#define MyAppURL "https://github.com/user/x_down"
+#define MyAppURL "https://github.com/shengengfun/RinaDown"
 #define MyAppExeName "rina_down.exe"
 
 ; Version is passed from CI via /DMyAppVersion=x.y.z
@@ -46,6 +46,9 @@ PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 CloseApplications=force
 SetupIconFile=..\..\windows\runner\resources\app_icon.ico
+; 向导右上角小图 = 应用 logo（由 scripts/gen_icons.ts 一并生成，与应用图标同源）。
+; 用 24-bit BMP：PNG/JPEG 向导图需要 Inno Setup 6.3+，BMP 全版本通吃。
+WizardSmallImageFile=wizard_small.bmp
 UninstallDisplayIcon={app}\{#MyAppExeName}
 UninstallDisplayName={#MyAppName}
 

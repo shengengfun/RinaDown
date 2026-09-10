@@ -62,8 +62,9 @@ export function AppearanceSettings() {
                 key={p.nameKey}
                 type="button"
                 aria-label={t(p.nameKey)}
+                title={t(p.nameKey)}
                 className={cn('color-dot', i === accent && 'active')}
-                style={{ background: p.light }}
+                style={{ background: p.color }}
                 onClick={() => setAccent(i)}
               />
             ))}

@@ -407,21 +407,22 @@ mod tests {
 
     #[test]
     fn accent_rewrites_derived_tokens_and_keeps_alpha() {
-        let theme = FluxThemeDefinition::rinadown_default().with_accent(AccentScheme::Rose, 0);
-        let rose = color(0xF43F5E);
+        let theme =
+            FluxThemeDefinition::rinadown_default().with_accent(AccentScheme::Lanzhu, 0);
+        let lanzhu = color(0xF69992);
         for tokens in [&theme.light, &theme.dark] {
-            assert_eq!(tokens.colors.primary, rose);
+            assert_eq!(tokens.colors.primary, lanzhu);
             assert_eq!(tokens.colors.primary_foreground, color(0xFFFFFF));
-            assert_eq!(tokens.colors.accent_foreground, rose);
-            assert_eq!(tokens.colors.ring, rose);
+            assert_eq!(tokens.colors.accent_foreground, lanzhu);
+            assert_eq!(tokens.colors.ring, lanzhu);
         }
         assert_eq!(
             theme.light.colors.accent,
-            color_with_alpha(0xF43F5E, 26.0 / 255.0)
+            color_with_alpha(0xF69992, 26.0 / 255.0)
         );
         assert_eq!(
             theme.dark.colors.accent,
-            color_with_alpha(0xF43F5E, 46.0 / 255.0)
+            color_with_alpha(0xF69992, 46.0 / 255.0)
         );
         assert_eq!(theme.light.colors.background, color(0xF8F9FA));
 
@@ -430,16 +431,17 @@ mod tests {
         assert_eq!(custom.light.colors.primary, color(0xFAFAFA));
         assert_eq!(custom.light.colors.primary_foreground, color(0x09090B));
 
+        // 自定义色盘填回主题自带强调色（#3B82F6）→ token 与默认完全一致。
         let unchanged =
-            FluxThemeDefinition::rinadown_default().with_accent(AccentScheme::Blue, 0xFF00_0000);
+            FluxThemeDefinition::rinadown_default().with_accent(AccentScheme::Custom, 0xFF3B_82F6);
         assert_eq!(unchanged, FluxThemeDefinition::rinadown_default());
     }
 
     #[test]
     fn accent_preserves_pinned_preset_foreground() {
-        let nord =
-            FluxThemeDefinition::builtin(BuiltinThemeId::Nord).with_accent(AccentScheme::Green, 0);
-        assert_eq!(nord.dark.colors.primary, color(0x22C55E));
+        let nord = FluxThemeDefinition::builtin(BuiltinThemeId::Nord)
+            .with_accent(AccentScheme::Setsuna, 0);
+        assert_eq!(nord.dark.colors.primary, color(0xD81C2F));
         assert_eq!(nord.dark.colors.primary_foreground, color(0x2E3440));
         assert_eq!(nord.light.colors.primary_foreground, color(0xFFFFFF));
     }

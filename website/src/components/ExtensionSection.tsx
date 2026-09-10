@@ -210,7 +210,7 @@ export default function ExtensionSection() {
                         <div className="flex items-center gap-2">
                           <img src="/logo.svg" alt="" className="w-6 h-6" />
                           <span className="text-sm font-semibold">
-                            <span className="text-brand-sky">Flux</span>
+                            <span className="text-brand-sky">Rina</span>
                             <span className="text-dark-text">Down</span>
                           </span>
                         </div>

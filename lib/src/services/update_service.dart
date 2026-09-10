@@ -100,6 +100,16 @@ class UpdateService extends ChangeNotifier {
   String _errorMessage = '';
   String get errorMessage => _errorMessage;
 
+  /// 客户端侧「检查更新超时」哨兵：此时 [_errorMessage] 是硬编码英文，
+  /// UI 需改用 i18n 文案（[UpdateService.errorIsTimeout] 为 true）。
+  bool _errorIsTimeout = false;
+  bool get errorIsTimeout => _errorIsTimeout;
+
+  void _setError(String message, {bool timeout = false}) {
+    _errorMessage = message;
+    _errorIsTimeout = timeout;
+  }
+
   /// Pending "previous update failed" message reported by the Rust updater on
   /// startup (empty when there is nothing to report). Set once after the app
   /// requests the marker; the UI should show it once and then call
@@ -181,7 +191,7 @@ class UpdateService extends ChangeNotifier {
     }
     logInfo('UpdateService', 'checkForUpdate, current=$_appVersion');
     _status = UpdateStatus.checking;
-    _errorMessage = '';
+    _setError('');
     notifyListeners();
 
     // Start a timeout guard — if Rust never responds, fall back to error.
@@ -202,7 +212,7 @@ class UpdateService extends ChangeNotifier {
       'check timed out after ${_checkTimeout.inSeconds}s',
     );
     _status = UpdateStatus.error;
-    _errorMessage = 'Check timed out';
+    _setError('Check timed out', timeout: true);
     notifyListeners();
   }
 
@@ -215,7 +225,7 @@ class UpdateService extends ChangeNotifier {
     logInfo('UpdateService', 'downloadUpdate v${result.latestVersion}');
     _status = UpdateStatus.downloading;
     _progress = null;
-    _errorMessage = '';
+    _setError('');
     notifyListeners();
 
     DownloadUpdate(
@@ -264,7 +274,7 @@ class UpdateService extends ChangeNotifier {
     // The update now lives in the main download list; reset the update UI so
     // it no longer shows the failed built-in download.
     _status = UpdateStatus.idle;
-    _errorMessage = '';
+    _setError('');
     notifyListeners();
     return true;
   }
@@ -285,7 +295,7 @@ class UpdateService extends ChangeNotifier {
       } on PlatformException catch (e) {
         logError('UpdateService', 'installApk failed', e);
         _status = UpdateStatus.error;
-        _errorMessage = e.message ?? e.code;
+        _setError(e.message ?? e.code);
         notifyListeners();
       }
       return;
@@ -309,7 +319,7 @@ class UpdateService extends ChangeNotifier {
 
     if (msg.errorMessage.isNotEmpty) {
       _status = UpdateStatus.error;
-      _errorMessage = msg.errorMessage;
+      _setError(msg.errorMessage);
     } else if (msg.hasUpdate) {
       _status = UpdateStatus.available;
       // Fetch changelog in background — don't block the status update

@@ -877,7 +877,7 @@ export default function HeroSection() {
                       color: theme.accent,
                     }}
                   >
-                    Flux
+                    Rina
                   </span>
                   <span
                     style={{

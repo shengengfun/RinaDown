@@ -7,6 +7,11 @@
  *
  * 依赖: sharp (bun 全局已安装)
  *
+ * 源文件 assets/logo/rinadown_logo.svg 自 logo 换成栅格插画（logo.jpg）后，
+ * 本身是一张「内嵌 JPEG + 圆角 clipPath」的 SVG 包装，几何（viewBox 30…482、
+ * 圆角矩形 56…456、rx=88）与旧矢量版完全一致——流水线无需知道源是栅格。
+ * 换 logo 时改 logo.jpg 后用 scripts/embed_logo.py 重生成该 SVG，再跑本脚本。
+ *
  * 从 assets/logo/rinadown_logo.svg 生成以下全部图标:
  *
  *   assets/logo/
@@ -15,12 +20,15 @@
  *     logo.png (600×600)
  *     tray_iconTemplate.png (36×36, macOS 2x 菜单栏模板图标)
  *     tray_iconTemplate@1x.png (18×18, macOS 1x 菜单栏模板图标)
- *     logo_on_dark.png (64×64, 暗色主题侧边栏专用: 蓝色箭头 + 透明背景)
  *
  *   windows/runner/resources/
  *     app_icon.ico (16,32,48,64,256 多分辨率 ICO；Flutter 与 GPUI PC 客户端共用)
- *     tray_win_dark.ico (16,32 — 深色模式白色箭头托盘图标)
- *     tray_win_light.ico (16,32 — 浅色模式深蓝色箭头托盘图标)
+ *     tray_win_dark.ico (16,32 — 深色任务栏托盘图标)
+ *     tray_win_light.ico (16,32 — 浅色任务栏托盘图标)
+ *
+ *   installer/windows/
+ *     wizard_small.bmp (55×55 24-bit BMP — Inno Setup 向导右上角小图，
+ *                       即安装包 logo，与应用图标同源)
  *
  *   macos/Runner/Assets.xcassets/AppIcon.appiconset/
  *     app_icon_{16,32,64,128,256,512,1024}.png
@@ -37,6 +45,9 @@
  *   rinaDown/public/icon/
  *     {16,32,48,128}.png  {16,32,48,128}-disabled.png
  *     rinadown_logo.png (128×128)  rinadown_logo.svg (副本)
+ *
+ *   web/public/  (Vite React 客户端 + 服务器内嵌 SPA)
+ *     favicon.svg  logo.png (256×256)
  *
  *   website/public/
  *     favicon.ico  favicon.svg  logo.png (1024×1024)  logo.svg (副本)
@@ -133,47 +144,17 @@ async function renderDisabledPng(size: number): Promise<Buffer> {
 }
 
 /**
- * 生成 macOS 菜单栏模板图标 — 黑色圆角方块 + 镂空箭头剪影
+ * 生成 macOS 菜单栏模板图标 — 纯黑圆角方块（透明背景）。
  *
  * macOS 模板图标规范:
  *   - 仅黑色 + alpha，系统按菜单栏外观自动着色（深色变白、浅色变黑）
- *   - 用 fill-rule=evenodd 把箭头从圆角方块中"挖空"，保留 logo 整体识别度
- *
- * 路径坐标与 rinadown_logo.svg 完全对齐:
- *   外框: rect(56,56,400,400, rx=88) → 等价 8 段贝塞尔/直线
- *   箭头: 与 renderWindowsTrayArrow 同一条 path
+ *   - 新 logo 是整块栅格插画，无法做成可辨认的剪影，故只保留图标本身的
+ *     圆角方块轮廓（与应用图标的圆角几何一致）。
+ *   几何与 rinadown_logo.svg 对齐: viewBox 30…482，圆角矩形 56…456，rx=88。
  */
 async function renderMacTrayTemplate(size: number): Promise<Buffer> {
   const svg = `<svg width="512" height="512" viewBox="30 30 452 452" xmlns="http://www.w3.org/2000/svg">
-    <path fill="#000000" fill-rule="evenodd" d="
-      M 144 56
-      L 368 56
-      Q 456 56 456 144
-      L 456 368
-      Q 456 456 368 456
-      L 144 456
-      Q 56 456 56 368
-      L 56 144
-      Q 56 56 144 56
-      Z
-      M 226 131
-      Q 226 119 238 119
-      L 274 119
-      Q 286 119 286 131
-      L 286 296
-      L 331 251
-      Q 340 242 349 251
-      L 363 265
-      Q 372 274 363 283
-      L 265 381
-      Q 256 390 247 381
-      L 149 283
-      Q 140 274 149 265
-      L 163 251
-      Q 172 242 181 251
-      L 226 296
-      Z
-    "/>
+    <rect x="56" y="56" width="400" height="400" rx="88" ry="88" fill="#000000"/>
   </svg>`;
   return sharp(Buffer.from(svg), { density: 300 })
     .resize(size, size, {
@@ -185,94 +166,8 @@ async function renderMacTrayTemplate(size: number): Promise<Buffer> {
     .toBuffer();
 }
 
-/** 旧的亮度阈值剪影算法 — 保留备用，新 logo 不再使用 */
-async function renderTrayTemplate(size: number): Promise<Buffer> {
-  const src = await renderPng(size);
-  const { data, info } = await sharp(src)
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  const LO = 180; // 亮度 <= LO → 完全不透明
-  const HI = 240; // 亮度 >= HI → 完全透明
-  const RANGE = HI - LO;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    const origAlpha = data[i + 3];
-
-    // 感知亮度 (BT.709 权重)
-    const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-    // 平滑阈值: 暗→不透明, 亮→透明
-    let shapeAlpha: number;
-    if (lum >= HI) {
-      shapeAlpha = 0;
-    } else if (lum <= LO) {
-      shapeAlpha = 255;
-    } else {
-      shapeAlpha = Math.round(255 * (1 - (lum - LO) / RANGE));
-    }
-
-    data[i] = 0; // R → 黑色
-    data[i + 1] = 0; // G → 黑色
-    data[i + 2] = 0; // B → 黑色
-    // 取原始 alpha 和计算 alpha 的较小值，保留原有透明区域
-    data[i + 3] = Math.min(origAlpha, shapeAlpha);
-  }
-
-  return sharp(data, {
-    raw: { width: info.width, height: info.height, channels: 4 },
-  })
-    .png({ compressionLevel: 9 })
-    .toBuffer();
-}
-
-/**
- * 生成 Windows 系统托盘专用箭头图标（透明背景，纯色箭头）
- *
- * 与应用图标不同，托盘图标不带圆角矩形背景，仅保留下载箭头形状。
- * - 深色模式（深色任务栏）→ 白色箭头 (#FFFFFF)
- * - 浅色模式（浅色任务栏）→ 深蓝色箭头 (#1e3a8a)
- *
- * viewBox "106 105 300 300" 以 300×300 正方形裁剪原始箭头路径：
- *   箭头 x:[149,363] y:[119,390]，中心 (256,255)，各边留约 15% 边距
- */
-async function renderWindowsTrayArrow(
-  size: number,
-  color: string,
-): Promise<Buffer> {
-  const svg = `<svg width="512" height="512" viewBox="106 105 300 300" xmlns="http://www.w3.org/2000/svg">
-    <path d="
-      M 226 131
-      Q 226 119 238 119
-      L 274 119
-      Q 286 119 286 131
-      L 286 296
-      L 331 251
-      Q 340 242 349 251
-      L 363 265
-      Q 372 274 363 283
-      L 265 381
-      Q 256 390 247 381
-      L 149 283
-      Q 140 274 149 265
-      L 163 251
-      Q 172 242 181 251
-      L 226 296
-      Z
-    " fill="${color}"/>
-  </svg>`;
-  return sharp(Buffer.from(svg), { density: 300 })
-    .resize(size, size, {
-      kernel: sharp.kernel.lanczos3,
-      fit: "contain",
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    })
-    .png({ compressionLevel: 9 })
-    .toBuffer();
-}
+// 旧 logo（蓝色箭头矢量）专用的「亮度阈值剪影」与「纯色箭头」两个生成器已随
+// logo 切换删除：托盘 / 菜单栏图标现在直接复用应用图标本身。
 
 /**
  * 手动构建 ICO 文件（多分辨率，PNG 压缩帧）
@@ -313,6 +208,58 @@ function buildIco(frames: { size: number; data: Buffer }[]): Buffer {
   }
 
   return Buffer.concat([header, directory, ...frames.map((f) => f.data)]);
+}
+
+/**
+ * 手写 24 位 BMP（bottom-up、BGR、每行按 4 字节对齐）。
+ *
+ * 用途：Inno Setup 的 `WizardSmallImageFile`（安装向导右上角小图 = 安装包 logo）。
+ * 所有 Inno 版本都接受 BMP，而 PNG/JPEG 要 6.3+；sharp 又没有 BMP 输出格式，
+ * 所以这里自己把栅格像素封装成 BMP。透明区域合成白底（向导背景为浅色）。
+ */
+async function buildBmp(size: number, png: Buffer): Promise<Buffer> {
+  const { data } = await sharp(png)
+    .flatten({ background: { r: 255, g: 255, b: 255 } })
+    .resize(size, size, { kernel: sharp.kernel.lanczos3 })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const rowBytes = size * 3;
+  const stride = rowBytes + ((4 - (rowBytes % 4)) % 4);
+  const pixelBytes = stride * size;
+
+  // BITMAPFILEHEADER (14B) + BITMAPINFOHEADER (40B)
+  const header = Buffer.alloc(54);
+  header.write("BM", 0, "ascii");
+  header.writeUInt32LE(54 + pixelBytes, 2); // bfSize
+  header.writeUInt32LE(0, 6); // bfReserved
+  header.writeUInt32LE(54, 10); // bfOffBits
+  header.writeUInt32LE(40, 14); // biSize
+  header.writeInt32LE(size, 18); // biWidth
+  header.writeInt32LE(size, 22); // biHeight (>0 → bottom-up)
+  header.writeUInt16LE(1, 26); // biPlanes
+  header.writeUInt16LE(24, 28); // biBitCount
+  header.writeUInt32LE(0, 30); // biCompression = BI_RGB
+  header.writeUInt32LE(pixelBytes, 34); // biSizeImage
+  header.writeInt32LE(2835, 38); // biXPelsPerMeter
+  header.writeInt32LE(2835, 42); // biYPelsPerMeter
+  header.writeUInt32LE(0, 46); // biClrUsed
+  header.writeUInt32LE(0, 50); // biClrImportant
+
+  const body = Buffer.alloc(pixelBytes);
+  for (let y = 0; y < size; y++) {
+    const srcRow = (size - 1 - y) * size * 3; // BMP 自下而上
+    const dstRow = y * stride;
+    for (let x = 0; x < size; x++) {
+      const s = srcRow + x * 3;
+      const d = dstRow + x * 3;
+      body[d] = data[s + 2]; // B
+      body[d + 1] = data[s + 1]; // G
+      body[d + 2] = data[s]; // R
+    }
+  }
+
+  return Buffer.concat([header, body]);
 }
 
 /** 保存 Buffer 到文件，打印路径 */
@@ -366,11 +313,6 @@ async function main() {
     const tray18 = await renderMacTrayTemplate(18);
     await saveFile("assets/logo/tray_iconTemplate@1x.png", tray18);
 
-    // 暗色主题侧边栏 logo — 蓝色箭头 (#3B82F6) + 透明背景，64px 保证高 DPI 清晰度
-    // 不含圆角矩形背景，直接在深色 surface1 上显示
-    const logoDark = await renderWindowsTrayArrow(64, "#3B82F6");
-    await saveFile("assets/logo/logo_on_dark.png", logoDark);
-
     // 内置备选应用图标「闪电」— 512px，运行时由 AppIconService 转 ICO
     if (existsSync(BOLT_SVG_SRC)) {
       const bolt = await renderPngFrom(BOLT_SVG_SRC, 512);
@@ -378,7 +320,7 @@ async function main() {
       totalCount += 1;
     }
 
-    totalCount += 5;
+    totalCount += 4;
   }
 
   // ──────────────────────────────────────────
@@ -402,7 +344,7 @@ async function main() {
 
   // ──────────────────────────────────────────
   // 2b. Windows 托盘图标 — 深/浅色共用同一彩色 logo
-  //     新 logo（蓝底白箭头）在浅/深任务栏均可辨识，无需区分主题
+  //     整块栅格图在浅/深任务栏均可辨识，无需区分主题
   // ──────────────────────────────────────────
   console.log("\n📁 windows/runner/resources/ (tray icons)");
   {
@@ -532,18 +474,20 @@ async function main() {
     const faviconIco = buildIco(faviconFrames);
     await saveFile("website/public/favicon.ico", faviconIco);
 
-    // favicon.svg — 将 1024px PNG 嵌入 SVG（与现有格式一致）
-    const logo1024 = await getCachedPng(1024);
-    const pngBase64 = logo1024.toString("base64");
+    // favicon.svg — 内嵌 256px PNG。logo 现在是栅格插画，嵌 1024px 会让
+    // favicon 涨到 ~1.4MB；favicon 实际最多渲染到 256px，256 足够。
+    const faviconPng = await getCachedPng(256);
+    const pngBase64 = faviconPng.toString("base64");
     const faviconSvg = [
-      `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" width="512" height="512">`,
-      `  <image href="data:image/png;base64,${pngBase64}" width="512" height="512"/>`,
+      `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 256 256" width="256" height="256">`,
+      `  <image href="data:image/png;base64,${pngBase64}" width="256" height="256"/>`,
       `</svg>`,
       "",
     ].join("\n");
     await saveFile("website/public/favicon.svg", faviconSvg);
 
     // logo.png (1024×1024)
+    const logo1024 = await getCachedPng(1024);
     await saveFile("website/public/logo.png", logo1024);
 
     // logo.svg (复制源 SVG)
@@ -551,6 +495,37 @@ async function main() {
     await saveFile("website/public/logo.svg", svgContent);
 
     totalCount += 4;
+  }
+
+  // ──────────────────────────────────────────
+  // 8. web/public/ — 服务器内嵌 SPA（Vite React）的 logo
+  // ──────────────────────────────────────────
+  console.log("\n📁 web/public/");
+  {
+    const webLogo = await getCachedPng(256);
+    await saveFile("web/public/logo.png", webLogo);
+
+    // favicon.svg — 内嵌 PNG（与 website 同构，避免再维护一份矢量源）
+    const pngBase64 = webLogo.toString("base64");
+    const faviconSvg = [
+      `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 256 256" width="256" height="256">`,
+      `  <image href="data:image/png;base64,${pngBase64}" width="256" height="256"/>`,
+      `</svg>`,
+      "",
+    ].join("\n");
+    await saveFile("web/public/favicon.svg", faviconSvg);
+
+    totalCount += 2;
+  }
+
+  // ──────────────────────────────────────────
+  // 9. installer/windows/ — 安装向导右上角小图（安装包 logo = 应用图标）
+  // ──────────────────────────────────────────
+  console.log("\n📁 installer/windows/");
+  {
+    const wizardBmp = await buildBmp(55, await getCachedPng(55));
+    await saveFile("installer/windows/wizard_small.bmp", wizardBmp);
+    totalCount += 1;
   }
 
   // ──────────────────────────────────────────

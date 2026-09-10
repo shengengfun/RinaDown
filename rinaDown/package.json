@@ -1,5 +1,5 @@
 {
-  "name": "flux-down-extension",
+  "name": "rinadown-extension",
   "description": "RinaDown browser extension - intercept downloads and send to RinaDown app",
   "version": "0.1.28",
   "private": true,

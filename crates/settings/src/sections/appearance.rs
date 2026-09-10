@@ -305,7 +305,8 @@ struct CustomColorSlot {
     _subscription: Subscription,
 }
 
-/// 与 Flutter `_ColorSchemeSelector` 一致：4 个预设色点 + 自定义；选中自定义时展开取色器。
+/// 与 Flutter `_ColorSchemeSelector` 一致：虹咲学园 13 位角色应援色点 + 自定义；
+/// 选中自定义时展开取色器。`AccentScheme::ALL` 与 Flutter 枚举顺序逐项对齐。
 fn color_scheme_field(ctx: &SectionContext) -> SettingField<SharedString> {
     let store = ctx.store();
     let labels: Vec<(AccentScheme, SharedString)> = AccentScheme::ALL

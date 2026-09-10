@@ -11,7 +11,7 @@
 #include "utils.h"
 
 // Must match kCopyDataId in main.cpp.
-static const ULONG_PTR kCopyDataId = 0x464C5558; // "FLUX"
+static const ULONG_PTR kCopyDataId = 0x52494E41; // "RINA"
 
 namespace {
 

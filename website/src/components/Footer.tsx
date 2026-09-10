@@ -30,7 +30,7 @@ export default function Footer() {
               />
               <span className="text-lg font-bold tracking-tight">
                 <span className="bg-gradient-to-r from-brand-sky to-brand-cyan bg-clip-text text-transparent">
-                  Flux
+                  Rina
                 </span>
                 <span className="text-dark-text">Down</span>
               </span>

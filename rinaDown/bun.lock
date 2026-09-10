@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "flux-down-extension",
+      "name": "rinadown-extension",
       "devDependencies": {
         "typescript": "^5.7.0",
         "wxt": "^0.20.14",

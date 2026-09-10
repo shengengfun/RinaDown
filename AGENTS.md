@@ -99,6 +99,7 @@ cd rinaDown && npm run dev            # 扩展开发（Chrome）；dev:firefox /
 # ── OpenAPI / 图标 / 发布 ──
 cargo run -p rinadown_api --example gen_openapi > website/public/openapi.json   # 改 API 后重生成
 bun scripts/gen_icons.ts              # 改 assets/logo/rinadown_logo.svg 后全平台图标一键生成
+python scripts/embed_logo.py          # 换 logo.jpg（仓库根）后重生成栅格版 rinadown_logo.svg，再跑上一条
 git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z   # 触发发布流水线（稳定版从 stable，预览 -rc.N 从 main；见 §6）
 ```
 

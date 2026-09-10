@@ -81,25 +81,50 @@ final builtinThemes = <BuiltinThemeEntry>[
 //  强调色方案（快速切换强调色的简化入口）
 // ═══════════════════════════════════════════════════════════
 
+/// 内置强调色 —— 虹咲学园角色应援色（枚举顺序即 UI 显示顺序）。
+///
+/// 默认配色为「钟岚珠」(F69992)。新增角色色时同步在 en.json / zh.json
+/// 补 `color<Name>` 键并在 [AppColorSchemeI18n.label] 挂接。
 enum AppColorScheme {
-  blue(Color(0xFF3B82F6)),
-  green(Color(0xFF22C55E)),
-  violet(Color(0xFF8B5CF6)),
-  rose(Color(0xFFF43F5E)),
-  custom(Color(0xFF6366F1));
+  ayumu(Color(0xFFED7D95)), // 上原步梦
+  kasumi(Color(0xFFE7D600)), // 中须霞
+  shizuku(Color(0xFF01B7ED)), // 樱坂雫
+  karin(Color(0xFF485EC6)), // 朝香果林
+  ai(Color(0xFFFF5800)), // 宫下爱
+  kanata(Color(0xFFA664A0)), // 近江彼方
+  setsuna(Color(0xFFD81C2F)), // 优木雪菜
+  emma(Color(0xFF84C36E)), // 艾玛·维尔德
+  rina(Color(0xFF9CA5B9)), // 天王寺璃奈
+  shioriko(Color(0xFF37B484)), // 三船栞子
+  mia(Color(0xFFA9A898)), // 米娅·泰勒
+  lanzhu(Color(0xFFF69992)), // 钟岚珠（默认）
+  yu(Color(0xFF1D1D1D)), // 高咲侑
+  custom(Color(0xFF6366F1)); // 自定义色盘
 
   final Color previewColor;
   const AppColorScheme(this.previewColor);
+
+  /// 默认强调色（钟岚珠）
+  static const AppColorScheme fallback = AppColorScheme.lanzhu;
 }
 
 extension AppColorSchemeI18n on AppColorScheme {
   String get label {
     final s = currentS;
     return switch (this) {
-      AppColorScheme.blue => s.colorBlue,
-      AppColorScheme.green => s.colorGreen,
-      AppColorScheme.violet => s.colorViolet,
-      AppColorScheme.rose => s.colorRose,
+      AppColorScheme.ayumu => s.colorAyumu,
+      AppColorScheme.kasumi => s.colorKasumi,
+      AppColorScheme.shizuku => s.colorShizuku,
+      AppColorScheme.karin => s.colorKarin,
+      AppColorScheme.ai => s.colorAi,
+      AppColorScheme.kanata => s.colorKanata,
+      AppColorScheme.setsuna => s.colorSetsuna,
+      AppColorScheme.emma => s.colorEmma,
+      AppColorScheme.rina => s.colorRina,
+      AppColorScheme.shioriko => s.colorShioriko,
+      AppColorScheme.mia => s.colorMia,
+      AppColorScheme.lanzhu => s.colorLanzhu,
+      AppColorScheme.yu => s.colorYu,
       AppColorScheme.custom => s.colorCustom,
     };
   }
@@ -183,8 +208,8 @@ class ThemeProvider extends ChangeNotifier {
   BuiltinThemeId _selectedDarkTheme = BuiltinThemeId.defaultDark;
   BuiltinThemeId _selectedLightTheme = BuiltinThemeId.defaultLight;
 
-  /// 强调色
-  AppColorScheme _colorScheme = AppColorScheme.blue;
+  /// 强调色（默认钟岚珠 F69992）
+  AppColorScheme _colorScheme = AppColorScheme.fallback;
   Color _customColor = const Color(0xFF6366F1);
 
   /// 界面缩放比例（0.8 ~ 1.5，默认 1.0）
@@ -309,12 +334,12 @@ class ThemeProvider extends ChangeNotifier {
         _loadSelectedThemes(themeStr);
       }
 
-      // 强调色方案
+      // 强调色方案（旧版本存过的 blue/green/violet/rose 已移除 → 回退默认色）
       final schemeStr = prefs.getString(_kColorScheme);
       if (schemeStr != null) {
         _colorScheme = AppColorScheme.values.firstWhere(
           (s) => s.name == schemeStr,
-          orElse: () => AppColorScheme.blue,
+          orElse: () => AppColorScheme.fallback,
         );
       }
 
@@ -621,11 +646,11 @@ class ThemeProvider extends ChangeNotifier {
     _selectedCustomLightId = null;
     _selectedDarkTheme = BuiltinThemeId.defaultDark;
     _selectedLightTheme = BuiltinThemeId.defaultLight;
-    _colorScheme = AppColorScheme.blue;
+    _colorScheme = AppColorScheme.fallback;
     _uiScale = 1.0;
     _invalidateCache();
     notifyListeners();
-    _persist(_kColorScheme, AppColorScheme.blue.name);
+    _persist(_kColorScheme, AppColorScheme.fallback.name);
     _persistRemove(_kImportedThemes);
     _persistRemove(_kSelectedCustomDark);
     _persistRemove(_kSelectedCustomLight);

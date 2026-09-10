@@ -371,8 +371,8 @@ void main() {
       });
 
       test('appearance.color_scheme applies a known scheme', () {
-        entryFor('appearance.color_scheme').apply('green');
-        expect(theme.colorScheme, AppColorScheme.green);
+        entryFor('appearance.color_scheme').apply('setsuna');
+        expect(theme.colorScheme, AppColorScheme.setsuna);
       });
 
       test('appearance.custom_color applies an ARGB int', () {

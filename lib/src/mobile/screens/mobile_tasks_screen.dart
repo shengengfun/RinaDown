@@ -206,17 +206,13 @@ class MobileTasksScreenState extends State<MobileTasksScreen> {
       child: Row(
         children: [
           // Logo + 全局速度
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: c.accent,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(
-              LucideIcons.arrowDownToLine,
-              size: 19,
-              color: c.accentForeground,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(9),
+            child: Image.asset(
+              'assets/logo/rinadown_logo.png',
+              width: 34,
+              height: 34,
+              filterQuality: FilterQuality.medium,
             ),
           ),
           const SizedBox(width: 10),
@@ -236,12 +232,28 @@ class MobileTasksScreenState extends State<MobileTasksScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'RinaDown',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: c.textPrimary,
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'Rina',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: c.accent,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                          TextSpan(
+                            text: 'Down',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: c.textPrimary,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Text(

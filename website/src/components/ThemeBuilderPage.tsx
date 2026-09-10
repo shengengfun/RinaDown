@@ -1517,7 +1517,7 @@ function PreviewPanel({
           <div className="flex items-center gap-2">
             <img src="/logo.svg" alt="" className="h-4 w-4 rounded" />
             <span className="text-[12px] font-semibold">
-              <span style={{ color: rgbaFromTheme(theme, "colors.accent.color") }} {...tokenAttrs("colors.accent.color")}>Flux</span>
+              <span style={{ color: rgbaFromTheme(theme, "colors.accent.color") }} {...tokenAttrs("colors.accent.color")}>Rina</span>
               <span style={{ color: rgbaFromTheme(theme, "colors.text.primary") }} {...tokenAttrs("colors.text.primary")}>Down</span>
             </span>
           </div>
