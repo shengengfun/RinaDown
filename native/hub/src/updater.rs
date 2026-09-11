@@ -1675,10 +1675,28 @@ fn spawn_no_elevation(program: &Path, args: &[&str]) -> Result<(), UpdateError> 
 fn install_setup(installer_path: &str) -> Result<(), UpdateError> {
     let updater = find_updater_bin()?;
     let pid = std::process::id();
+    // 把当前安装目录一并交给安装器（它转成 Inno 的 /DIR=）。不带的话静默覆盖
+    // 安装会回落到 DefaultDirName，把自定义目录里装好的程序悄悄搬到
+    // %LOCALAPPDATA%\Programs\RinaDown，并在原处留一只空壳目录。
+    // 目录名仍是旧品牌（FluxDown）时由更新器识别剔除，让安装器重新安家。
+    let app_dir = std::env::current_exe()
+        .map_err(UpdateError::Io)?
+        .parent()
+        .map(std::path::Path::to_path_buf)
+        .ok_or_else(|| UpdateError::Other("cannot determine app directory".to_string()))?
+        .to_string_lossy()
+        .to_string();
 
     spawn_no_elevation(
         &updater,
-        &["--pid", &pid.to_string(), "--installer", installer_path],
+        &[
+            "--pid",
+            &pid.to_string(),
+            "--installer",
+            installer_path,
+            "--dir",
+            &app_dir,
+        ],
     )?;
 
     std::process::exit(0);

@@ -68,7 +68,11 @@ enum Action {
         exe: String,
     },
     /// Run a downloaded NSIS installer silently (Windows only).
-    Setup { installer: PathBuf },
+    Setup {
+        installer: PathBuf,
+        /// 期望的安装目录（当前程序所在目录）。`None` = 交给安装器的默认目录。
+        dir: Option<PathBuf>,
+    },
     /// Replace the running AppImage with a new one (Linux only).
     AppImage { src: PathBuf, dst: PathBuf },
     /// Extract a .tar.gz and copy files into `dir`, then restart `exe` (Linux only).
@@ -181,7 +185,7 @@ impl Args {
         let pid = pid.ok_or(UpdaterError::MissingArg("--pid"))?;
 
         let action = if let Some(installer) = installer {
-            Action::Setup { installer }
+            Action::Setup { installer, dir }
         } else if let Some(src) = appimage_src {
             Action::AppImage {
                 src,
@@ -238,7 +242,7 @@ fn run() -> Result<(), UpdaterError> {
 
     match args.action {
         Action::PortableZip { zip, dir, exe } => do_portable_zip(&zip, &dir, &exe),
-        Action::Setup { installer } => do_setup(&installer),
+        Action::Setup { installer, dir } => do_setup(&installer, dir.as_deref()),
         Action::AppImage { src, dst } => do_appimage(&src, &dst),
         Action::PortableTarball { tarball, dir, exe } => do_tarball(&tarball, &dir, &exe),
         Action::PackageDeb { package } => do_pkg_deb(&package),
@@ -337,8 +341,15 @@ fn do_portable_zip(zip: &Path, dir: &Path, exe: &str) -> Result<(), UpdaterError
     Ok(())
 }
 
+/// 旧品牌目录名。更名（FluxDown → RinaDown）前装出来的程序文件夹是
+/// `…\Programs\FluxDown`：这种路径不回传给安装器，改为让 Inno 用
+/// `DefaultDirName`（`…\Programs\RinaDown`）重新安家，旧目录由安装器的
+/// `[Code]` 在安装成功后删除。
+#[cfg(target_os = "windows")]
+const LEGACY_INSTALL_DIR_NAMES: [&str; 1] = ["FluxDown"];
+
 /// Windows setup: remove Mark-of-the-Web, run NSIS installer silently.
-fn do_setup(installer: &Path) -> Result<(), UpdaterError> {
+fn do_setup(installer: &Path, dir: Option<&Path>) -> Result<(), UpdaterError> {
     log_msg(&format!("setup: installer={}", installer.display())).ok();
 
     #[cfg(target_os = "windows")]
@@ -349,19 +360,35 @@ fn do_setup(installer: &Path) -> Result<(), UpdaterError> {
         // is allowed to unblock files on behalf of the user.
         remove_zone_identifier(installer);
 
-        spawn_no_elevation(
-            installer,
-            &["/SILENT", "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS"],
-        )
-        .map_err(UpdaterError::Io)?;
+        // `/DIR=` 让覆盖安装留在用户当初选的目录里。若当前目录仍带旧品牌名，
+        // 则故意不回传，交给安装器的默认目录（+ 旧目录清理）。
+        let keep_dir = dir.filter(|d| {
+            d.file_name().and_then(|n| n.to_str()).is_none_or(|n| {
+                !LEGACY_INSTALL_DIR_NAMES
+                    .iter()
+                    .any(|legacy| legacy.eq_ignore_ascii_case(n))
+            })
+        });
+        let dir_arg = keep_dir.map(|d| format!("/DIR={}", d.display()));
+
+        let mut args: Vec<&str> = vec!["/SILENT", "/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS"];
+        if let Some(arg) = dir_arg.as_deref() {
+            log_msg(&format!("setup: {arg}")).ok();
+            args.push(arg);
+        }
+
+        spawn_no_elevation(installer, &args).map_err(UpdaterError::Io)?;
 
         Ok(())
     }
 
     #[cfg(not(target_os = "windows"))]
-    Err(UpdaterError::Other(
-        "setup mode is only supported on Windows".to_string(),
-    ))
+    {
+        let _ = dir;
+        Err(UpdaterError::Other(
+            "setup mode is only supported on Windows".to_string(),
+        ))
+    }
 }
 
 /// Linux AppImage: replace current AppImage with new one and relaunch.

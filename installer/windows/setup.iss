@@ -28,6 +28,13 @@ AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
+; 始终显示「选择安装位置」向导页。默认值 auto 会在检测到同一 AppId 的既有安装
+; （或 /RESTARTAPPLICATIONS 的覆盖安装）时直接跳过该页，用户看到的现象就是
+; 「安装包不能自定义安装位置」。静默安装不受影响（本来也不显示页，用默认目录）。
+DisableDirPage=no
+; 绝不沿用旧安装记录的目录。2026-09 项目由 FluxDown 更名为 RinaDown，旧记录里
+; 是 …\Programs\FluxDown；沿用会把新版本继续装进那只旧文件夹（改名等于没改）。
+UsePreviousAppDir=no
 OutputDir=..\..\build\installer
 OutputBaseFilename=RinaDown-{#MyAppVersion}-windows-{#MyAppArch}-setup
 Compression=lzma2/ultra64
@@ -215,6 +222,69 @@ begin
   AppExe := ExpandConstant('{app}\{#MyAppExeName}');
   if (RegisteredExe <> '') and (CompareText(RegisteredExe, AppExe) = 0) then
     RegDeleteValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Run', '{#MyAppName}');
+end;
+
+{ ── 旧品牌（FluxDown）安装目录清理 ─────────────────────────────────────────
+  2026-09 项目由 FluxDown 更名为 RinaDown。更名前装出来的程序文件夹
+  （…\Programs\FluxDown / C:\Program Files\FluxDown）既不会被新版复用
+  （UsePreviousAppDir=no），也不在任何卸载记录里（旧机实测无对应 Uninstall
+  键），放着就是一只名叫 FluxDown 的死目录——用户看到的「安装完还是
+  FluxDown」正是它。安装成功后删除。
+
+  只在目录确实是我们自己的安装时才动（含 unins000.exe，或含 flux_down.exe，
+  或 rina_down.exe + hub.dll），避免误删用户同名的自建目录；用户若恰好把新版
+  装在同一路径（AppDir），跳过。 }
+
+function LooksLikeOurInstall(const Dir: String): Boolean;
+var
+  Prefix: String;
+begin
+  Prefix := AddBackslash(Dir);
+  Result := FileExists(Prefix + 'unins000.exe')
+    or FileExists(Prefix + 'flux_down.exe')
+    or (FileExists(Prefix + 'rina_down.exe') and FileExists(Prefix + 'hub.dll'));
+end;
+
+procedure TryRemoveLegacyBrandDir(const Dir, AppDir: String);
+begin
+  if CompareText(Dir, AppDir) = 0 then
+  begin
+    Log('legacy dir is the target dir, keeping it: ' + Dir);
+  end
+  else if not DirExists(Dir) then
+  begin
+    { 绝大多数机器上没有旧目录，这里是常态分支。 }
+  end
+  else if not LooksLikeOurInstall(Dir) then
+  begin
+    Log('legacy dir left alone (not our install): ' + Dir);
+  end
+  else if DelTree(Dir, True, True, True) then
+  begin
+    Log('removed legacy install dir: ' + Dir);
+  end
+  else
+  begin
+    Log('legacy install dir not fully removed (files locked?): ' + Dir);
+  end;
+end;
+
+procedure RemoveLegacyBrandInstallDir;
+var
+  AppDir: String;
+begin
+  AppDir := ExpandConstant('{app}');
+  { 非管理员安装（PrivilegesRequired=lowest）落在 %LOCALAPPDATA%\Programs，
+    管理员安装落在 %ProgramFiles%；两种都查，不存在的那条是空操作。 }
+  TryRemoveLegacyBrandDir(ExpandConstant('{localappdata}\Programs\FluxDown'), AppDir);
+  TryRemoveLegacyBrandDir(ExpandConstant('{commonpf}\FluxDown'), AppDir);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  { 等安装文件全部就位后再清旧目录：中途失败时至少还有一边是完整可用的。 }
+  if CurStep = ssPostInstall then
+    RemoveLegacyBrandInstallDir;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

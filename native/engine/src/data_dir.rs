@@ -27,6 +27,13 @@
 //!   WAL 持有未 checkpoint 的事务，绝不与主库分离；
 //! - 失败的条目原地保留并记录到 `<portable_data>/migration_errors.log`
 //!   （GUI 进程无可见 stderr），下次启动自动重试。
+//!
+//! ### 更名迁移（FluxDown → RinaDown）
+//!
+//! 2026-09 项目更名，Windows 已安装模式的数据目录由 `%LOCALAPPDATA%\FluxDown`
+//! 改为 `%LOCALAPPDATA%\RinaDown`、主库由 `flux_down.db` 改为 `rina_down.db`。
+//! 首次解析数据目录时执行一次迁移（新目录不存在则整目录 rename，否则逐项补齐），
+//! 避免用户的旧任务与设置随更名蒸发。与便携迁移同样「幂等 + 失败下次重试」。
 
 use std::path::{Path, PathBuf};
 
@@ -109,7 +116,10 @@ fn resolve_data_dir_inner() -> PathBuf {
         }
         // Installed mode: use %LOCALAPPDATA%\RinaDown (always user-writable).
         if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-            return PathBuf::from(local).join("RinaDown");
+            let base = PathBuf::from(local);
+            let dir = base.join("RinaDown");
+            migrate_legacy_appdata(&base, &dir);
+            return dir;
         }
         // Fallback: %APPDATA%\RinaDown
         if let Some(appdata) = std::env::var_os("APPDATA") {
@@ -192,6 +202,20 @@ const DB_WAL: &str = "rina_down.db-wal";
 #[cfg(any(target_os = "windows", test))]
 const DB_SHM: &str = "rina_down.db-shm";
 
+/// 更名前的主库文件名（`flux_down.db`，伴生 `-wal` / `-shm` 由它派生）。
+#[cfg(any(target_os = "windows", test))]
+const LEGACY_DB_FILE: &str = "flux_down.db";
+
+/// 更名前的 Windows 数据目录名（`%LOCALAPPDATA%\FluxDown`）。
+#[cfg(target_os = "windows")]
+const LEGACY_APPDATA_DIR_NAME: &str = "FluxDown";
+
+/// 迁移失败日志的落盘标签，用于区分是哪条迁移路径失败的。
+#[cfg(any(target_os = "windows", test))]
+const MIGRATE_TAG_PORTABLE: &str = "便携迁移";
+#[cfg(target_os = "windows")]
+const MIGRATE_TAG_RENAME: &str = "更名迁移";
+
 /// 独立迁移项（不含 DB 三件套——那组走 [`migrate_db_group`] 原子迁移）。
 // KEEP IN SYNC with lib/src/services/platform_utils.dart knownItems
 #[cfg(any(target_os = "windows", test))]
@@ -224,10 +248,54 @@ fn migrate_portable_data(old_root: &Path, new_dir: &Path) {
             return;
         }
         for msg in &failures {
-            eprintln!("[便携迁移] {msg}");
+            eprintln!("[{MIGRATE_TAG_PORTABLE}] {msg}");
         }
-        persist_migration_failures(new_dir, &failures);
+        persist_migration_failures(new_dir, MIGRATE_TAG_PORTABLE, &failures);
     });
+}
+
+/// 触发更名前数据目录（`%LOCALAPPDATA%\FluxDown`）→ 新目录的一次性迁移。
+///
+/// 与便携迁移同构：`Once` + 幂等 + 失败落盘重试。放在数据目录解析里是为了
+/// 抢在任何一次 DB 打开之前完成——旧库名与新库名不同（`flux_down.db` /
+/// `rina_down.db`），晚一步就是「新目录里凭空多出一只空库，旧任务再也看不见」。
+#[cfg(target_os = "windows")]
+fn migrate_legacy_appdata(base: &Path, new_dir: &Path) {
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    ONCE.call_once(|| {
+        let old_dir = base.join(LEGACY_APPDATA_DIR_NAME);
+        let failures = migrate_legacy_layout(&old_dir, new_dir);
+        if failures.is_empty() {
+            return;
+        }
+        for msg in &failures {
+            eprintln!("[{MIGRATE_TAG_RENAME}] {msg}");
+        }
+        persist_migration_failures(new_dir, MIGRATE_TAG_RENAME, &failures);
+    });
+}
+
+/// 更名迁移的纯路径部分（可测，不依赖 Windows 环境变量）。
+///
+/// 两种策略：
+/// - 新目录尚不存在（更名后首次启动）→ 整个旧目录 `rename` 过去，旧文件夹
+///   当场消失，用户不会再看到一只名为 FluxDown 的空壳；随后**必须**把库名从
+///   旧名改成新名，否则新版按 `rina_down.db` 找不到库，会当场再建一只空库，
+///   等于白搬；
+/// - 新目录已存在（用户先跑过新版，或更早的版本已建过）→ 逐项补齐，
+///   已存在的目标一律不覆盖；旧目录里没搬走的条目原地保留，不删。
+#[cfg(any(target_os = "windows", test))]
+fn migrate_legacy_layout(old_dir: &Path, new_dir: &Path) -> Vec<String> {
+    if !old_dir.is_dir() {
+        return Vec::new();
+    }
+    if !new_dir.exists() && std::fs::rename(old_dir, new_dir).is_ok() {
+        // 目录已改名，但库文件还是 flux_down.db；原地再改一次文件名。
+        let mut failures = Vec::new();
+        migrate_db_group(new_dir, LEGACY_DB_FILE, new_dir, &mut failures);
+        return failures;
+    }
+    migrate_dir_into(old_dir, LEGACY_DB_FILE, new_dir)
 }
 
 /// 执行旧便携布局 → `portable_data/` 的迁移，返回失败描述列表（空 = 全部成功）。
@@ -239,12 +307,21 @@ fn migrate_portable_data(old_root: &Path, new_dir: &Path) {
 /// 原子，输家仅多一条失败记录。
 #[cfg(any(target_os = "windows", test))]
 fn migrate_portable_layout(old_root: &Path, new_dir: &Path) -> Vec<String> {
+    migrate_dir_into(old_root, DB_FILE, new_dir)
+}
+
+/// 逐项迁移：DB 三件套（`old_db_file` 名下的主库与其 WAL/SHM，落到新目录的
+/// [`DB_FILE`] 名下）+ [`KNOWN_ITEMS`]。返回失败描述列表（空 = 全部成功）。
+///
+/// 幂等：目标已存在即跳过，绝不覆盖新目录里的数据。
+#[cfg(any(target_os = "windows", test))]
+fn migrate_dir_into(old_root: &Path, old_db_file: &str, new_dir: &Path) -> Vec<String> {
     let mut failures = Vec::new();
     if let Err(e) = std::fs::create_dir_all(new_dir) {
         failures.push(format!("创建目录失败 {}: {e}", new_dir.display()));
         return failures;
     }
-    migrate_db_group(old_root, new_dir, &mut failures);
+    migrate_db_group(old_root, old_db_file, new_dir, &mut failures);
     for name in KNOWN_ITEMS {
         let old_path = old_root.join(name);
         let new_path = new_dir.join(name);
@@ -272,8 +349,14 @@ fn migrate_portable_layout(old_root: &Path, new_dir: &Path) -> Vec<String> {
 /// - WAL rename 失败 → 已移动的主库回滚回原位，下次启动重试整组；
 /// - SHM 是共享内存索引，SQLite 会按需重建——失败仅记录、不回滚。
 #[cfg(any(target_os = "windows", test))]
-fn migrate_db_group(old_root: &Path, new_dir: &Path, failures: &mut Vec<String>) {
-    let old_db = old_root.join(DB_FILE);
+fn migrate_db_group(
+    old_root: &Path,
+    old_db_file: &str,
+    new_dir: &Path,
+    failures: &mut Vec<String>,
+) {
+    // 源三件套按旧名派生（更名前是 flux_down.db[-wal|-shm]），目标一律用新名。
+    let old_db = old_root.join(old_db_file);
     let new_db = new_dir.join(DB_FILE);
     if !old_db.exists() || new_db.exists() {
         return;
@@ -286,7 +369,7 @@ fn migrate_db_group(old_root: &Path, new_dir: &Path, failures: &mut Vec<String>)
         ));
         return;
     }
-    let old_wal = old_root.join(DB_WAL);
+    let old_wal = old_root.join(format!("{old_db_file}-wal"));
     let new_wal = new_dir.join(DB_WAL);
     if old_wal.exists()
         && let Err(e) = std::fs::rename(&old_wal, &new_wal)
@@ -306,7 +389,7 @@ fn migrate_db_group(old_root: &Path, new_dir: &Path, failures: &mut Vec<String>)
         }
         return;
     }
-    let old_shm = old_root.join(DB_SHM);
+    let old_shm = old_root.join(format!("{old_db_file}-shm"));
     let new_shm = new_dir.join(DB_SHM);
     if old_shm.exists()
         && !new_shm.exists()
@@ -325,7 +408,7 @@ fn migrate_db_group(old_root: &Path, new_dir: &Path, failures: &mut Vec<String>)
 /// 放数据目录根层而非 `logs/`——迁移失败时若在此处预创建 `logs/` 目录，
 /// 会让下次启动误判 `logs` 已迁移而永久跳过它。
 #[cfg(any(target_os = "windows", test))]
-fn persist_migration_failures(new_dir: &Path, failures: &[String]) {
+fn persist_migration_failures(new_dir: &Path, tag: &str, failures: &[String]) {
     use std::io::Write;
     let Ok(mut file) = std::fs::OpenOptions::new()
         .create(true)
@@ -336,7 +419,7 @@ fn persist_migration_failures(new_dir: &Path, failures: &[String]) {
     };
     let ts = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
     for msg in failures {
-        let _ = writeln!(file, "{ts} [便携迁移] {msg}");
+        let _ = writeln!(file, "{ts} [{tag}] {msg}");
     }
 }
 
@@ -353,8 +436,8 @@ fn exe_dir() -> PathBuf {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::{
-        DB_FILE, DB_SHM, DB_WAL, migrate_db_group, migrate_portable_layout,
-        persist_migration_failures,
+        DB_FILE, DB_SHM, DB_WAL, LEGACY_DB_FILE, MIGRATE_TAG_PORTABLE, migrate_db_group,
+        migrate_legacy_layout, migrate_portable_layout, persist_migration_failures,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -447,7 +530,7 @@ mod tests {
         fs::create_dir_all(&new_dir).unwrap();
         write(&root.join(DB_WAL), "wal");
         let mut failures = Vec::new();
-        migrate_db_group(&root, &new_dir, &mut failures);
+        migrate_db_group(&root, DB_FILE, &new_dir, &mut failures);
         assert!(failures.is_empty(), "{failures:?}");
         assert!(root.join(DB_WAL).exists());
         assert!(!new_dir.join(DB_WAL).exists());
@@ -462,7 +545,7 @@ mod tests {
         write(&root.join(DB_WAL), "old-wal");
         write(&new_dir.join(DB_FILE), "new-db");
         let mut failures = Vec::new();
-        migrate_db_group(&root, &new_dir, &mut failures);
+        migrate_db_group(&root, DB_FILE, &new_dir, &mut failures);
         assert!(failures.is_empty(), "{failures:?}");
         // 新主库不被覆盖，旧三件套原地保留——绝不把旧 WAL 混到新主库旁。
         assert_eq!(fs::read_to_string(new_dir.join(DB_FILE)).unwrap(), "new-db");
@@ -472,12 +555,89 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    /// 更名迁移：新目录不存在时整目录搬走，旧文件夹当场消失。
+    #[test]
+    fn legacy_layout_renames_whole_dir_when_target_absent() {
+        let root = fresh_root("legacy_rename");
+        let old_dir = root.join("FluxDown");
+        let new_dir = root.join("RinaDown");
+        write(&old_dir.join(LEGACY_DB_FILE), "old-db");
+        write(&old_dir.join(format!("{LEGACY_DB_FILE}-wal")), "old-wal");
+        write(&old_dir.join("settings.json"), "{}");
+        write(&old_dir.join("plugins").join("a.js"), "//p");
+
+        let failures = migrate_legacy_layout(&old_dir, &new_dir);
+        assert!(failures.is_empty(), "{failures:?}");
+        assert!(!old_dir.exists());
+        // 主库连名带内容一起落到新名下（新目录里不该出现 flux_down.db）。
+        assert_eq!(fs::read_to_string(new_dir.join(DB_FILE)).unwrap(), "old-db");
+        assert_eq!(fs::read_to_string(new_dir.join(DB_WAL)).unwrap(), "old-wal");
+        assert_eq!(
+            fs::read_to_string(new_dir.join("settings.json")).unwrap(),
+            "{}"
+        );
+        assert!(new_dir.join("plugins").join("a.js").exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// 更名迁移：新目录已存在时逐项补齐，旧库改名落地，既有新数据不被覆盖。
+    #[test]
+    fn legacy_layout_merges_when_target_exists() {
+        let root = fresh_root("legacy_merge");
+        let old_dir = root.join("FluxDown");
+        let new_dir = root.join("RinaDown");
+        write(&old_dir.join(LEGACY_DB_FILE), "old-db");
+        write(&old_dir.join(format!("{LEGACY_DB_FILE}-shm")), "old-shm");
+        write(&old_dir.join("bin").join("ffmpeg.exe"), "bin");
+        write(&new_dir.join("settings.json"), "new");
+
+        let failures = migrate_legacy_layout(&old_dir, &new_dir);
+        assert!(failures.is_empty(), "{failures:?}");
+        assert_eq!(fs::read_to_string(new_dir.join(DB_FILE)).unwrap(), "old-db");
+        assert_eq!(fs::read_to_string(new_dir.join(DB_SHM)).unwrap(), "old-shm");
+        assert!(new_dir.join("bin").join("ffmpeg.exe").exists());
+        // 目标已存在 → 不覆盖；旧目录剩下的条目原地不动。
+        assert_eq!(
+            fs::read_to_string(new_dir.join("settings.json")).unwrap(),
+            "new"
+        );
+        assert!(old_dir.exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// 更名迁移：新库已在（用户先跑过新版）时不动旧库，避免把有数据的旧库
+    /// 覆盖到新库上或反向覆盖——保守优先，交由人工处理。
+    #[test]
+    fn legacy_layout_keeps_new_db() {
+        let root = fresh_root("legacy_keep_new_db");
+        let old_dir = root.join("FluxDown");
+        let new_dir = root.join("RinaDown");
+        write(&old_dir.join(LEGACY_DB_FILE), "old-db");
+        write(&new_dir.join(DB_FILE), "new-db");
+
+        let failures = migrate_legacy_layout(&old_dir, &new_dir);
+        assert!(failures.is_empty(), "{failures:?}");
+        assert_eq!(fs::read_to_string(new_dir.join(DB_FILE)).unwrap(), "new-db");
+        assert!(old_dir.join(LEGACY_DB_FILE).exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// 更名迁移：没有旧目录时是完全的 no-op。
+    #[test]
+    fn legacy_layout_is_noop_without_old_dir() {
+        let root = fresh_root("legacy_noop");
+        let new_dir = root.join("RinaDown");
+        assert!(migrate_legacy_layout(&root.join("FluxDown"), &new_dir).is_empty());
+        assert!(!new_dir.exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
     #[test]
     fn failures_are_persisted_to_data_dir_root() {
         let root = fresh_root("persist");
         let new_dir = root.join("portable_data");
         fs::create_dir_all(&new_dir).unwrap();
-        persist_migration_failures(&new_dir, &["boom".to_string()]);
+        persist_migration_failures(&new_dir, MIGRATE_TAG_PORTABLE, &["boom".to_string()]);
         let content = fs::read_to_string(new_dir.join("migration_errors.log")).unwrap();
         assert!(content.contains("[便携迁移] boom"), "{content}");
         // 不得预创建 logs/ 目录（会让下次启动误判 logs 已迁移）。

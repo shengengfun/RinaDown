@@ -28,6 +28,12 @@ const _dbFile = 'rina_down.db';
 const _dbWal = 'rina_down.db-wal';
 const _dbShm = 'rina_down.db-shm';
 
+/// 更名前（FluxDown 时代）的主库文件名；伴生 `-wal` / `-shm` 由它派生。
+const _legacyDbFile = 'flux_down.db';
+
+/// 更名前的 Windows 数据目录名（`%LOCALAPPDATA%\FluxDown`）。
+const _legacyAppDataDirName = 'FluxDown';
+
 /// 独立迁移项（不含 DB 三件套——那组走 `_migrateDbGroup` 原子迁移）。
 // KEEP IN SYNC with native/engine/src/data_dir.rs KNOWN_ITEMS
 const _knownItems = [
@@ -62,7 +68,7 @@ void migratePortableData(String exeDir, String newDir) {
     stderr.writeln('[便携迁移] 创建目录失败 $newDir: $e');
     return;
   }
-  _migrateDbGroup(exeDir, newDir, failures);
+  _migrateDbGroup(exeDir, _dbFile, newDir, failures);
   for (final name in _knownItems) {
     final oldPath = '$exeDir${Platform.pathSeparator}$name';
     final newPath = '$newDir${Platform.pathSeparator}$name';
@@ -74,8 +80,69 @@ void migratePortableData(String exeDir, String newDir) {
   for (final msg in failures) {
     stderr.writeln('[便携迁移] $msg');
   }
-  _persistFailures(newDir, failures);
+  _persistFailures(newDir, _tagPortable, failures);
 }
+
+/// 更名（FluxDown → RinaDown）迁移是否已在本进程内执行过（同
+/// [_portableMigrationDone] 的短路语义）。
+bool _legacyMigrationDone = false;
+
+/// 更名前数据目录（`%LOCALAPPDATA%\FluxDown`）→ 新目录的一次性迁移。
+/// 与 Rust 侧 `migrate_legacy_layout` 语义一致：
+///
+/// - 旧目录不存在 → 完全的 no-op；
+/// - 新目录不存在 → 整个旧目录 rename 过去（旧文件夹当场消失），随后把库名
+///   从 `flux_down.db` 改成 `rina_down.db`——不改名的话新版按新名找不到库，
+///   会当场再建一只空库，等于白搬；
+/// - 新目录已存在 → 逐项补齐，已存在的目标一律不覆盖，旧目录剩余条目原地保留。
+@visibleForTesting
+void migrateLegacyAppData(String baseDir, String newDir) {
+  final sep = Platform.pathSeparator;
+  final oldDir = '$baseDir$sep$_legacyAppDataDirName';
+  if (FileSystemEntity.typeSync(oldDir) != FileSystemEntityType.directory) {
+    return;
+  }
+
+  final failures = <String>[];
+  if (!_exists(newDir)) {
+    try {
+      Directory(oldDir).renameSync(newDir);
+      _migrateDbGroup(newDir, _legacyDbFile, newDir, failures);
+      if (failures.isEmpty) return;
+      for (final msg in failures) {
+        stderr.writeln('[更名迁移] $msg');
+      }
+      _persistFailures(newDir, _tagRename, failures);
+      return;
+    } catch (_) {
+      // 跨卷 / 被占用 → 退回逐项迁移（下面）。
+    }
+  }
+
+  try {
+    Directory(newDir).createSync(recursive: true);
+  } catch (e) {
+    stderr.writeln('[更名迁移] 创建目录失败 $newDir: $e');
+    return;
+  }
+  _migrateDbGroup(oldDir, _legacyDbFile, newDir, failures);
+  for (final name in _knownItems) {
+    final oldPath = '$oldDir$sep$name';
+    final newPath = '$newDir$sep$name';
+    if (_exists(oldPath) && !_exists(newPath)) {
+      _rename(oldPath, newPath, failures);
+    }
+  }
+  if (failures.isEmpty) return;
+  for (final msg in failures) {
+    stderr.writeln('[更名迁移] $msg');
+  }
+  _persistFailures(newDir, _tagRename, failures);
+}
+
+/// 迁移失败日志的落盘标签，区分是哪条迁移路径失败的。
+const _tagPortable = '便携迁移';
+const _tagRename = '更名迁移';
 
 bool _exists(String path) =>
     FileSystemEntity.typeSync(path) != FileSystemEntityType.notFound;
@@ -101,19 +168,27 @@ bool _rename(String oldPath, String newPath, List<String> failures) {
 /// - 主库 rename 失败 → 整组放弃；
 /// - WAL rename 失败 → 已移动的主库回滚回原位，下次启动重试整组；
 /// - SHM 是共享内存索引，SQLite 会按需重建——失败仅记录、不回滚。
-void _migrateDbGroup(String exeDir, String newDir, List<String> failures) {
+///
+/// [oldDbFile] 是旧目录里的主库文件名：更名前是 `flux_down.db`，重命名后目标
+/// 一律落在 [_dbFile] 名下，因此这个函数同时承担「改名」与「换目录」两件事。
+void _migrateDbGroup(
+  String oldDir,
+  String oldDbFile,
+  String newDir,
+  List<String> failures,
+) {
   final sep = Platform.pathSeparator;
-  final oldDb = '$exeDir$sep$_dbFile';
+  final oldDb = '$oldDir$sep$oldDbFile';
   final newDb = '$newDir$sep$_dbFile';
   if (!_exists(oldDb) || _exists(newDb)) return;
   if (!_rename(oldDb, newDb, failures)) return;
-  final oldWal = '$exeDir$sep$_dbWal';
+  final oldWal = '$oldDir$sep$oldDbFile-wal';
   if (_exists(oldWal) && !_rename(oldWal, '$newDir$sep$_dbWal', failures)) {
     // WAL 搬不动 → 主库回滚，保持三件套同处一地。
     _rename(newDb, oldDb, failures);
     return;
   }
-  final oldShm = '$exeDir$sep$_dbShm';
+  final oldShm = '$oldDir$sep$oldDbFile-shm';
   final newShm = '$newDir$sep$_dbShm';
   if (_exists(oldShm) && !_exists(newShm)) {
     _rename(oldShm, newShm, failures);
@@ -124,11 +199,11 @@ void _migrateDbGroup(String exeDir, String newDir, List<String> failures) {
 ///
 /// 放数据目录根层而非 `logs/`——迁移失败时若在此处预创建 `logs/` 目录，
 /// 会让下次启动误判 `logs` 已迁移而永久跳过它。
-void _persistFailures(String newDir, List<String> failures) {
+void _persistFailures(String newDir, String tag, List<String> failures) {
   try {
     final ts = DateTime.now().toIso8601String();
     File('$newDir${Platform.pathSeparator}migration_errors.log').writeAsStringSync(
-      failures.map((m) => '$ts [便携迁移] $m\n').join(),
+      failures.map((m) => '$ts [$tag] $m\n').join(),
       mode: FileMode.append,
       flush: true,
     );
@@ -172,5 +247,10 @@ String resolveDataDir() {
   final localAppData = Platform.environment['LOCALAPPDATA'] ??
       Platform.environment['APPDATA'] ??
       File(Platform.resolvedExecutable).parent.path;
-  return '$localAppData${Platform.pathSeparator}RinaDown';
+  final newDir = '$localAppData${Platform.pathSeparator}RinaDown';
+  if (!_legacyMigrationDone) {
+    _legacyMigrationDone = true;
+    migrateLegacyAppData(localAppData, newDir);
+  }
+  return newDir;
 }
