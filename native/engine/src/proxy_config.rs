@@ -310,6 +310,30 @@ impl ProxyConfig {
         }
     }
 
+    /// [`Self::resolve_for`] 的「外部工具」版本：交给 yt-dlp 这类**自己建连的
+    /// 子进程**的出口配置。
+    ///
+    /// 与 [`Self::resolve_for`] 只差 `Auto`：引擎的 Auto 是「直连起飞 + 采样
+    /// 热切换」，外部工具没有这套机器（一次调用就得把出口定下来），所以这里取
+    /// 「有就用」——先看手动字段，再问系统代理（含 PAC，按 `target` 求值），都
+    /// 没有才是直连。候选优先级与 [`crate::auto_proxy::resolve_candidates`] 一致。
+    pub fn resolve_for_tool(&self, target: Option<&str>) -> Self {
+        match self.mode {
+            ProxyMode::Auto => {
+                if !self.host.is_empty() && self.port != 0 {
+                    let mut manual = self.clone();
+                    manual.mode = ProxyMode::Manual;
+                    return manual;
+                }
+                detect_system_proxy_for(target)
+                    .ok()
+                    .flatten()
+                    .unwrap_or_default()
+            }
+            _ => self.resolve_for(target),
+        }
+    }
+
     /// Return the `host:port` string for direct socket connections (FTP SOCKS proxy).
     #[allow(dead_code)]
     pub fn addr(&self) -> String {
@@ -2270,6 +2294,48 @@ mod tests {
         // Result depends on OS config — just verify it resolved to
         // either Manual (with populated fields) or None (system proxy disabled).
         assert!(resolved.mode == ProxyMode::Manual || resolved.mode == ProxyMode::None);
+    }
+
+    #[test]
+    fn resolve_for_tool_auto_prefers_manual_fields() {
+        // 外部工具（yt-dlp）在 Auto 下取「有就用」：手动字段优先，与
+        // auto_proxy::resolve_candidates 的候选顺序一致。
+        let config = ProxyConfig {
+            mode: ProxyMode::Auto,
+            proxy_type: ProxyType::Http,
+            host: "127.0.0.1".to_string(),
+            port: 7897,
+            ..ProxyConfig::default()
+        };
+        let resolved = config.resolve_for_tool(Some("https://www.youtube.com/watch?v=x"));
+        assert_eq!(resolved.mode, ProxyMode::Manual);
+        assert_eq!(resolved.host, "127.0.0.1");
+        assert_eq!(resolved.port, 7897);
+        assert_eq!(
+            resolved.to_proxy_url().unwrap_or_default(),
+            "http://127.0.0.1:7897"
+        );
+    }
+
+    #[test]
+    fn resolve_for_tool_manual_and_none_match_resolve_for() {
+        let manual = ProxyConfig {
+            mode: ProxyMode::Manual,
+            proxy_type: ProxyType::Socks5,
+            host: "10.0.0.9".to_string(),
+            port: 1080,
+            ..ProxyConfig::default()
+        };
+        assert_eq!(
+            manual.resolve_for_tool(None).to_proxy_url(),
+            manual.resolve_for(None).to_proxy_url()
+        );
+        assert!(
+            ProxyConfig::default()
+                .resolve_for_tool(None)
+                .to_proxy_url()
+                .is_none()
+        );
     }
 
     // -----------------------------------------------------------------------

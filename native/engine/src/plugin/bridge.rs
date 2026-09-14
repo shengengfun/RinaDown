@@ -328,6 +328,9 @@ pub struct EngineBridge {
     ffmpeg_sema: Arc<Semaphore>,
     /// 全局并发 yt-dlp 进程限流。
     ytdlp_sema: Arc<Semaphore>,
+    /// 代理配置快照：除了建 `client`，还要转给**自行建连的子进程**（yt-dlp）。
+    /// 与 `client` 一样是构造时快照（v1 限制，见模块文档）。
+    proxy: ProxyConfig,
 }
 
 impl EngineBridge {
@@ -373,7 +376,17 @@ impl EngineBridge {
             data_dir,
             ffmpeg_sema: Arc::new(Semaphore::new(MAX_CONCURRENT_FFMPEG)),
             ytdlp_sema: Arc::new(Semaphore::new(MAX_CONCURRENT_YTDLP)),
+            proxy: proxy.clone(),
         })
+    }
+
+    /// 交给 yt-dlp 的出口参数（语义见 [`proxy_args_for_tool`]）。
+    ///
+    /// yt-dlp 自己建连、不认引擎的代理配置，也**不读系统 PAC**：不显式交出
+    /// 出口，被墙站点（YouTube 等）在本机就永远卡到超时——插件侧看到的只是
+    /// 「连续超时」，根因在宿主这一侧。
+    fn ytdlp_proxy_args(&self, args: &[String]) -> Vec<String> {
+        proxy_args_for_tool(&self.proxy, args)
     }
 }
 
@@ -803,13 +816,25 @@ impl PluginBridge for EngineBridge {
         // subdir，使同插件多次调用共享 nsig/player JS 等缓存；插件自带的
         // `--cache-dir`（只能是牢笼内相对路径）会覆盖此默认，仍在牢笼内。
         cmd.arg("--cache-dir").arg(jail.join(".cache"));
+        // 出口：用户代理设置里的生效值（PAC 按目标 URL 求值）。日志不落具体
+        // 值——代理 URL 可能带 user:pass。
+        let proxy_args = self.ytdlp_proxy_args(&spec.args);
+        let proxy_desc = if proxy_args.is_empty() {
+            "直连"
+        } else {
+            "已配置"
+        };
+        // 无论如何都摘掉继承来的 `*_PROXY`：出口只能由上面的 --proxy 说了算。
+        strip_proxy_env(&mut cmd);
         log_info!(
-            "[ytdlp-exec] plugin={} 执行: {} --ignore-config --cache-dir <jail> {}",
+            "[ytdlp-exec] plugin={} 执行: {} --ignore-config --cache-dir <jail> [proxy={}] {}",
             plugin_id,
             bin.display(),
+            proxy_desc,
             spec.args.join(" ")
         );
         cmd.args(&spec.args)
+            .args(&proxy_args)
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -1042,7 +1067,12 @@ fn truncate_utf8(bytes: &[u8], cap: usize) -> (String, bool) {
 
 /// 会执行外部程序 / 加载任意配置或插件 / 读浏览器凭据的 yt-dlp 开关黑名单
 /// （突破沙箱边界，一律拒绝）。
-const YTDLP_BLOCKED_FLAGS: [&str; 13] = [
+///
+/// 出口（`--proxy`）也封：代理由**宿主按用户的代理设置**注入（见
+/// [`EngineBridge::ytdlp_proxy_args`]），插件不得改自己的 egress——否则插件
+/// 可以把下载流量指向任意主机，与 [`super::bridge`] 模块文档里「代理由用户
+/// 显式配置，视为可信出口」的模型相背。
+const YTDLP_BLOCKED_FLAGS: [&str; 15] = [
     "--exec",
     "--exec-before-download",
     "--downloader",
@@ -1056,6 +1086,8 @@ const YTDLP_BLOCKED_FLAGS: [&str; 13] = [
     "--load-info-json",
     "--load-info",
     "--cookies-from-browser",
+    "--proxy",
+    "--geo-verification-proxy",
 ];
 
 /// 校验 yt-dlp 参数：放行 URL（yt-dlp 本职），封越牢文件路径 + 封会执行外部
@@ -1116,13 +1148,101 @@ fn ytdlp_arg_reject_reason(a: &str) -> Option<&'static str> {
     None
 }
 
+/// 插件参数里的目标 URL：第一个 http(s) 实参。
+///
+/// PAC 按目标网址求值，交给外部工具的出口得按**真实目标**算——同一个插件抓
+/// YouTube 与抓内网直链需要的结论可能不同。认不出（比如只给了视频 ID）返回
+/// `None`，由 [`ProxyConfig::resolve_for_tool`] 按「目标未知」处理。
+fn ytdlp_target_url(args: &[String]) -> Option<&str> {
+    args.iter().map(String::as_str).find(|a| {
+        let lower = a.to_ascii_lowercase();
+        lower.starts_with("http://") || lower.starts_with("https://")
+    })
+}
+
+/// 交给 yt-dlp 的 `--proxy` 参数（语义见 [`EngineBridge::ytdlp_proxy_args`]）。
+///
+/// 生效代理存在时返回 `["--proxy", url]`，直连时返回**空**——直连不靠
+/// `--proxy ""`，而是由调用方摘掉子进程的 `*_PROXY` 环境变量（见
+/// [`strip_proxy_env`]），不依赖 yt-dlp 对空值的处理。
+fn proxy_args_for_tool(proxy: &ProxyConfig, args: &[String]) -> Vec<String> {
+    let resolved = proxy.resolve_for_tool(ytdlp_target_url(args));
+    match resolved.to_proxy_url() {
+        Some(url) => vec!["--proxy".to_string(), url],
+        None => Vec::new(),
+    }
+}
+
+/// 摘掉子进程继承来的代理环境变量。
+///
+/// yt-dlp 会读 `HTTP_PROXY` / `HTTPS_PROXY` / `ALL_PROXY`（大小写都认）。宿主
+/// 已经按用户的代理设置算出了出口，让它变两个口径只会得到「应用设置直连、
+/// 子进程却走了代理」这种无法归因的行为。
+pub(crate) fn strip_proxy_env(cmd: &mut Command) {
+    for key in [
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+        "NO_PROXY",
+        "no_proxy",
+    ] {
+        cmd.env_remove(key);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        arg_reject_reason, is_globally_routable_unicast, truncate_utf8, validate_ffmpeg_args,
-        validate_ytdlp_args, ytdlp_arg_reject_reason,
+        arg_reject_reason, is_globally_routable_unicast, proxy_args_for_tool, truncate_utf8,
+        validate_ffmpeg_args, validate_ytdlp_args, ytdlp_arg_reject_reason,
     };
+    use crate::proxy_config::{ProxyConfig, ProxyMode, ProxyType};
     use std::net::IpAddr;
+
+    fn manual_proxy(host: &str, port: u16) -> ProxyConfig {
+        ProxyConfig {
+            mode: ProxyMode::Manual,
+            proxy_type: ProxyType::Http,
+            host: host.to_string(),
+            port,
+            ..ProxyConfig::default()
+        }
+    }
+
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn ytdlp_proxy_args_carry_manual_proxy_from_settings() {
+        let proxy = manual_proxy("127.0.0.1", 7897);
+        let spec = args(&["--print", "%(url)s", "https://www.youtube.com/watch?v=abc"]);
+        assert_eq!(
+            proxy_args_for_tool(&proxy, &spec),
+            vec!["--proxy".to_string(), "http://127.0.0.1:7897".to_string()]
+        );
+    }
+
+    #[test]
+    fn ytdlp_proxy_args_force_direct_when_proxy_disabled() {
+        // 直连：不传 --proxy（子进程环境已由 strip_proxy_env 清理）。
+        let spec = args(&["https://example.com/v"]);
+        assert!(proxy_args_for_tool(&ProxyConfig::default(), &spec).is_empty());
+    }
+
+    #[test]
+    fn ytdlp_proxy_args_survive_missing_target_url() {
+        // 只有视频 ID（认不出 URL）时按「目标未知」算，手动代理仍生效。
+        let proxy = manual_proxy("127.0.0.1", 1080);
+        let spec = args(&["--print", "%(title)s", "dQw4w9WgXcQ"]);
+        assert_eq!(
+            proxy_args_for_tool(&proxy, &spec),
+            vec!["--proxy".to_string(), "http://127.0.0.1:1080".to_string()]
+        );
+    }
 
     fn ip(s: &str) -> IpAddr {
         s.parse().unwrap_or_else(|_| panic!("bad ip {s}"))

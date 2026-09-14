@@ -178,7 +178,7 @@
     {
       "key": "extraArgs",
       "title": "附加 yt-dlp 参数（高级）",
-      "description": "追加到 yt-dlp 解析命令的额外参数，空格分隔（如 --geo-bypass --extractor-args \"generic:impersonate\"）。用于释放 yt-dlp 高级能力。⚠ 出于安全，RinaDown 会拒绝 --exec / --downloader / --config-location / --load-info-json / --cookies-from-browser 等危险开关；--ffmpeg-location 由 RinaDown 自动注入，请勿手填。含空格的单个参数值请用引号包裹。",
+      "description": "追加到 yt-dlp 解析命令的额外参数，空格分隔（如 --geo-bypass --extractor-args \"generic:impersonate\"）。用于释放 yt-dlp 高级能力。⚠ 出于安全，RinaDown 会拒绝 --exec / --downloader / --config-location / --load-info-json / --cookies-from-browser 等危险开关；--ffmpeg-location 与 --proxy 由 RinaDown 自动注入（代理跟随「设置 → 代理」，含系统代理与 PAC），请勿手填。含空格的单个参数值请用引号包裹。",
       "type": "string",
       "widget": "text",
       "default": ""
