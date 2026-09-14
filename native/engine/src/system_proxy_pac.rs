@@ -11,10 +11,24 @@
 //!
 //! PAC 是**按目标 URL 求值的脚本**（`FindProxyForURL(url, host)`），不存在
 //! 「全局代理地址」，所以本模块的出口是 [`resolve_proxy_for`] 而不是
-//! 「检测一次地址」。求值交给 Windows 自己的 WinHTTP
-//! （[`WinHttpGetProxyForUrl`]）：下载/缓存 PAC、处理 `file://` 与本地路径、
-//! 执行脚本、按 `ProxyOverride` 给出绕过列表全由它负责——与浏览器同款实现，
-//! 也不必给引擎背一个 JS 引擎。
+//! 「检测一次地址」。求值优先交给 Windows 自己的 WinHTTP
+//! （[`WinHttpGetProxyForUrl`]）：下载/缓存 PAC、执行脚本、按 `ProxyOverride`
+//! 给出绕过列表全由它负责——与浏览器同款实现，也不必给引擎背一个 JS 引擎。
+//!
+//! # WinHTTP 的两个硬限制（实测）与兜底
+//!
+//! 1. **不认 `file://` / 裸本地路径**（`ERROR_WINHTTP_UNRECOGNIZED_SCHEME`）。
+//!    Shadowsocks-Windows 之类客户端是把 `AutoConfigURL` 指向本地 pac 文件。
+//! 2. **要求 PAC 响应带 `Content-Type: application/x-ns-proxy-autoconfig`**，
+//!    否则在`text/plain` / `application/octet-stream`（朴素静态服务器常见）
+//!    下直接报 `ERROR_WINHTTP_BAD_AUTO_PROXY_SCRIPT`，即使脚本本身完全合法。
+//!
+//! 两者都会让「VPN 软件开了 PAC 模式，但 APP 不识别」。因此 WinHTTP 失败后走
+//! [`fallback_from_script`]：自己取回脚本，再按 [`extract_single_loopback_proxy`]
+//! 抽端点——判据刻意收紧（**整份脚本只出现一个代理端点、且必须是回环地址**），
+//! 只覆盖「把一切都交给本机 VPN 客户端」这类 PAC（Clash Verge / v2rayN /
+//! Shadowsocks 的默认 PAC 都是这个形状）。按规则分流到多个代理的 PAC 不猜：
+//! 宁可不走代理，也不把流量塞进错误的出口。
 //!
 //! # 边界与代价
 //!
@@ -33,10 +47,9 @@ use std::time::{Duration, Instant};
 
 use windows_sys::Win32::Foundation::{GetLastError, GlobalFree, HGLOBAL};
 use windows_sys::Win32::Networking::WinHttp::{
-    WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY, WINHTTP_ACCESS_TYPE_NO_PROXY,
-    WINHTTP_AUTO_DETECT_TYPE_DHCP, WINHTTP_AUTO_DETECT_TYPE_DNS_A, WINHTTP_AUTOPROXY_AUTO_DETECT,
-    WINHTTP_AUTOPROXY_CONFIG_URL, WINHTTP_AUTOPROXY_OPTIONS, WINHTTP_PROXY_INFO,
-    WinHttpCloseHandle, WinHttpGetProxyForUrl, WinHttpOpen, WinHttpSetTimeouts,
+    WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_AUTO_DETECT_TYPE_DHCP, WINHTTP_AUTO_DETECT_TYPE_DNS_A,
+    WINHTTP_AUTOPROXY_AUTO_DETECT, WINHTTP_AUTOPROXY_CONFIG_URL, WINHTTP_AUTOPROXY_OPTIONS,
+    WINHTTP_PROXY_INFO, WinHttpCloseHandle, WinHttpGetProxyForUrl, WinHttpOpen, WinHttpSetTimeouts,
 };
 
 use crate::logger::{log_error, log_info};
@@ -54,6 +67,10 @@ const CACHE_MAX_ENTRIES: usize = 256;
 
 /// 会话级超时（毫秒）：解析 / 连接 / 发送 / 接收。PAC 下载走的就是这套。
 const SESSION_TIMEOUTS: (i32, i32, i32, i32) = (3000, 3000, 5000, 5000);
+
+/// 兜底取回 PAC 脚本时的连接/读写超时，以及正文上限。
+const SCRIPT_TIMEOUT: Duration = Duration::from_secs(3);
+const SCRIPT_MAX_BYTES: u64 = 512 * 1024;
 
 /// 目标 URL 缺失或不是 WinHTTP 能解析的绝对 URL 时的探针地址。
 ///
@@ -195,7 +212,18 @@ pub(crate) fn resolve_proxy_for(
     let outcome = match resolve_via_winhttp(source, &target) {
         Ok(Some(config)) => Outcome::Proxied(Box::new(config)),
         Ok(None) => Outcome::Direct,
-        Err(error) => Outcome::Failed(error),
+        Err(error) => match fallback_from_script(source) {
+            Some(config) => {
+                log_info!(
+                    "[pac] WinHTTP 求值失败（{error}），脚本兑底解析到 {}:{}（{}）",
+                    config.host,
+                    config.port,
+                    config.proxy_type.as_str()
+                );
+                Outcome::Proxied(Box::new(config))
+            }
+            None => Outcome::Failed(error),
+        },
     };
 
     {
@@ -287,29 +315,19 @@ fn with_session<T>(f: impl FnOnce(*mut core::ffi::c_void) -> T) -> Result<T, Str
     };
     if *guard == 0 {
         let agent = to_wide("RinaDown");
-        // AUTOMATIC_PROXY 让会话在下载 PAC 时也用系统代理（PAC 常在代理后面
-        // 的网关上）；Win8.1 之前没有这个取值，失败就退回 NO_PROXY 重试一次。
+        // 用 NO_PROXY 而不是 AUTOMATIC_PROXY：取回 PAC 这一步本身不能反过来
+        // 依赖系统代理（否则为解析 PAC 去求值 PAC）。PAC 服务几乎都是本机
+        // 回环地址（Clash / Verge / Shadowsocks 都自己跑一个本地 PAC 服务）。
         // SAFETY: 两个参数都是本函数持有的宽字符串，空代理参数按 API 约定允许。
-        let mut handle = unsafe {
+        let handle = unsafe {
             WinHttpOpen(
                 agent.as_ptr(),
-                WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                WINHTTP_ACCESS_TYPE_NO_PROXY,
                 std::ptr::null(),
                 std::ptr::null(),
                 0,
             )
         };
-        if handle.is_null() {
-            handle = unsafe {
-                WinHttpOpen(
-                    agent.as_ptr(),
-                    WINHTTP_ACCESS_TYPE_NO_PROXY,
-                    std::ptr::null(),
-                    std::ptr::null(),
-                    0,
-                )
-            };
-        }
         if handle.is_null() {
             return Err(format!("WinHttpOpen failed: {}", last_error_text()));
         }
@@ -396,6 +414,279 @@ fn resolve_via_winhttp(
             .replace(';', ",")
             .replace("<local>", "localhost"),
     }))
+}
+
+// ---------------------------------------------------------------------------
+// 脚本兜底解析（WinHTTP 失败时）
+// ---------------------------------------------------------------------------
+
+/// WinHTTP 失败后的兜底：自己取回脚本，只在「唯一回环端点」时采用。
+fn fallback_from_script(source: &AutoProxySource) -> Option<ProxyConfig> {
+    let script = match load_pac_script(source) {
+        Ok(script) => script,
+        Err(error) => {
+            log_info!("[pac] 兜底取回 PAC 脚本失败: {error}");
+            return None;
+        }
+    };
+    let found = extract_single_loopback_proxy(&script);
+    if found.is_none() {
+        log_info!("[pac] 兜底解析未命中「唯一回环代理端点」判据，不猜代理");
+    }
+    found
+}
+
+/// 取回 PAC 脚本文本：本地文件直读，`http://` 自行取回，`https://` 放弃
+/// （自建 HTTP 取回不背 TLS 栈，远端 PAC 只能指望 WinHTTP）。
+fn load_pac_script(source: &AutoProxySource) -> Result<String, String> {
+    let AutoProxySource::ConfigUrl(raw) = source else {
+        return Err("WPAD 没有可直接取回的脚本地址".to_string());
+    };
+    let lower = raw.to_ascii_lowercase();
+    if lower.starts_with("http://") {
+        return http_get_text(raw);
+    }
+    if lower.starts_with("https://") {
+        return Err("https PAC 需 TLS，交由 WinHTTP 处理".to_string());
+    }
+    let path = local_pac_path(raw).ok_or_else(|| format!("无法解析本地 PAC 路径: {raw}"))?;
+    read_text_capped(&path)
+}
+
+/// `AutoConfigURL` 的本地形态 → 文件路径。既认 `file:///C:/...`，也认
+/// 客户端直接写的裸路径 `C:\...\pac.txt`（Shadowsocks-Windows 等）。
+fn local_pac_path(raw: &str) -> Option<std::path::PathBuf> {
+    if raw.to_ascii_lowercase().starts_with("file://") {
+        return url::Url::parse(raw).ok()?.to_file_path().ok();
+    }
+    let path = std::path::PathBuf::from(raw);
+    path.is_absolute().then_some(path)
+}
+
+/// 读取 PAC 文件（带体积上限，避免指向超大文件时把内存吃光）。
+fn read_text_capped(path: &std::path::Path) -> Result<String, String> {
+    let meta = std::fs::metadata(path)
+        .map_err(|e| format!("读取 PAC 文件 {} 失败: {e}", path.display()))?;
+    if meta.len() > SCRIPT_MAX_BYTES {
+        return Err(format!(
+            "PAC 文件过大（{} 字节 > {SCRIPT_MAX_BYTES}）",
+            meta.len()
+        ));
+    }
+    let bytes =
+        std::fs::read(path).map_err(|e| format!("读取 PAC 文件 {} 失败: {e}", path.display()))?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// 极简 HTTP/1.1 GET（仅明文 http、直连）：取回 PAC 正文。
+///
+/// 不用 reqwest 的原因：本模块跑在同步上下文（可能就在宿主 actor 线程上），
+/// reqwest 的 blocking 客户端在已有 runtime 里会 panic，async 又进不来。
+/// PAC 服务端都是本机或内网的朴素 HTTP 服务，这点代码够用且不引入 TLS 依赖。
+fn http_get_text(url_str: &str) -> Result<String, String> {
+    use std::io::{Read, Write};
+    use std::net::{TcpStream, ToSocketAddrs};
+
+    let parsed = url::Url::parse(url_str).map_err(|e| format!("PAC URL 非法: {e}"))?;
+    let host = parsed.host_str().ok_or("PAC URL 缺少主机名")?.to_string();
+    let port = parsed.port_or_known_default().ok_or("PAC URL 缺少端口")?;
+    let mut path = parsed.path().to_string();
+    if path.is_empty() {
+        path.push('/');
+    }
+    if let Some(query) = parsed.query() {
+        path.push('?');
+        path.push_str(query);
+    }
+
+    let addrs = (host.as_str(), port)
+        .to_socket_addrs()
+        .map_err(|e| format!("PAC 主机解析失败: {e}"))?
+        .collect::<Vec<_>>();
+    if addrs.is_empty() {
+        return Err("PAC 主机无可用地址".to_string());
+    }
+
+    let request = format!(
+        "GET {path} HTTP/1.1\r\nHost: {host}:{port}\r\nUser-Agent: RinaDown\r\nAccept: */*\r\nConnection: close\r\n\r\n"
+    );
+    let mut last_error = String::new();
+    for addr in addrs {
+        let mut stream = match TcpStream::connect_timeout(&addr, SCRIPT_TIMEOUT) {
+            Ok(stream) => stream,
+            Err(e) => {
+                last_error = format!("连接 {addr} 失败: {e}");
+                continue;
+            }
+        };
+        let _ = stream.set_read_timeout(Some(SCRIPT_TIMEOUT));
+        let _ = stream.set_write_timeout(Some(SCRIPT_TIMEOUT));
+        if let Err(e) = stream.write_all(request.as_bytes()) {
+            last_error = format!("发送 PAC 请求失败: {e}");
+            continue;
+        }
+        let mut raw = Vec::new();
+        let mut limited = stream.take(SCRIPT_MAX_BYTES + 8192);
+        if let Err(e) = limited.read_to_end(&mut raw) {
+            last_error = format!("读取 PAC 响应失败: {e}");
+            continue;
+        }
+        return parse_http_body(&raw);
+    }
+    Err(last_error)
+}
+
+/// 从原始响应字节里切出正文（处理 `Content-Length` / `chunked` / 读到断开）。
+fn parse_http_body(raw: &[u8]) -> Result<String, String> {
+    let split = raw
+        .windows(4)
+        .position(|w| w == b"\r\n\r\n")
+        .ok_or("PAC 响应缺少头体分隔")?;
+    let head = String::from_utf8_lossy(&raw[..split]);
+    let body = &raw[split + 4..];
+
+    let status = head
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .unwrap_or("");
+    if status != "200" {
+        return Err(format!("PAC 服务返回 HTTP {status}"));
+    }
+
+    let chunked = head
+        .to_ascii_lowercase()
+        .contains("transfer-encoding: chunked");
+    if chunked {
+        return dechunk(body);
+    }
+    Ok(String::from_utf8_lossy(body).into_owned())
+}
+
+/// 解开 chunked 传输编码。
+fn dechunk(body: &[u8]) -> Result<String, String> {
+    let mut out: Vec<u8> = Vec::new();
+    let mut rest = body;
+    loop {
+        let line_end = rest
+            .windows(2)
+            .position(|w| w == b"\r\n")
+            .ok_or("chunk 长度行缺失")?;
+        let size_field = String::from_utf8_lossy(&rest[..line_end]);
+        let size_text = size_field.split(';').next().unwrap_or("").trim();
+        let size =
+            usize::from_str_radix(size_text, 16).map_err(|e| format!("chunk 长度非法: {e}"))?;
+        let data_start = line_end + 2;
+        if size == 0 {
+            break;
+        }
+        if rest.len() < data_start + size {
+            return Err("chunk 数据不完整".to_string());
+        }
+        out.extend_from_slice(&rest[data_start..data_start + size]);
+        // 跳过数据与其后的 CRLF（尾块可能是裸 LF，宽容处理）。
+        let mut next = data_start + size;
+        if rest.len() >= next + 2 && &rest[next..next + 2] == b"\r\n" {
+            next += 2;
+        } else if rest.len() > next && rest[next] == b'\n' {
+            next += 1;
+        }
+        rest = &rest[next..];
+    }
+    Ok(String::from_utf8_lossy(&out).into_owned())
+}
+
+/// 仅当整份脚本只给出**一个回环代理端点**时返回它。
+///
+/// 判据刻意收紧（见模块文档）：多个不同端点（按规则分流到不同代理）或端点
+/// 不在本机（企业 PAC 的远端代理）时一律不猜——宁可不走代理，也不把流量
+/// 塞进错误的出口。命中场景是「把一切交给本机 VPN 客户端」这类 PAC：
+/// `PROXY 127.0.0.1:<mixed-port>; SOCKS5 127.0.0.1:<mixed-port>; DIRECT;`。
+fn extract_single_loopback_proxy(script: &str) -> Option<ProxyConfig> {
+    if !script.contains("FindProxyForURL") {
+        return None;
+    }
+    let mut chosen: Option<(ProxyType, String, u16)> = None;
+    for (proxy_type, host, port) in proxy_directives(script) {
+        if !is_loopback_host(&host) {
+            return None;
+        }
+        match &chosen {
+            // 同一个端点的重复声明（PROXY 与 SOCKS5 指向同一个 mixed-port）：
+            // 保留先出现的类型——PAC 的条目顺序就是优先级顺序，第一个通常
+            // 是 HTTP `CONNECT`，对下载最稳。
+            Some(existing) if existing.1 == host && existing.2 == port => {}
+            Some(_) => return None,
+            None => chosen = Some((proxy_type, host, port)),
+        }
+    }
+    let (proxy_type, host, port) = chosen?;
+    Some(ProxyConfig {
+        mode: ProxyMode::Manual,
+        proxy_type,
+        host,
+        port,
+        username: String::new(),
+        password: String::new(),
+        no_proxy_list: String::new(),
+    })
+}
+
+/// 脚本里出现的 PAC 代理指令（按出现顺序）：`PROXY` / `HTTP` / `HTTPS` /
+/// `SOCKS5` / `SOCKS4` / `SOCKS` 后跟 `host:port`。
+fn proxy_directives(script: &str) -> Vec<(ProxyType, String, u16)> {
+    static RE: OnceLock<Option<regex::Regex>> = OnceLock::new();
+    let Some(re) = RE
+        .get_or_init(|| {
+            regex::Regex::new(r"(?i)\b(PROXY|HTTP|HTTPS|SOCKS5|SOCKS4|SOCKS)\s+([^\s;,'\x22]+)")
+                .ok()
+        })
+        .as_ref()
+    else {
+        return Vec::new();
+    };
+
+    let mut found = Vec::new();
+    for caps in re.captures_iter(script) {
+        let (Some(kind), Some(addr)) = (caps.get(1), caps.get(2)) else {
+            continue;
+        };
+        let proxy_type = match kind.as_str().to_ascii_uppercase().as_str() {
+            "PROXY" | "HTTP" => ProxyType::Http,
+            "HTTPS" => ProxyType::Https,
+            "SOCKS4" => ProxyType::Socks4,
+            // PAC 里的裸 `SOCKS` 历史上指 SOCKS4，但现实中的分流脚本
+            // （v2rayN / Shadowsocks / Clash）一律写 `SOCKS5`，此处按 5 处理
+            // 更贴合实际；纯 SOCKS4 服务端本来也不吃域名。
+            "SOCKS" | "SOCKS5" => ProxyType::Socks5,
+            _ => continue,
+        };
+        let token = addr.as_str().trim_end_matches(':');
+        let Some((host, port)) = split_host_port(token) else {
+            continue;
+        };
+        found.push((proxy_type, host, port));
+    }
+    found
+}
+
+/// `host:port` → `(host, port)`；要求显式端口（PAC 里不该省略）。
+fn split_host_port(token: &str) -> Option<(String, u16)> {
+    let (host, port) = token.rsplit_once(':')?;
+    let port = port.parse::<u16>().ok()?;
+    if host.is_empty() || port == 0 {
+        return None;
+    }
+    Some((host.to_string(), port))
+}
+
+/// 是否回环地址（本机 VPN 客户端的监听端点）。
+fn is_loopback_host(host: &str) -> bool {
+    let host = host.trim_matches(|c| c == '[' || c == ']');
+    host.eq_ignore_ascii_case("localhost")
+        || host.starts_with("127.")
+        || host == "::1"
+        || host == "0:0:0:0:0:0:0:1"
 }
 
 /// 解析 WinHTTP 返回的代理列表（`lpszProxy`）。
@@ -533,5 +824,79 @@ mod tests {
     fn auto_proxy_source_does_not_panic() {
         // 结果取决于运行机器的注册表；只验证读取路径可用。
         let _ = auto_proxy_source();
+    }
+
+    /// Clash Verge Rev 的默认 PAC（`pac_file_content`）——两个条目指向同一个
+    /// mixed-port，应取先出现的 PROXY/HTTP。
+    const VERGE_PAC: &str = "function FindProxyForURL(url, host) {\r\n  \
+         return \"PROXY 127.0.0.1:7897; SOCKS5 127.0.0.1:7897; DIRECT;\";\r\n}\r\n";
+
+    #[test]
+    fn extract_takes_single_loopback_endpoint() {
+        let config = extract_single_loopback_proxy(VERGE_PAC).expect("verge pac");
+        assert_eq!(config.proxy_type, ProxyType::Http);
+        assert_eq!(config.host, "127.0.0.1");
+        assert_eq!(config.port, 7897);
+        assert_eq!(config.mode, ProxyMode::Manual);
+    }
+
+    #[test]
+    fn extract_handles_rule_based_script_with_one_local_port() {
+        // Shadowsocks-Windows 式规则脚本：规则再多，代理端点只有一个且在本机。
+        let script = r#"
+var proxy = "PROXY 127.0.0.1:1080; DIRECT;";
+var direct = "DIRECT;";
+function FindProxyForURL(url, host) {
+  if (shExpMatch(host, "*.cn")) return direct;
+  if (isInNet(dnsResolve(host), "192.168.0.0", "255.255.0.0")) return direct;
+  return proxy;
+}
+"#;
+        let config = extract_single_loopback_proxy(script).expect("ss pac");
+        assert_eq!(config.host, "127.0.0.1");
+        assert_eq!(config.port, 1080);
+    }
+
+    #[test]
+    fn extract_refuses_multiple_or_remote_endpoints() {
+        // 两个不同端点：按规则分流到不同代理，不猜。
+        let two = "function FindProxyForURL(u,h){ return \"PROXY 127.0.0.1:7897; DIRECT;\"; }\n\
+                   function Other(){ return \"PROXY 127.0.0.1:7898;\"; }";
+        assert!(extract_single_loopback_proxy(two).is_none());
+
+        // 唯一端点但不在本机：企业 PAC 的远端代理，不猜。
+        let remote =
+            "function FindProxyForURL(u,h){ return \"PROXY proxy.corp.example:8080; DIRECT;\"; }";
+        assert!(extract_single_loopback_proxy(remote).is_none());
+
+        // 不是 PAC。
+        assert!(extract_single_loopback_proxy("PROXY 127.0.0.1:7897").is_none());
+        // 纯直连脚本：没有可用端点。
+        assert!(
+            extract_single_loopback_proxy("function FindProxyForURL(u,h){return \"DIRECT\";}")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn local_pac_path_accepts_file_url_and_plain_path() {
+        let from_url = local_pac_path("file:///C:/Users/fan/pac.txt").expect("file url");
+        assert!(from_url.to_string_lossy().ends_with("pac.txt"));
+        let plain = local_pac_path(r"C:\Users\fan\pac.txt").expect("plain path");
+        assert!(plain.is_absolute());
+        assert!(local_pac_path("https://example.com/pac").is_none());
+    }
+
+    #[test]
+    fn parse_http_body_handles_content_length_and_chunked() {
+        let plain = b"HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello";
+        assert_eq!(parse_http_body(plain).unwrap_or_default(), "hello");
+
+        let chunked =
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n";
+        assert_eq!(parse_http_body(chunked).unwrap_or_default(), "hello");
+
+        let not_found = b"HTTP/1.1 404 Not Found\r\n\r\n";
+        assert!(parse_http_body(not_found).is_err());
     }
 }
