@@ -42,8 +42,8 @@ use crate::signals::{
     RescanFiles, ResolvePreviewRequest, RestartNativeListener, RevealFile, RunDiagnostics,
     SaveConfig, SavePluginSettings, SelectBtFiles, SelectHlsQuality, SelectResolveVariant,
     SetFileAssociation, SetPluginEnabled, SetPriorityTask, SetQueueSchedule, SetRssItemAction,
-    SetTaskSeedLimits, SetTaskSpeedLimit, SetUrlProtocol, SimulateWebhookEvent, StartQueue, StopQueue,
-    SystemProxyInfo, TaskSegmentsUpdated, TestProxyConnection, TestWebhookEndpoint,
+    SetTaskSeedLimits, SetTaskSpeedLimit, SetUrlProtocol, SimulateWebhookEvent, StartQueue,
+    StopQueue, SystemProxyInfo, TaskSegmentsUpdated, TestProxyConnection, TestWebhookEndpoint,
     TrackerSubscriptionResult, UninstallFfmpeg, UninstallPlugin, UninstallYtdlp, UpdateCheckResult,
     UpdateEd2kServerSubscription, UpdateFailureMarker, UpdateQueue, UpdateRssSource,
     UpdateTaskSegments, UpdateTrackerSubscription, UrlProtocolStatus, ValidateRssFeed,
@@ -1997,34 +1997,39 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
             // --- System proxy detection ---
             Some(_) = detect_sys_proxy_recv.recv() => {
                 tokio::task::spawn_blocking(|| {
+                    // PAC / WPAD：脚本按目标 URL 判定，下面的 host/port 是
+                    // 【探针地址】的结论。把 PAC 本身报给 UI，让它说明
+                    // 「系统代理由脚本按网址决定」，而不是显示成一个固定出口。
+                    let auto = rinadown_engine::proxy_config::system_auto_proxy();
+                    let pac = auto.is_some();
+                    let auto_config_url = auto
+                        .as_ref()
+                        .and_then(|config| config.config_url.clone())
+                        .unwrap_or_default();
+                    let empty = || SystemProxyInfo {
+                        detected: false,
+                        proxy_type: String::new(),
+                        host: String::new(),
+                        port: String::new(),
+                        no_proxy_list: String::new(),
+                        pac,
+                        auto_config_url: auto_config_url.clone(),
+                    };
                     match rinadown_engine::proxy_config::detect_system_proxy() {
-                        Ok(Some(cfg)) => {
-                            SystemProxyInfo {
-                                detected: true,
-                                proxy_type: cfg.proxy_type.as_str().to_owned(),
-                                host: cfg.host,
-                                port: cfg.port.to_string(),
-                                no_proxy_list: cfg.no_proxy_list,
-                            }.send_signal_to_dart();
+                        Ok(Some(cfg)) => SystemProxyInfo {
+                            detected: true,
+                            proxy_type: cfg.proxy_type.as_str().to_owned(),
+                            host: cfg.host,
+                            port: cfg.port.to_string(),
+                            no_proxy_list: cfg.no_proxy_list,
+                            pac,
+                            auto_config_url,
                         }
-                        Ok(None) => {
-                            SystemProxyInfo {
-                                detected: false,
-                                proxy_type: String::new(),
-                                host: String::new(),
-                                port: String::new(),
-                                no_proxy_list: String::new(),
-                            }.send_signal_to_dart();
-                        }
+                        .send_signal_to_dart(),
+                        Ok(None) => empty().send_signal_to_dart(),
                         Err(e) => {
                             log_info!("[actor] system proxy detection error: {}", e);
-                            SystemProxyInfo {
-                                detected: false,
-                                proxy_type: String::new(),
-                                host: String::new(),
-                                port: String::new(),
-                                no_proxy_list: String::new(),
-                            }.send_signal_to_dart();
+                            empty().send_signal_to_dart();
                         }
                     }
                 });

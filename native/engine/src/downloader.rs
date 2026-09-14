@@ -839,11 +839,28 @@ const DEFAULT_UA: &str = if cfg!(debug_assertions) {
 /// - `ProxyMode::Manual`  → user-specified proxy URL (HTTP/HTTPS/SOCKS4/SOCKS5)
 ///
 /// When `user_agent` is non-empty, it overrides the built-in Chrome UA.
+///
+/// 目标 URL 未知，因此 `ProxyMode::System` 在 PAC 场景下只能按探针地址近似
+/// 判定（见 [`crate::proxy_config::detect_system_proxy_for`]）；知道目标的
+/// 下载路径请用 [`build_client_for_target`]。
 pub fn build_client(
     proxy_config: &crate::proxy_config::ProxyConfig,
     user_agent: &str,
 ) -> Result<Client, DownloadError> {
     build_client_with_tls_policy(proxy_config, user_agent, false)
+}
+
+/// 构建下载 client，并把目标 URL 交给系统代理（PAC）求值。
+///
+/// PAC 脚本按目标 URL 返回不同结论（内网/国内域名常为 `DIRECT`），因此建
+/// 任务 client 时应当传任务 URL：传 `None`/探针地址会把「本直连的域名」
+/// 也塞进代理，或反过来让该走代理的域名直连。
+pub fn build_client_for_target(
+    proxy_config: &crate::proxy_config::ProxyConfig,
+    user_agent: &str,
+    target_url: &str,
+) -> Result<Client, DownloadError> {
+    build_client_with_tls_policy_for_target(proxy_config, user_agent, false, target_url)
 }
 
 /// 构建【钉定 IP】的下载 client：与 [`build_client_with_tls_policy`] 完全同参
@@ -866,6 +883,7 @@ pub fn build_pinned_client(
         user_agent,
         ignore_tls_errors,
         Some((host, ip)),
+        None,
     )
 }
 
@@ -878,19 +896,40 @@ pub fn build_client_with_tls_policy(
     user_agent: &str,
     ignore_tls_errors: bool,
 ) -> Result<Client, DownloadError> {
-    build_client_inner(proxy_config, user_agent, ignore_tls_errors, None)
+    build_client_inner(proxy_config, user_agent, ignore_tls_errors, None, None)
+}
+
+/// [`build_client_with_tls_policy`] 的目标感知版本：系统代理（PAC）按
+/// `target_url` 求值，其余装配逐字节相同。
+pub fn build_client_with_tls_policy_for_target(
+    proxy_config: &crate::proxy_config::ProxyConfig,
+    user_agent: &str,
+    ignore_tls_errors: bool,
+    target_url: &str,
+) -> Result<Client, DownloadError> {
+    build_client_inner(
+        proxy_config,
+        user_agent,
+        ignore_tls_errors,
+        None,
+        Some(target_url),
+    )
 }
 
 /// 共享装配核心：[`build_client_with_tls_policy`] 与 [`build_pinned_client`]
 /// 的唯一实现体。`pin = Some((host, ip))` 时追加 `.resolve()` DNS 钉定，
 /// 其余配置两者逐字节相同（代理/UA/TLS/池参数绝不允许分叉）。
+///
+/// `target` 只影响 `ProxyMode::System` 的 PAC 求值（见
+/// [`crate::proxy_config::ProxyConfig::resolve_for`]）：`None` = 目标未知。
 fn build_client_inner(
     proxy_config: &crate::proxy_config::ProxyConfig,
     user_agent: &str,
     ignore_tls_errors: bool,
     pin: Option<(&str, std::net::IpAddr)>,
+    target: Option<&str>,
 ) -> Result<Client, DownloadError> {
-    use crate::proxy_config::{ProxyMode, detect_system_proxy};
+    use crate::proxy_config::{ProxyMode, detect_system_proxy_for};
 
     let ua = if user_agent.is_empty() {
         DEFAULT_UA
@@ -970,8 +1009,9 @@ fn build_client_inner(
             builder = builder.no_proxy();
         }
         ProxyMode::System => {
-            // Read Windows registry / env vars for system proxy.
-            match detect_system_proxy() {
+            // Read Windows registry / env vars for system proxy.  PAC 需按目标
+            // URL 求值，故带上调用方给的目标（未知时用探针地址）。
+            match detect_system_proxy_for(target) {
                 Ok(Some(sys_proxy)) => {
                     if let Some(url) = sys_proxy.to_proxy_url() {
                         log_info!(

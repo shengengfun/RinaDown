@@ -763,7 +763,8 @@ class FloatingBallService {
       (2, s.pauseAll),
       (0, ''),
       (3, s.trayShowWindow),
-      (4, s.hideFloatingBall),
+      (4, s.hideFloatingBallTemporarily),
+      (6, s.disableFloatingBall),
       (0, ''),
       (5, s.trayExit),
     ]);
@@ -780,6 +781,8 @@ class FloatingBallService {
       case 3:
         unawaited(_restoreMainWindow());
       case 4:
+        unawaited(disable());
+      case 6:
         setEnabled(false);
         unawaited(TrayService.instance.refreshMenu()); // 同步托盘复选状态
       case 5:
@@ -880,7 +883,8 @@ class FloatingBallService {
                   {'id': 2, 'label': s.pauseAll},
                   {'id': 0, 'label': ''},
                   {'id': 3, 'label': s.trayShowWindow},
-                  {'id': 4, 'label': s.hideFloatingBall},
+                  {'id': 4, 'label': s.hideFloatingBallTemporarily},
+                  {'id': 6, 'label': s.disableFloatingBall},
                   {'id': 0, 'label': ''},
                   {'id': 5, 'label': s.trayExit},
                 ],

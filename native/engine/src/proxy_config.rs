@@ -239,7 +239,8 @@ impl ProxyConfig {
         match self.mode {
             ProxyMode::None => None,
             ProxyMode::System => {
-                // System proxy is resolved at call time via detect_system_proxy()
+                // System proxy is resolved at call time via
+                // detect_system_proxy_for()（PAC 需按目标 URL 求值）。
                 None
             }
             // Auto 的具体代理由 auto_proxy 决策路径以 Manual 配置给出，
@@ -269,17 +270,27 @@ impl ProxyConfig {
     ///
     /// - `None` mode → returned as-is.
     /// - `Manual` mode → returned as-is.
-    /// - `System` mode → calls `detect_system_proxy()` and returns the resolved
-    ///   config with `mode = Manual` and populated host/port fields.
+    /// - `System` mode → calls `detect_system_proxy_for(target)` and returns the
+    ///   resolved config with `mode = Manual` and populated host/port fields.
     ///   If system proxy is disabled or detection fails, falls back to `None`.
     ///
     /// This is needed for FTP downloads because `ftp_connect_sync_with_proxy`
     /// reads `host`/`port` directly (unlike HTTP which uses `build_client()`
     /// where system proxy resolution already happens inside reqwest).
     pub fn resolve(&self) -> Self {
+        self.resolve_for(None)
+    }
+
+    /// [`Self::resolve`] 的 PAC 感知版本：把目标 URL 交给 PAC 脚本求值。
+    ///
+    /// PAC（`AutoConfigURL`）模式下**不存在「全局代理地址」**——同一个脚本
+    /// 对内网/国内域名返回 `DIRECT`、对其它域名返回代理。凡是知道目标 URL
+    /// 的地方（建任务 client、FTP 连接、RSS 抓取）都应传 `Some(url)`；确无
+    /// 目标时传 `None`，由探针地址兜底（Windows 见 `system_proxy_pac::PAC_PROBE_URL`）。
+    pub fn resolve_for(&self, target: Option<&str>) -> Self {
         match self.mode {
             ProxyMode::System => {
-                match detect_system_proxy() {
+                match detect_system_proxy_for(target) {
                     Ok(Some(resolved)) => resolved,
                     Ok(None) => {
                         // System proxy not configured → direct connection
@@ -387,20 +398,97 @@ impl ProxyConfig {
 // System proxy detection (Windows)
 // ---------------------------------------------------------------------------
 
-/// Detect the system-level proxy from Windows registry.
+/// Detect the system-level proxy for a specific destination.
 ///
-/// Reads `HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings`:
-/// - `ProxyEnable` (DWORD): 0 = disabled, 1 = enabled
-/// - `ProxyServer` (SZ): proxy address, possibly multi-protocol format
-/// - `ProxyOverride` (SZ): semicolon-separated bypass list
+/// 两条独立通道，按 PAC 优先的顺序合并（与浏览器一致）：
+///
+/// 1. **自动代理（PAC / WPAD）**——注册表 `AutoConfigURL` 或 `AutoDetect`。
+///    PAC 是按目标 URL 求值的脚本，故结果取决于 `target`；求值交给 Windows
+///    自己的 WinHTTP，实现见 [`crate::system_proxy_pac`]。脚本判定直连时本
+///    函数返回 `None`（PAC 是权威，不再回落到静态项——PAC 模式下静态项
+///    通常只是同一条链路的旧残留）；求值失败（PAC 不可达/脚本报错）则回退
+///    静态项，避免一个坏脚本把用户彻底断网。
+/// 2. **静态代理**——`ProxyEnable`（DWORD，0 = 关闭）+ `ProxyServer`（SZ，
+///    支持多协议写法）+ `ProxyOverride`（`;` 分隔的绕过列表）。
+///
+/// 返回 `Manual` 模式的配置（reqwest 直接用），或 `None`（直连）。
+#[cfg(target_os = "windows")]
+pub fn detect_system_proxy_for(target: Option<&str>) -> Result<Option<ProxyConfig>, DownloadError> {
+    let static_proxy = read_static_system_proxy()?;
+    let Some(source) = crate::system_proxy_pac::auto_proxy_source() else {
+        return Ok(static_proxy);
+    };
+    let probe = target.unwrap_or(crate::system_proxy_pac::PAC_PROBE_URL);
+    match crate::system_proxy_pac::resolve_proxy_for(&source, probe) {
+        Ok(Some(pac)) => Ok(Some(pac)),
+        Ok(None) => Ok(None),
+        Err(error) => {
+            log_info!("[proxy] PAC 求值失败，回退静态系统代理: {error}");
+            Ok(static_proxy)
+        }
+    }
+}
+
+/// Detect the system-level proxy when the destination is unknown.
+///
+/// PAC 场景下这是一个**近似**：脚本对探针地址的判定被当作「这台机器的系统
+/// 代理」。凡是知道目标 URL 的调用方都该用 [`detect_system_proxy_for`]。
+#[cfg(target_os = "windows")]
+pub fn detect_system_proxy() -> Result<Option<ProxyConfig>, DownloadError> {
+    detect_system_proxy_for(None)
+}
+
+/// 系统「自动代理」（PAC / WPAD）配置；`None` = 未配置。
+///
+/// 供宿主向用户说明「系统代理为什么是脚本而不是一个地址」；真正的求值入口
+/// 是 [`detect_system_proxy_for`]。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AutoProxyConfig {
+    /// PAC 脚本地址（注册表 `AutoConfigURL`）；WPAD 自动发现时为 `None`。
+    pub config_url: Option<String>,
+    /// 是否启用了「自动检测设置」（WPAD：DHCP / DNS 发现）。
+    pub auto_detect: bool,
+}
+
+/// 读取系统自动代理配置，见 [`AutoProxyConfig`]。
+#[cfg(target_os = "windows")]
+pub fn system_auto_proxy() -> Option<AutoProxyConfig> {
+    use crate::system_proxy_pac::AutoProxySource;
+    match crate::system_proxy_pac::auto_proxy_source()? {
+        AutoProxySource::ConfigUrl(url) => Some(AutoProxyConfig {
+            config_url: Some(url),
+            auto_detect: false,
+        }),
+        AutoProxySource::AutoDetect => Some(AutoProxyConfig {
+            config_url: None,
+            auto_detect: true,
+        }),
+    }
+}
+
+/// 非 Windows：PAC 概念不适用（非 Windows 由 reqwest 自行读 `*_PROXY` 环境变量）。
+#[cfg(not(target_os = "windows"))]
+pub fn system_auto_proxy() -> Option<AutoProxyConfig> {
+    None
+}
+
+/// 作废 PAC 求值缓存（含 WinHTTP 会话级的 PAC 缓存）。
+///
+/// 代理设置变更时调用：PAC 内容可能已随模式切换而变，按 URL 缓存的旧结论
+/// 不该继续生效。非 Windows 是空操作。
+pub fn clear_system_proxy_cache() {
+    #[cfg(target_os = "windows")]
+    crate::system_proxy_pac::clear_cache();
+}
+
+/// 读取静态注册表项（`ProxyEnable` / `ProxyServer` / `ProxyOverride`），
+/// 不做 PAC 求值。
 ///
 /// The `ProxyServer` value can be:
 /// - Simple: `host:port` (applies to all protocols)
 /// - Multi-protocol: `http=host:port;https=host:port;ftp=host:port;socks=host:port`
-///
-/// Returns a `ProxyConfig` in `Manual` mode on success, or `None` if disabled/unavailable.
 #[cfg(target_os = "windows")]
-pub fn detect_system_proxy() -> Result<Option<ProxyConfig>, DownloadError> {
+fn read_static_system_proxy() -> Result<Option<ProxyConfig>, DownloadError> {
     use winreg::RegKey;
     use winreg::enums::HKEY_CURRENT_USER;
 
@@ -440,6 +528,16 @@ pub fn detect_system_proxy() -> Result<Option<ProxyConfig>, DownloadError> {
 
 /// Fallback for non-Windows platforms — returns `None`.
 #[cfg(not(target_os = "windows"))]
+pub fn detect_system_proxy_for(
+    _target: Option<&str>,
+) -> Result<Option<ProxyConfig>, DownloadError> {
+    // On non-Windows, reqwest already reads HTTP_PROXY/HTTPS_PROXY env vars.
+    // We don't need extra detection.
+    Ok(None)
+}
+
+/// Fallback for non-Windows platforms — returns `None`.
+#[cfg(not(target_os = "windows"))]
 pub fn detect_system_proxy() -> Result<Option<ProxyConfig>, DownloadError> {
     // On non-Windows, reqwest already reads HTTP_PROXY/HTTPS_PROXY env vars.
     // We don't need extra detection.
@@ -458,7 +556,7 @@ pub fn detect_system_proxy() -> Result<Option<ProxyConfig>, DownloadError> {
 /// plaintext HTTP `CONNECT`, so it maps to [`ProxyType::Http`] — mapping it to
 /// [`ProxyType::Https`] would make reqwest attempt a TLS handshake *with the
 /// proxy*, which these endpoints do not accept (issue #183).
-#[allow(dead_code)] // only called from #[cfg(windows)] detect_system_proxy; kept for cross-platform test coverage
+#[allow(dead_code)] // #[cfg(windows)] 静态检测与 system_proxy_pac::parse_proxy_list 使用；保留以覆盖跨平台单测
 pub fn parse_windows_proxy_server(server: &str) -> (ProxyType, String, u16) {
     // Check if it's multi-protocol format (contains '=')
     if server.contains('=') {
@@ -487,7 +585,7 @@ pub fn parse_windows_proxy_server(server: &str) -> (ProxyType, String, u16) {
 }
 
 /// Parse multi-protocol proxy string like `http=host:port;https=host2:port2;socks=host3:port3`.
-#[allow(dead_code)] // only called from #[cfg(windows)] detect_system_proxy; kept for cross-platform test coverage
+#[allow(dead_code)] // 同 parse_windows_proxy_server：Windows 检测路径使用，单测覆盖跨平台
 fn parse_multi_protocol_proxy(server: &str) -> HashMap<String, (String, u16)> {
     let mut result = HashMap::new();
     for entry in server.split(';') {
@@ -507,7 +605,7 @@ fn parse_multi_protocol_proxy(server: &str) -> HashMap<String, (String, u16)> {
 }
 
 /// Parse `host:port` string, defaulting port to 8080 if missing/invalid.
-fn parse_host_port(addr: &str) -> (String, u16) {
+pub(crate) fn parse_host_port(addr: &str) -> (String, u16) {
     // Handle IPv6: [::1]:port
     if let Some(bracket_end) = addr.find(']') {
         let host = addr[..=bracket_end].to_string();

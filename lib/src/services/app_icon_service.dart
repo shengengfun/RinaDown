@@ -87,7 +87,12 @@ class AppIconService extends ChangeNotifier {
   static const builtinBoltAsset = 'assets/logo/rinadown_bolt.png';
 
   /// Windows ICO 容器渲染的正方形尺寸集合。
-  static const _icoSizes = [16, 24, 32, 48, 64, 128, 256];
+  ///
+  /// 16/20/24/28/32/40 = 100%…250% 缩放下**系统小图标**的像素值（任务栏按钮、
+  /// 通知区托盘、Alt-Tab 都按它取帧）；缺档时 Windows 只能把邻帧拉伸，
+  /// 125%/150%/175% 缩放下托盘图标会糊成马赛克。128/256 供大图标视图
+  /// （资源管理器、跳跃列表）与窗口图标使用。
+  static const _icoSizes = [16, 20, 24, 28, 32, 40, 48, 64, 128, 256];
 
   /// Linux/macOS 单文件持久化图标的正方形尺寸——两者运行时都直接吃 PNG，
   /// 不需要 Windows ICO 那种多尺寸容器；256px 与 Linux 打包默认图标

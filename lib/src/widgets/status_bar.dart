@@ -1192,12 +1192,14 @@ class _ProxyModeContent extends StatelessWidget {
     final systemAvailable = svc.detected;
     final current = settingsProvider.proxyMode;
 
-    // 系统代理副文本：检测中 / 已检测到的摘要 / 未检测到
+    // 系统代理副文本：检测中 / 已检测到的摘要 / 未检测到。PAC 下没有
+    // 固定出口（脚本按每个网址判定），展示摘要会把探针结果当事实，
+    // 所以换成「脚本按网址」的说法。
     final String systemSubtitle;
     if (svc.detecting) {
       systemSubtitle = s.proxySystemDetecting;
     } else if (systemAvailable) {
-      systemSubtitle = svc.summary;
+      systemSubtitle = svc.pac ? s.proxySystemPacShort : svc.summary;
     } else {
       systemSubtitle = s.proxySystemNotDetected;
     }

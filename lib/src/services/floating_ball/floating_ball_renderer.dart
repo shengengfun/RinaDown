@@ -516,8 +516,6 @@ class _BallWidget extends StatelessWidget {
     final isDragTarget = variant == BallVariant.dragTarget;
     final spec = activeSpec;
     final logo = ballLogoImage;
-    // idle 态且 logo 可用：logo 直接铺满整球（无底色圈/边框）
-    final logoFillsBall = variant == BallVariant.idle && logo != null;
 
     return Center(
       child: SizedBox(
@@ -531,20 +529,14 @@ class _BallWidget extends StatelessWidget {
               width: kBallDiameter,
               height: kBallDiameter,
               decoration: BoxDecoration(
-                // idle-logo 态也保留柔和投影（透明填充仅呈现外圈光晕；此前
-                // logo 铺满整球时无任何投影，观感偏平）。
-                color: logoFillsBall
-                    ? Colors.transparent
-                    : (isDragTarget ? accent.withValues(alpha: 0.92) : bg),
+                color: isDragTarget ? accent.withValues(alpha: 0.92) : bg,
                 shape: BoxShape.circle,
-                border: logoFillsBall
-                    ? null
-                    : Border.all(
-                        color: isDragTarget
-                            ? accent
-                            : tokens.border.withValues(alpha: 0.8),
-                        width: isDragTarget ? 2 : 1,
-                      ),
+                border: Border.all(
+                  color: isDragTarget
+                      ? accent
+                      : tokens.border.withValues(alpha: 0.8),
+                  width: isDragTarget ? 2 : 1,
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.28),
@@ -554,7 +546,6 @@ class _BallWidget extends StatelessWidget {
                 ],
               ),
               child: _ballBody(
-                logoFillsBall: logoFillsBall,
                 logo: logo,
                 isDragTarget: isDragTarget,
                 accent: accent,
@@ -598,20 +589,21 @@ class _BallWidget extends StatelessWidget {
 
   /// 球体主体内容：idle=铺满 logo；active=波浪进度 + 速度文本；其余=图标。
   Widget _ballBody({
-    required bool logoFillsBall,
     required ui.Image? logo,
     required bool isDragTarget,
     required Color accent,
     required BallActiveSpec? spec,
   }) {
-    if (logoFillsBall) {
-      return ClipOval(
-        child: RawImage(
-          image: logo,
-          width: kBallDiameter,
-          height: kBallDiameter,
-          fit: BoxFit.cover,
-          filterQuality: FilterQuality.medium,
+    if (variant == BallVariant.idle && logo != null) {
+      return Center(
+        child: ClipOval(
+          child: RawImage(
+            image: logo,
+            width: 28,
+            height: 28,
+            fit: BoxFit.cover,
+            filterQuality: FilterQuality.medium,
+          ),
         ),
       );
     }

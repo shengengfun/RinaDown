@@ -45,7 +45,7 @@ use crate::cdn::NodePool;
 use crate::db::Db;
 use crate::events::{EngineEvent, EventSink};
 use crate::logger::{log_error, log_info};
-use crate::proxy_config::{ProxyConfig, ProxyMode, detect_system_proxy};
+use crate::proxy_config::{ProxyConfig, ProxyMode, detect_system_proxy_for};
 
 // ---------------------------------------------------------------------------
 // 常量（刻意不做设置项：没有证据表明用户需要调它们）
@@ -241,9 +241,14 @@ pub struct ProxyCandidate {
 /// 解析 Auto 模式的全部候选代理：手动字段与系统代理同时存在时全部返回；
 /// 完全相同的代理 URL 只保留手动候选（显式配置优先，避免重复采样同一端点）。
 ///
+/// `target_url` 是任务的真实目标：**PAC 按目标 URL 求值**——同一个脚本对
+/// 内网/国内域名可能返回 `DIRECT`，那种情况下系统代理不能进候选表，否则
+/// Auto 会把本该直连的下载采样后切到代理上。目标确实未知时传 `None`，
+/// 由探针地址近似判定。
+///
 /// 仅对 `mode == Auto` 的配置有意义；其余模式返回空列表。
-pub fn resolve_candidates(config: &ProxyConfig) -> Vec<ProxyCandidate> {
-    let system = match detect_system_proxy() {
+pub fn resolve_candidates(config: &ProxyConfig, target_url: Option<&str>) -> Vec<ProxyCandidate> {
+    let system = match detect_system_proxy_for(target_url) {
         Ok(system) => system,
         Err(error) => {
             log_info!("[auto-proxy] 系统代理检测失败: {error}");

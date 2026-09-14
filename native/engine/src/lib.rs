@@ -47,6 +47,9 @@ pub mod selection;
 /// 站点 HTTP Basic 认证凭据（per-host 保存 + 建任务时自动套用）。
 pub mod site_auth;
 pub mod speed_limiter;
+/// 系统「自动代理」（PAC / WPAD）求值：仅 Windows，仅被 [`proxy_config`] 调用。
+#[cfg(target_os = "windows")]
+pub(crate) mod system_proxy_pac;
 pub mod tracker_subscription;
 /// 用户主目录下的系统标准目录（下载目录：Windows 已知文件夹 / XDG user-dirs）。
 pub mod user_dirs;

@@ -693,6 +693,12 @@ pub struct SystemProxyInfo {
     pub port: String,
     /// Bypass / no-proxy list (comma-separated)
     pub no_proxy_list: String,
+    /// 系统代理是否由 PAC / WPAD 脚本给出。为 `true` 时 host/port 只是
+    /// 【探针地址】的判定结果——真实出口由脚本按每个目标 URL 现场求值，
+    /// 因此 UI 应说明「按网址自动判定」而不是把它当成一个固定代理。
+    pub pac: bool,
+    /// PAC 脚本地址（注册表 `AutoConfigURL`）；WPAD 自动发现时为空串。
+    pub auto_config_url: String,
 }
 
 // ========== HLS quality selection signals ==========

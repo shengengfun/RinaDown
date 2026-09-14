@@ -83,6 +83,8 @@ class TrayManagerPlugin : public flutter::Plugin {
                                                              LPARAM lparam);
   HWND TrayManagerPlugin::GetMainWindow();
   HICON TrayManagerPlugin::LoadIconFromPath(const std::wstring& path);
+  void TrayManagerPlugin::SwapIcon(HICON fresh);
+  void TrayManagerPlugin::RefreshIconForDpi();
   bool TrayManagerPlugin::AddIcon(bool reset_retry);
   void TrayManagerPlugin::ScheduleAddRetry();
   void TrayManagerPlugin::CancelAddRetry();
@@ -141,6 +143,14 @@ TrayManagerPlugin::~TrayManagerPlugin() {
   registrar->UnregisterTopLevelWindowProcDelegate(window_proc_id);
 }
 
+// Notification-area icons are plain HICONs: the shell does NOT pick a frame
+// for us.  It scales whatever bitmap it gets to the notification area's pixel
+// size, so handing it a frame smaller than that size is what turns the icon
+// into mush at fractional scaling (125% -> 20px, 150% -> 24px, 175% -> 28px).
+// The .ico therefore ships a frame per DPI step and this asks for the frame
+// matching the current system DPI (PerMonitorV2 process -> the system DPI is
+// the taskbar monitor's DPI).  Never pass LR_DEFAULTSIZE: that would force the
+// 32px large-icon metric instead.
 HICON TrayManagerPlugin::LoadIconFromPath(const std::wstring& path) {
   if (path.empty()) {
     return nullptr;
@@ -148,6 +158,42 @@ HICON TrayManagerPlugin::LoadIconFromPath(const std::wstring& path) {
   return static_cast<HICON>(::LoadImage(
       nullptr, path.c_str(), IMAGE_ICON, GetSystemMetrics(SM_CXSMICON),
       GetSystemMetrics(SM_CYSMICON), LR_LOADFROMFILE));
+}
+
+// Installs `fresh` as the current icon handle and reclaims the previous one.
+// No shell notification: callers decide between NIM_MODIFY and (re-)NIM_ADD.
+void TrayManagerPlugin::SwapIcon(HICON fresh) {
+  if (fresh == nullptr) {
+    return;
+  }
+  HICON old = nid.hIcon;
+  nid.hIcon = fresh;
+  if (old != nullptr && old != fresh) {
+    DestroyIcon(old);
+  }
+}
+
+// Re-reads the icon at the current system DPI.  Called after the display
+// scaling or resolution changed: the HICON the shell holds was picked for the
+// *old* tray pixel size, so it would stay blurry until the icon is reset.
+void TrayManagerPlugin::RefreshIconForDpi() {
+  if (icon_path.empty()) {
+    return;
+  }
+  HICON fresh = LoadIconFromPath(icon_path);
+  if (fresh == nullptr) {
+    // Keep the old icon: a slightly soft icon beats an empty tray slot.
+    return;
+  }
+  SwapIcon(fresh);
+  if (tray_icon_setted) {
+    nid.uFlags |= NIF_ICON;
+    if (!Shell_NotifyIcon(NIM_MODIFY, &nid)) {
+      // The shell no longer knows this icon; re-add instead of going blank.
+      tray_icon_setted = false;
+      AddIcon(true);
+    }
+  }
 }
 
 void TrayManagerPlugin::CancelAddRetry() {
@@ -244,17 +290,17 @@ std::optional<LRESULT> TrayManagerPlugin::HandleWindowProc(HWND hWnd,
   // other plugins listen for it too.
   if (taskbar_created_msg != 0 && message == taskbar_created_msg) {
     if (!icon_path.empty()) {
-      HICON fresh = LoadIconFromPath(icon_path);
-      if (fresh != nullptr) {
-        HICON old = nid.hIcon;
-        nid.hIcon = fresh;
-        if (old != nullptr) {
-          DestroyIcon(old);
-        }
-      }
+      SwapIcon(LoadIconFromPath(icon_path));
       tray_icon_setted = false;
       AddIcon(true);
     }
+    return result;
+  }
+  // Display scaling / resolution changed (user moved the window to another
+  // monitor, changed the system scale, ...).  The notification-area pixel size
+  // usually changes with it, so re-pick the icon frame.
+  if (message == WM_DPICHANGED || message == WM_DISPLAYCHANGE) {
+    RefreshIconForDpi();
     return result;
   }
   if (message == WM_TIMER && wParam == TRAY_ADD_RETRY_TIMER) {

@@ -878,6 +878,9 @@ class S {
   };
   String get trayShowFloatingBall => _r('trayShowFloatingBall');
   String get hideFloatingBall => _r('hideFloatingBall');
+    String get hideFloatingBallTemporarily =>
+            _r('hideFloatingBallTemporarily');
+    String get disableFloatingBall => _r('disableFloatingBall');
   String get torrentFileAssociation => _r('torrentFileAssociation');
   String get torrentFileAssociationDesc => _r('torrentFileAssociationDesc');
   String get ed2kLinkAssociation => _r('ed2kLinkAssociation');
@@ -1252,6 +1255,11 @@ class S {
   String get proxySystemDetecting => _r('proxySystemDetecting');
   String get proxySystemNotConfigured => _r('proxySystemNotConfigured');
   String get proxySystemDetected => _r('proxySystemDetected');
+  String get proxySystemPacActive => _r('proxySystemPacActive');
+  String get proxySystemPacShort => _r('proxySystemPacShort');
+  String get proxySystemPacScriptUrl => _r('proxySystemPacScriptUrl');
+  String get proxySystemPacWpad => _r('proxySystemPacWpad');
+  String get proxySystemPacProbeHint => _r('proxySystemPacProbeHint');
   String get proxyTestConnection => _r('proxyTestConnection');
   String get proxyTesting => _r('proxyTesting');
   String proxyTestSuccess(int ms) => _r('proxyTestSuccess', {'ms': ms});

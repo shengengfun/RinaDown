@@ -2764,6 +2764,10 @@ impl DownloadManager {
         let new_client = downloader::build_client(&config, &self.global_user_agent)?;
         self.client = new_client;
         self.proxy_config = config;
+        // PAC（AutoConfigURL / WPAD）的求值结论按「来源 + 目标 URL」缓存，
+        // 且 WinHTTP 会话还会缓存 PAC 脚本体——模式一换（系统代理开/关、
+        // 换 PAC 地址）旧结论与旧脚本都必须立即作废，否则新任务仍按旧出口走。
+        crate::proxy_config::clear_system_proxy_cache();
         // 仅 `useProxy` 端点用得上，但出口变了就得跟着重建。
         self.webhook.set_proxy_config(&self.proxy_config);
         // 网络出口变化：域名连接上限是对【旧出口】的服务器策略观察，
@@ -3786,7 +3790,8 @@ impl DownloadManager {
                     crate::route_health::clear_proxy_prior(&host, &self.db);
                 }
 
-                let mut candidates = crate::auto_proxy::resolve_candidates(&self.proxy_config);
+                let mut candidates =
+                    crate::auto_proxy::resolve_candidates(&self.proxy_config, Some(&task.url));
                 if let Some(crate::auto_proxy::Decision::Proxy(preferred)) =
                     self.auto_proxy_cache.lookup(&host)
                 {
@@ -5077,7 +5082,7 @@ impl DownloadManager {
                 None,
             ));
         }
-        let candidates = auto_proxy::resolve_candidates(&self.proxy_config);
+        let candidates = auto_proxy::resolve_candidates(&self.proxy_config, Some(url));
         if candidates.is_empty() {
             return Some((ProxyConfig::default(), auto_proxy::route::DIRECT, None));
         }
@@ -5196,24 +5201,30 @@ impl DownloadManager {
         // Auto 判走代理时必须构建专属 client（全局 client 在 Auto 下恒直连）。
         let auto_needs_proxy_client =
             matches!(&auto_override, Some(p) if p.mode != ProxyMode::None);
+        // PAC（AutoConfigURL / WPAD）下系统代理的结论随目标 URL 变化，而全局
+        // client 是按探针地址建的（见 `ProxyConfig::resolve_for`）——不能拿它
+        // 当本任务的出口，否则「该走代理的域名直连、该直连的域名被代理」。
+        let system_proxy_varies = crate::proxy_config::system_auto_proxy().is_some();
         let needs_dedicated_client = !proxy_url.is_empty()
             || !user_agent.is_empty()
             || !queue_ua.is_empty()
             || ignore_tls_errors
-            || auto_needs_proxy_client;
+            || auto_needs_proxy_client
+            || system_proxy_varies;
         if !needs_dedicated_client {
-            let proxy = auto_override.unwrap_or_else(|| self.proxy_config.resolve());
+            let proxy = auto_override.unwrap_or_else(|| self.proxy_config.resolve_for(Some(url)));
             return (self.client.clone(), proxy, auto_outcome);
         }
 
         let proxy = if !proxy_url.is_empty() {
-            // `.resolve()`：把 system:// 哨兵（System 模式）现场具体化为
-            // Manual/直连，使 FTP 直读 host/port 与 CDN 门槛判定一致生效。
-            ProxyConfig::from_proxy_url(proxy_url).resolve()
+            // `.resolve_for(url)`：把 system:// 哨兵（System 模式）现场具体化为
+            // Manual/直连（PAC 需按目标 URL 求值），使 FTP 直读 host/port 与
+            // CDN 门槛判定一致生效。
+            ProxyConfig::from_proxy_url(proxy_url).resolve_for(Some(url))
         } else if let Some(p) = auto_override {
             p
         } else {
-            self.proxy_config.resolve()
+            self.proxy_config.resolve_for(Some(url))
         };
         match downloader::build_client_with_tls_policy(&proxy, resolved_ua, ignore_tls_errors) {
             Ok(client) => (client, proxy, auto_outcome),
@@ -5221,7 +5232,11 @@ impl DownloadManager {
                 log_info!("[manager] failed to build per-task client: {}", e);
                 // 构建失败降级为全局直连 client——不再对路由做任何声明
                 // （空标签），避免「标签说代理、实际走直连」的可追溯性谎言。
-                (self.client.clone(), self.proxy_config.resolve(), ("", None))
+                (
+                    self.client.clone(),
+                    self.proxy_config.resolve_for(Some(url)),
+                    ("", None),
+                )
             }
         }
     }
@@ -6677,14 +6692,15 @@ impl DownloadManager {
             let needs_rebuild = !task.proxy_url.is_empty()
                 || !resume_user_agent.is_empty()
                 || task.ignore_tls_errors
-                || matches!(&auto_override, Some(p) if p.mode != ProxyMode::None);
+                || matches!(&auto_override, Some(p) if p.mode != ProxyMode::None)
+                || crate::proxy_config::system_auto_proxy().is_some();
             let (task_client, task_proxy) = if needs_rebuild {
                 let pc = if !task.proxy_url.is_empty() {
-                    ProxyConfig::from_proxy_url(&task.proxy_url).resolve()
+                    ProxyConfig::from_proxy_url(&task.proxy_url).resolve_for(Some(&task.url))
                 } else if let Some(p) = auto_override {
                     p
                 } else {
-                    self.proxy_config.resolve()
+                    self.proxy_config.resolve_for(Some(&task.url))
                 };
                 match downloader::build_client_with_tls_policy(
                     &pc,
@@ -6694,11 +6710,15 @@ impl DownloadManager {
                     Ok(c) => (c, pc),
                     Err(e) => {
                         log_info!("[manager] failed to build per-task client on resume: {}", e);
-                        (self.client.clone(), self.proxy_config.resolve())
+                        (
+                            self.client.clone(),
+                            self.proxy_config.resolve_for(Some(&task.url)),
+                        )
                     }
                 }
             } else {
-                let pc = auto_override.unwrap_or_else(|| self.proxy_config.resolve());
+                let pc =
+                    auto_override.unwrap_or_else(|| self.proxy_config.resolve_for(Some(&task.url)));
                 (self.client.clone(), pc)
             };
             let range_verified = self.db.get_task_range_verified(&tid).await.unwrap_or(true);

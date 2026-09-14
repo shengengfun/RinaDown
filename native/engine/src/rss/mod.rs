@@ -389,7 +389,7 @@ impl RssManager {
             } else {
                 source.user_agent.clone()
             },
-            proxy: resolve_proxy(&source.proxy_url, proxy),
+            proxy: resolve_proxy(&source.proxy_url, proxy, &source.url),
         };
         // 乐观置位 last_fetch_at：即便抓取任务本身崩了，due 判定也不会把这个
         // 源变成每 tick 重试的死循环（回流分支会用真实结果覆盖）。
@@ -445,7 +445,7 @@ impl RssManager {
             } else {
                 user_agent
             },
-            proxy: resolve_proxy(&proxy_url, proxy),
+            proxy: resolve_proxy(&proxy_url, proxy, &url),
         };
         async move {
             match fetch_feed(&request).await {
@@ -515,7 +515,7 @@ impl RssManager {
             } else {
                 plan.user_agent.clone()
             },
-            proxy: resolve_proxy(&plan.proxy_url, proxy),
+            proxy: resolve_proxy(&plan.proxy_url, proxy, &plan.url),
         };
         let referrer = plan.referrer.clone();
         let tx = self.tx.clone();
@@ -860,9 +860,12 @@ fn plan_for(source: &RssSourceInfo, item: &RssItemInfo) -> RssDownloadPlan {
 }
 
 /// 订阅级代理覆盖：空 = 用全局解析结果。
-fn resolve_proxy(proxy_url: &str, global: &ProxyConfig) -> ProxyConfig {
+///
+/// `target_url` 交回 [`ProxyConfig::resolve_for`]——PAC 按目标 URL 判定，
+/// feed 站点与种子站点完全可能一个走代理、一个直连。
+fn resolve_proxy(proxy_url: &str, global: &ProxyConfig, target_url: &str) -> ProxyConfig {
     if proxy_url.is_empty() {
-        global.resolve()
+        global.resolve_for(Some(target_url))
     } else {
         ProxyConfig::from_proxy_url(proxy_url)
     }

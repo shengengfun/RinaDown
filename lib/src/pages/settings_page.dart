@@ -5591,6 +5591,8 @@ class _ProxySettingsCardState extends State<_ProxySettingsCard> {
   // 系统代理检测状态
   bool _sysProxyDetecting = false;
   bool _sysProxyDetected = false;
+  bool _sysProxyPac = false;
+  String _sysProxyPacUrl = '';
   String _sysProxyType = '';
   String _sysProxyHost = '';
   String _sysProxyPort = '';
@@ -5677,6 +5679,10 @@ class _ProxySettingsCardState extends State<_ProxySettingsCard> {
     setState(() {
       _sysProxyDetecting = false;
       _sysProxyDetected = msg.detected;
+      // PAC（AutoConfigURL / WPAD）：脚本按每个目标网址现场判定，
+      // host/port 只是样本目标的结论，UI 必须说明这一点。
+      _sysProxyPac = msg.pac;
+      _sysProxyPacUrl = msg.autoConfigUrl;
       _sysProxyType = msg.proxyType;
       _sysProxyHost = msg.host;
       _sysProxyPort = msg.port;
@@ -5859,65 +5865,85 @@ class _ProxySettingsCardState extends State<_ProxySettingsCard> {
                   ),
                 ],
               )
-            else if (!_sysProxyDetected)
-              Row(
-                children: [
-                  Icon(LucideIcons.info, size: 14, color: c.textMuted),
-                  const SizedBox(width: 8),
-                  Text(
-                    s.proxySystemNotConfigured,
-                    style: TextStyle(fontSize: 12, color: c.textMuted),
-                  ),
-                ],
-              )
             else ...[
-              Text(
-                s.proxySystemDetected,
-                style: TextStyle(fontSize: 11.5, color: c.textMuted),
-              ),
-              const SizedBox(height: 10),
-              // 代理类型
-              _ReadOnlyProxyField(
-                label: s.proxyType,
-                value: _sysProxyType.toUpperCase(),
-                colors: c,
-              ),
-              const SizedBox(height: 8),
-              // 地址 + 端口（与手动配置表单布局一致）
-              Row(
-                children: [
-                  SizedBox(
-                    width: 80,
-                    child: Text(
-                      s.proxyHost,
-                      style: TextStyle(fontSize: 12, color: c.textSecondary),
-                    ),
-                  ),
-                  Expanded(
-                    child: _ReadOnlyValueBox(value: _sysProxyHost, colors: c),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 48,
-                    child: Text(
-                      s.proxyPort,
-                      style: TextStyle(fontSize: 12, color: c.textSecondary),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 90,
-                    child: _ReadOnlyValueBox(value: _sysProxyPort, colors: c),
-                  ),
-                ],
-              ),
-              if (_sysProxyNoList.isNotEmpty) ...[
-                const SizedBox(height: 8),
+              // PAC / WPAD：没有「一个固定出口」可展示，先把这件事讲清楚。
+              if (_sysProxyPac) ...[
+                Text(
+                  s.proxySystemPacActive,
+                  style: TextStyle(fontSize: 11.5, color: c.textMuted),
+                ),
+                const SizedBox(height: 10),
                 _ReadOnlyProxyField(
-                  label: s.proxyNoList,
-                  value: _sysProxyNoList,
+                  label: s.proxySystemPacScriptUrl,
+                  value: _sysProxyPacUrl.isEmpty
+                      ? s.proxySystemPacWpad
+                      : _sysProxyPacUrl,
                   colors: c,
                 ),
+                if (_sysProxyDetected) const SizedBox(height: 12),
+              ],
+              if (!_sysProxyDetected && !_sysProxyPac)
+                Row(
+                  children: [
+                    Icon(LucideIcons.info, size: 14, color: c.textMuted),
+                    const SizedBox(width: 8),
+                    Text(
+                      s.proxySystemNotConfigured,
+                      style: TextStyle(fontSize: 12, color: c.textMuted),
+                    ),
+                  ],
+                )
+              else if (_sysProxyDetected) ...[
+                Text(
+                  _sysProxyPac
+                      ? s.proxySystemPacProbeHint
+                      : s.proxySystemDetected,
+                  style: TextStyle(fontSize: 11.5, color: c.textMuted),
+                ),
+                const SizedBox(height: 10),
+                // 代理类型
+                _ReadOnlyProxyField(
+                  label: s.proxyType,
+                  value: _sysProxyType.toUpperCase(),
+                  colors: c,
+                ),
+                const SizedBox(height: 8),
+                // 地址 + 端口（与手动配置表单布局一致）
+                Row(
+                  children: [
+                    SizedBox(
+                      width: 80,
+                      child: Text(
+                        s.proxyHost,
+                        style: TextStyle(fontSize: 12, color: c.textSecondary),
+                      ),
+                    ),
+                    Expanded(
+                      child: _ReadOnlyValueBox(value: _sysProxyHost, colors: c),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      width: 48,
+                      child: Text(
+                        s.proxyPort,
+                        style: TextStyle(fontSize: 12, color: c.textSecondary),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 90,
+                      child: _ReadOnlyValueBox(value: _sysProxyPort, colors: c),
+                    ),
+                  ],
+                ),
+                if (_sysProxyNoList.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _ReadOnlyProxyField(
+                    label: s.proxyNoList,
+                    value: _sysProxyNoList,
+                    colors: c,
+                  ),
+                ],
               ],
             ],
           ],

@@ -22,9 +22,9 @@
  *     tray_iconTemplate@1x.png (18×18, macOS 1x 菜单栏模板图标)
  *
  *   windows/runner/resources/
- *     app_icon.ico (16,32,48,64,256 多分辨率 ICO；Flutter 与 GPUI PC 客户端共用)
- *     tray_win_dark.ico (16,32 — 深色任务栏托盘图标)
- *     tray_win_light.ico (16,32 — 浅色任务栏托盘图标)
+ *     app_icon.ico (16,20,24,28,32,40,48,64,128,256 多分辨率 ICO；Flutter 与 GPUI PC 客户端共用)
+ *     tray_win_dark.ico (16,20,24,28,32,40,48,64 — 深色任务栏托盘图标)
+ *     tray_win_light.ico (16,20,24,28,32,40,48,64 — 浅色任务栏托盘图标)
  *
  *   installer/windows/
  *     wizard_small.bmp (55×55 24-bit BMP — Inno Setup 向导右上角小图，
@@ -328,7 +328,9 @@ async function main() {
   // ──────────────────────────────────────────
   console.log("\n📁 windows/runner/resources/");
   {
-    const icoSizes = [16, 32, 48, 64, 256];
+    // 16/20/24/28/32/40 = 100%…250% 缩放下系统小图标的像素值：任务栏按钮、
+    // 通知区、Alt-Tab 都会直接按这些尺寸取帧，缺档时 Windows 只能拉伸邻帧。
+    const icoSizes = [16, 20, 24, 28, 32, 40, 48, 64, 128, 256];
     const frames: { size: number; data: Buffer }[] = [];
     for (const size of icoSizes) {
       const data = await getCachedPng(size);
@@ -348,7 +350,11 @@ async function main() {
   // ──────────────────────────────────────────
   console.log("\n📁 windows/runner/resources/ (tray icons)");
   {
-    const traySizes = [16, 32];
+    // 通知区图标是 HICON，Shell 不会替我们选帧：它把拿到的位图缩放到任务栏
+    // 的像素尺寸，所以 125%/150%/175% 缩放（= 20/24/28px）下缺档就会被拉伸
+    // 成马赛克。逐 DPI 档各备一帧，由 tray_manager 的 LoadImage 按
+    // GetSystemMetrics(SM_CXSMICON) 取对应尺寸。
+    const traySizes = [16, 20, 24, 28, 32, 40, 48, 64];
     const trayFrames: { size: number; data: Buffer }[] = [];
     for (const size of traySizes) {
       trayFrames.push({ size, data: await getCachedPng(size) });

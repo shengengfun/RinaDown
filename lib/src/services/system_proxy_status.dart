@@ -23,6 +23,8 @@ class SystemProxyStatusService extends ChangeNotifier {
 
   bool _detecting = false;
   bool _detected = false;
+  bool _pac = false;
+  String _autoConfigUrl = '';
   String _summary = '';
 
   /// 检测请求在途
@@ -30,6 +32,14 @@ class SystemProxyStatusService extends ChangeNotifier {
 
   /// 最近一次检测是否发现系统代理
   bool get detected => _detected;
+
+  /// 系统代理是否由 PAC / WPAD 脚本判定。为 true 时 [summary] 只是样本
+  /// 目标的结论——真实出口由脚本按每个下载网址现场求值（引擎侧
+  /// `ProxyConfig::resolve_for`）。
+  bool get pac => _pac;
+
+  /// PAC 脚本地址；WPAD 自动发现时为空串。
+  String get autoConfigUrl => _autoConfigUrl;
 
   /// 检测到的代理摘要,如 'http://127.0.0.1:7890';未检测到为 ''
   String get summary => _summary;
@@ -54,6 +64,8 @@ class SystemProxyStatusService extends ChangeNotifier {
     final msg = pack.message;
     _detecting = false;
     _detected = msg.detected;
+    _pac = msg.pac;
+    _autoConfigUrl = msg.autoConfigUrl;
     _summary = msg.detected && msg.host.isNotEmpty
         ? '${msg.proxyType.isEmpty ? 'http' : msg.proxyType}://${msg.host}'
               '${msg.port.isEmpty ? '' : ':${msg.port}'}'

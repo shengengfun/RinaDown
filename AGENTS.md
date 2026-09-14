@@ -151,6 +151,7 @@ git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z   # 触发发布流水�
 - **RSS 是无人值守链路**：任何「需要用户点一下才能继续」的东西都是 bug。建任务即落全选 + `unattended=1`（否则启动时会弹 N 次文件选择框）；`create_task` 内部自发建任务必须补 `load_and_send_all_tasks()`（`TaskProgress` 不带 `queue_id`）；手动「重新下载」对**任何**状态放行。
 - 引擎学习/遥测类 config 键（`cdn_node_health`、`auto_route_health`、`cdn_pending_reports`、`domain_conn_caps`）**UI 不读写**。
 - **遥测只有两条匿名部署事件**（`app_installed` 一次 + `app_active` 每日，`analytics_enabled` 门控），**绝不**采集下载/任务信息——不要新增遥测点。
+- **系统代理在 PAC / WPAD 下没有「一个地址」**：脚本模式（注册表 `AutoConfigURL` / `AutoDetect`）下 `ProxyEnable` 恒为 0，只读静态项会把系统代理判成「没配」→ System 模式静默直连、Auto 模式连候选都拿不到。因此检测必须走 `proxy_config::detect_system_proxy_for(target)`（WinHTTP 求值，按目标 URL 缓存），**知道目标 URL 的路径一律用 `ProxyConfig::resolve_for(Some(url))` / `downloader::build_client_for_target`**；PAC 与静态项并存时以 PAC 为准（仅求值失败才回退静态）。代理设置变更必须 `proxy_config::clear_system_proxy_cache()`（连带作废 WinHTTP 会话级的 PAC 缓存）。
 - 命名歧义：`tracker_subscription.rs` / `ed2k/server_subscription.rs` 是 BT tracker 列表 / ED2K `server.met` 订阅，与 `rss/` 的 feed 订阅无关；官网 `api/webhooks/github` 是 GitHub 接收器，与 `engine/src/webhook.rs` 的任务事件推送无关。
 
 ---
@@ -169,6 +170,7 @@ git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z   # 触发发布流水�
 | 任一 UI 文案 | 只补 **en + zh 基线对**：App `assets/i18n/{en,zh}.json` + `translations.dart` getter；`web/src/lib/locales/{en,zh}.json`；`website/src/lib/locales/{en,zh-CN}.json`；`rinaDown/utils/locales/{en,zh-CN}.ts`。社区语言（`ja` 等）由 Weblate 维护，**不碰**（运行时键级回退英文） |
 | web 设置项 / 对话框字段归属 | **基准 = 桌面**：同一功能在两端的分类归属与分区排序必须一致（桌面 `settings_page.dart` 分类 ↔ web 分区组件 GeneralSettings/DownloadSettings/ProxySettings…）。双端并行开发时归属分类要写成一份共享契约，禁止两份各自措辞 |
 | 「一键分类目录」的目录名推导 | `lib/src/models/custom_category.dart` 的 `sanitizeCategoryDirName` / `categoryDirUnder` ↔ `web/src/lib/categories.ts` 同名函数（含分隔符归一）；**且内置分类显示名两端逐字一致**（App `assets/i18n` 的 `categoryVideo/...` ↔ web `type.video/...`），否则同一台机器上桌面与 Web 会各建一套目录（`Document` vs `Documents`） |
+| Windows 图标的 DPI 档位集合（`scripts/gen_icons.ts` 的 `app_icon.ico` / `tray_win_{dark,light}.ico` 帧列表） | 三处必须覆盖同一组档位（16/20/24/28/32/40/48/64…）：`packages/tray_manager_local/windows/tray_manager_plugin.cpp` 的 `LoadIconFromPath`（按 `GetSystemMetrics(SM_CXSMICON)` 取帧 + `WM_DPICHANGED`/`WM_DISPLAYCHANGE` 重取）、`lib/src/services/app_icon_service.dart` 的 `_icoSizes`（自定义/闪电图标）。**缺档 = 125%/150%/175% 缩放下 Shell 拉伸邻帧，托盘图标糊成马赛克** |
 
 ---
 
@@ -184,7 +186,7 @@ git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z   # 触发发布流水�
 ## 7. 代码风格与强制规则
 
 **Rust**
-- Edition 2024；Clippy **deny**：`unwrap_used`/`expect_used`/`wildcard_imports`。非测试代码禁 `.unwrap()`/`.expect()`，用 `?` + `thiserror`；禁 `use foo::*`。禁 `unsafe`（除已批准的 `fallocate`/`statvfs`/`GetDiskFreeSpaceExW`）。
+- Edition 2024；Clippy **deny**：`unwrap_used`/`expect_used`/`wildcard_imports`。非测试代码禁 `.unwrap()`/`.expect()`，用 `?` + `thiserror`；禁 `use foo::*`。禁 `unsafe`（除已批准的 `fallocate`/`statvfs`/`GetDiskFreeSpaceExW`、`engine/src/system_proxy_pac.rs` 的 WinHTTP PAC 求值 FFI）。
 - snake_case 函数/变量，PascalCase 类型，SCREAMING_SNAKE_CASE 常量；公开 API `///` + doctest。
 - 异步优先，同步阻塞走 `spawn_blocking`；重试指数退避（MAX=3，base=2s）；task panic 用 `AssertUnwindSafe` + `catch_unwind`。
 - 日志宏：`use crate::logger::log_info; log_info!("[mod] ...")`（Rust 2024 无 `#[macro_use]`，每文件显式 use）。Dart 侧 `logInfo(_tag, msg)` 写**同一文件**，格式 `HH:MM:SS.mmm [Tag] message`。
