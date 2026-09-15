@@ -774,7 +774,10 @@ class _DetailPanelState extends State<DetailPanel> {
         alignment: Alignment.centerLeft,
         widthFactor: progress,
         child: Container(
-          decoration: BoxDecoration(color: c.accent, borderRadius: m.brXs),
+          decoration: BoxDecoration(
+            color: AppColors.progress,
+            borderRadius: m.brXs,
+          ),
         ),
       ),
     );
@@ -799,7 +802,7 @@ class _DetailPanelState extends State<DetailPanel> {
             segments: segs,
             totalBytes: totalBytes,
             emptyColor: c.surface3,
-            palette: const [Color(0xFF2563EB), Color(0xFF2563EB)],
+            palette: const [AppColors.progress, AppColors.progress],
             accent: c.accent,
             monochrome: monochrome,
           ),
@@ -852,7 +855,7 @@ class _DetailPanelState extends State<DetailPanel> {
                     unfilledAlpha: c.bg.computeLuminance() < 0.5
                         ? m.alphaMuted
                         : m.alphaActive,
-                    palette: const [Color(0xFF2563EB), Color(0xFF2563EB)],
+                    palette: const [AppColors.progress, AppColors.progress],
                     accent: c.accent,
                     monochrome: monochrome,
                   ),
@@ -871,7 +874,7 @@ class _DetailPanelState extends State<DetailPanel> {
     AppMetrics m,
     List<SegmentData> segs,
   ) {
-    const palette = [Color(0xFF2563EB), Color(0xFF2563EB)];
+    const palette = [AppColors.progress, AppColors.progress];
     return Wrap(
       spacing: 12,
       runSpacing: 6,
@@ -1139,7 +1142,7 @@ class _DetailPanelState extends State<DetailPanel> {
   }
 
   /// 单任务下载限速行 —— 显示任务级限速（0 = 不限），点击弹窗编辑/清除。
-  /// 正在运行的任务于下次启动/续传生效（引擎语义）。
+  /// 正在运行的任务立即生效（引擎侧分层限速器热改）。
   Widget _buildTaskSpeedLimitRow(AppColors c, DownloadTask task) {
     final s = currentS;
     final bps = widget.controller.taskSpeedLimitBps(task.id);

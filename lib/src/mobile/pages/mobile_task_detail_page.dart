@@ -383,7 +383,7 @@ class _ProgressCard extends StatelessWidget {
       TaskStatus.error => c.statusError,
       TaskStatus.completed => c.statusSuccess,
       TaskStatus.canceled => c.textMuted,
-      _ => c.accent,
+      _ => AppColors.progress,
     };
 
     return Container(

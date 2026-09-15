@@ -489,7 +489,7 @@ class _MobileTaskCard extends StatelessWidget {
                       color: switch (task.status) {
                         TaskStatus.paused => c.statusWarning,
                         TaskStatus.error => c.statusError,
-                        _ => c.accent,
+                        _ => AppColors.progress,
                       },
                     ),
                   ],

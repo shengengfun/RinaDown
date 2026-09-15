@@ -82,6 +82,12 @@ class AppColors {
   static const categoryVideo = Color(0xFFA855F7);
   static const categoryAudio = Color(0xFF06B6D4);
 
+  // ── 进度条（静态常量 — 不随主题强调色变化）──
+  /// 下载进度填充色：恒为蓝色。进度条表达的是「传输了多少」，与品牌/强调色
+  /// 无关——跟随主题色会让进度条在角色应援色主题下变成粉/紫，与「下载中」
+  /// 的通用语义脱节。详情页分片条、分片图例与流量图下行线共用同一色值。
+  static const progress = Color(0xFF2563EB);
+
   // ── Segment Palette ──
   List<Color> get segmentPalette => _tokens.segmentPalette;
 }

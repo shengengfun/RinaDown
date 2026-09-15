@@ -1012,7 +1012,8 @@ pub async fn run(db_dir: PathBuf) -> Result<(), ActorError> {
         SeedingTick,
         /// 任务级做种限制覆盖写入（热读，下一次做种求值 tick 生效）。
         SeedLimits(SetTaskSeedLimits),
-        /// 任务级下载限速写入（B/s，0 = 不限；正在运行的任务下次启动/续传生效）。
+        /// 任务级下载限速写入（B/s，0 = 不限；正在运行的任务立即生效，
+        /// BT 任务需下次 add/re-add）。
         TaskSpeedLimit(SetTaskSpeedLimit),
         /// 文件跟踪扫描回流的「文件已消失」任务批次，需删除其任务记录
         /// （config `file_missing_action == "delete"`）。

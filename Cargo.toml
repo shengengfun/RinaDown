@@ -51,3 +51,20 @@ lto = "fat"
 codegen-units = 1
 # 注意：不设 panic = "abort" —— engine 的 download_manager 依赖 catch_unwind
 # 恢复 task panic（见 AGENTS.md），abort 会让 panic 直接终止进程。
+
+# 本地迭代档：产品行为与 release 一致（同一份代码、同样跑得起来），但编译快
+# 得多——release 是「最小体积」档（fat LTO + 1 CGU + opt-level=z），LTO 阶段
+# 基本单线程，一次发布要链 4 个产物（hub.dll + 三个 exe）≈ 11 分钟。
+#
+# 用法（想再快就配独立 target 目录，避免和 release 缓存互踩）：
+#   cargo build --profile fast -p rinadown_engine
+#   $env:CARGO_TARGET_DIR='target/fast'
+#   $env:RUSTFLAGS='-C linker=rust-lld'   # 可选：MSVC link.exe → LLVM lld
+#
+# **发布产物一律走 --release**，不要用本档（体积与执行速度都不是发布档）。
+[profile.fast]
+inherits = "release"
+opt-level = 2
+lto = "thin"
+codegen-units = 16
+strip = "debuginfo"

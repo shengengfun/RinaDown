@@ -1826,6 +1826,12 @@ class _TaskGridCardState extends State<_TaskGridCard> {
       c,
       fileMissing: task.fileMissing,
     );
+    // 进度填充恒为固定蓝；`color` 仍供状态图标/文字使用。
+    final barColor = taskProgressColor(
+      task.status,
+      c,
+      fileMissing: task.fileMissing,
+    );
     final selected =
         widget.isSelected || (widget.isManageMode && widget.isChecked);
 
@@ -1929,7 +1935,7 @@ class _TaskGridCardState extends State<_TaskGridCard> {
                         : FractionallySizedBox(
                             alignment: Alignment.centerLeft,
                             widthFactor: task.progress.clamp(0.0, 1.0),
-                            child: ColoredBox(color: color),
+                            child: ColoredBox(color: barColor),
                           ),
                   ),
                   // 尾行弹性底对齐：卡片受行装箱固定高度约束（_gridCardHeight），

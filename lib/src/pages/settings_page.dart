@@ -31,6 +31,7 @@ import '../models/webhook_endpoint.dart';
 import '../models/webhook_provider.dart';
 import '../services/app_icon_service.dart';
 import '../services/clipboard_platforms.dart';
+import '../services/completion_sound.dart';
 import '../services/cloud/cloud_auth_service.dart';
 import '../services/cloud/cloud_client.dart';
 import '../services/cloud/config_sync_service.dart';
@@ -43,6 +44,7 @@ import '../services/link/local_pairing_service.dart';
 import '../services/local_interfaces.dart';
 import '../services/kv_store.dart';
 import '../services/log_service.dart';
+import '../services/open_folder.dart';
 import '../services/recent_dirs.dart';
 import '../services/update_service.dart';
 import '../theme/app_colors.dart';
@@ -278,6 +280,13 @@ List<SettingsSearchItem> get settingsSearchItems {
       description: s.notifyOnCompleteDesc,
       keywords: s.searchKeywordsNotifyOnComplete,
       icon: LucideIcons.bellRing,
+    ),
+    SettingsSearchItem(
+      category: SettingsCategory.notify,
+      label: s.notifySound,
+      description: s.notifySoundDesc,
+      keywords: s.searchKeywordsNotifySound,
+      icon: LucideIcons.music,
     ),
     SettingsSearchItem(
       category: SettingsCategory.notify,
@@ -7050,6 +7059,15 @@ class _NotifyContentState extends State<_NotifyContent> {
                     onChanged: (v) => sp.setNotifyOnComplete(v),
                   ),
                 ),
+                // 完成音效：只在完成通知开着时有意义（音效与通知同开关联动，
+                // 见 home_page 的 _handleTaskCompleted）。
+                if (sp.notifyOnComplete)
+                  _SettingRow(
+                    label: s.notifySound,
+                    description: s.notifySoundDesc,
+                    vertical: true,
+                    child: _CompletionSoundPicker(settingsProvider: sp),
+                  ),
               ],
             ),
             const SizedBox(height: 20),
@@ -7171,6 +7189,170 @@ class _NotifyContentState extends State<_NotifyContent> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 下载完成音效选择器：内置合成音 + 用户音效目录里扫描到的文件。
+///
+/// 音效目录是 `<数据目录>/sounds/`——用户把 wav/mp3/ogg 丢进去就出现在
+/// 下拉里，不必经过任何导入流程。目录不存在时会把内置音效（asset）释放
+/// 进去，作为「开箱有声」的起点。
+class _CompletionSoundPicker extends StatefulWidget {
+  final SettingsProvider settingsProvider;
+
+  const _CompletionSoundPicker({required this.settingsProvider});
+
+  @override
+  State<_CompletionSoundPicker> createState() => _CompletionSoundPickerState();
+}
+
+class _CompletionSoundPickerState extends State<_CompletionSoundPicker> {
+  List<String> _names = const [];
+  bool _previewing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _names = CompletionSound.instance.listSoundNames();
+    // 首帧之后再做异步 IO（释放内置音效 → 重新扫描），避免 build 里 await。
+    unawaited(
+      CompletionSound.instance.ensureReady().then((_) {
+        if (mounted) {
+          setState(() => _names = CompletionSound.instance.listSoundNames());
+        }
+      }),
+    );
+  }
+
+  Future<void> _rescan() async {
+    await CompletionSound.instance.ensureReady();
+    if (!mounted) return;
+    setState(() => _names = CompletionSound.instance.listSoundNames());
+  }
+
+  Future<void> _openFolder() async {
+    final dir = CompletionSound.instance.soundsDir;
+    try {
+      if (!dir.existsSync()) await dir.create(recursive: true);
+    } catch (e) {
+      logError('Settings', 'create sounds dir failed: $e');
+    }
+    await openFolder(dir.path);
+  }
+
+  Future<void> _preview(String soundId) async {
+    if (_previewing) return;
+    setState(() => _previewing = true);
+    try {
+      await CompletionSound.instance.play(soundId: soundId);
+    } finally {
+      if (mounted) setState(() => _previewing = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = LocaleScope.of(context);
+    final c = AppColors.of(context);
+    final m = AppMetrics.of(context);
+    final current = widget.settingsProvider.notifySound;
+    // 选中的音效被外部删掉时回落到「内置」展示（不写回设置）：播放侧本来
+    // 就会回退内置音，展示层保持一致即可，避免用户看到一个不存在的选项。
+    final value = _names.contains(current) ? current : CompletionSound.builtinId;
+    final options = <String>[CompletionSound.builtinId, ..._names];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Wrap 而非 Row：设置页在宽屏下会切成双列（每列可用宽度 ≈ 416px），
+        // 「下拉 + 试听 + 打开目录 + 重新扫描」四个控件横排会溢出——换行排布
+        // 让窄列也完整可点。
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: 220,
+              child: ShadSelect<String>(
+                key: ValueKey('sound:$value:${_names.length}'),
+                initialValue: value,
+                options: [
+                  for (final id in options)
+                    ShadOption(
+                      value: id,
+                      child: Text(
+                        id.isEmpty ? s.notifySoundBuiltin : id,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                ],
+                selectedOptionBuilder: (context, v) => Text(
+                  v.isEmpty ? s.notifySoundBuiltin : v,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                onChanged: (v) {
+                  if (v != null) widget.settingsProvider.setNotifySound(v);
+                },
+              ),
+            ),
+            ShadButton.outline(
+              size: ShadButtonSize.sm,
+              enabled: !_previewing,
+              onPressed: () => _preview(value),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(LucideIcons.play, size: 13),
+                  const SizedBox(width: 4),
+                  Text(s.notifySoundPreview),
+                ],
+              ),
+            ),
+            ShadButton.outline(
+              size: ShadButtonSize.sm,
+              onPressed: _openFolder,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(LucideIcons.folderOpen, size: 13),
+                  const SizedBox(width: 4),
+                  Text(s.notifySoundFolder),
+                ],
+              ),
+            ),
+            ShadButton.ghost(
+              size: ShadButtonSize.sm,
+              onPressed: _rescan,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(LucideIcons.refreshCw, size: 13),
+                  const SizedBox(width: 4),
+                  Text(s.notifySoundRefresh),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: c.surface2,
+            borderRadius: m.brCard,
+            border: Border.all(color: c.border, width: 1),
+          ),
+          child: Text(
+            s.notifySoundFolderHint(CompletionSound.instance.soundsDir.path),
+            style: TextStyle(fontSize: 10.5, height: 1.5, color: c.textMuted),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -10365,25 +10547,25 @@ class _ColorSchemeSelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // ── 色点行：13 角色色 + 1 自定义 ──
+        // ── 色点行：13 角色色 + 1 自定义（每个胶囊都直接带配色名）──
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             for (final scheme in _presetSchemes)
-              _ColorDot(
+              _ColorChip(
                 color: scheme.previewColor,
                 label: scheme.label,
                 selected: current == scheme,
                 colors: c,
                 onTap: () => provider.setColorScheme(scheme),
               ),
-            _ColorDot(
+            _ColorChip(
               color: provider.customColor,
               label: AppColorScheme.custom.label,
               selected: isCustom,
               colors: c,
-              icon: isCustom ? LucideIcons.check : LucideIcons.palette,
+              icon: LucideIcons.palette,
               onTap: () => provider.setColorScheme(AppColorScheme.custom),
             ),
           ],
@@ -10408,7 +10590,7 @@ class _ColorSchemeSelector extends StatelessWidget {
   }
 }
 
-class _ColorDot extends StatefulWidget {
+class _ColorChip extends StatefulWidget {
   final Color color;
   final String label;
   final bool selected;
@@ -10416,7 +10598,7 @@ class _ColorDot extends StatefulWidget {
   final IconData? icon;
   final VoidCallback onTap;
 
-  const _ColorDot({
+  const _ColorChip({
     required this.color,
     required this.label,
     required this.selected,
@@ -10426,17 +10608,22 @@ class _ColorDot extends StatefulWidget {
   });
 
   @override
-  State<_ColorDot> createState() => _ColorDotState();
+  State<_ColorChip> createState() => _ColorChipState();
 }
 
-class _ColorDotState extends State<_ColorDot> {
+/// 单个配色胶囊：左侧色点 + 配色名。
+///
+/// 旧实现只有一个 28px 色点，配色名藏在悬浮 tooltip 里——用户必须逐个
+/// 悬停才能知道哪个是「钟岚珠」，选中哪一个也没有文字反馈。改为胶囊后
+/// 名称常驻，选中态用边框 + 对勾 + 加粗三重表达。
+class _ColorChipState extends State<_ColorChip> {
   bool _isHovered = false;
 
   @override
   Widget build(BuildContext context) {
     final m = AppMetrics.of(context);
+    final c = widget.colors;
     final selected = widget.selected;
-    final showIcon = selected || widget.icon != null;
     return ShadTooltip(
       builder: (_) => Text(widget.label),
       child: MouseRegion(
@@ -10447,42 +10634,59 @@ class _ColorDotState extends State<_ColorDot> {
           onTap: widget.onTap,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            width: 28,
-            height: 28,
+            padding: const EdgeInsets.fromLTRB(6, 5, 10, 5),
             decoration: BoxDecoration(
-              color: widget.color,
-              shape: BoxShape.circle,
+              color: selected
+                  ? m.subtle(c.accent)
+                  : _isHovered
+                  ? c.hoverBg
+                  : c.surface1,
+              borderRadius: m.brCard,
               border: Border.all(
-                color: selected
-                    ? widget.colors.textPrimary
-                    : _isHovered
-                    ? m.borderMedium(widget.colors.textSecondary)
-                    : widget.color,
-                width: selected
-                    ? 2.5
-                    : _isHovered
-                    ? 1.5
-                    : 0,
+                color: selected ? c.accent : c.border,
+                width: selected ? 1.5 : 1,
               ),
-              boxShadow: _isHovered || selected
-                  ? [
-                      BoxShadow(
-                        color: m.shadowStrong(widget.color),
-                        blurRadius: 6,
-                        spreadRadius: 0,
-                      ),
-                    ]
-                  : null,
             ),
-            child: showIcon
-                ? Icon(
-                    selected
-                        ? LucideIcons.check
-                        : (widget.icon ?? LucideIcons.check),
-                    size: selected ? 13 : 12,
-                    color: Colors.white,
-                  )
-                : null,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 色点用主题色本身；选中时叠一个对勾做第二重反馈。
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: widget.color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: selected
+                          ? c.textPrimary
+                          : m.borderMedium(c.border),
+                      width: selected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: selected
+                      ? const Icon(
+                          LucideIcons.check,
+                          size: 10,
+                          color: Color(0xFFFFFFFF),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    color: selected ? c.accent : c.textSecondary,
+                  ),
+                ),
+                if (!selected && widget.icon != null) ...[
+                  const SizedBox(width: 5),
+                  Icon(widget.icon, size: 11, color: c.textMuted),
+                ],
+              ],
+            ),
           ),
         ),
       ),

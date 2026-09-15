@@ -139,6 +139,7 @@ git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z   # 触发发布流水�
 - `download_actor.rs` 主 `tokio::select!` **已占满 tokio 64 分支硬上限**，再加一条即编译错误。新增任何 Dart 信号 / 定时节拍 / 回流通道**都不许往主循环加分支**——并进既有 `AuxSignal` 合并泵（两个后台 spawn 把消息合流进单条 `aux_tx`，主循环只有一条 `aux_rx.recv()`）。
 - rquickjs（`engine/Cargo.toml`）：禁止叠加 `rust-alloc`/`allocator`（会让 `set_memory_limit` 静默失效）；必带 `parallel`（`AsyncRuntime`/`AsyncContext` 的 Send/Sync 依赖它）。
 - `profile.release` **不**设 `panic="abort"`——`download_manager` 靠 `catch_unwind` 恢复 task panic。
+- **本地迭代一律 `--profile fast`，不要拿 `--release` 试手感**：release 是「最小体积」档（`lto="fat"` + `codegen-units=1` + `opt-level="z"`），LTO 阶段基本单线程，且一次发布要链 **4 个独立产物**（`hub.dll` + 三个 exe），动一处 `native/engine` 就四处全废 ≈ 11 分钟。`fast` 档（`thin` LTO / 16 CGU / opt 2）产品行为一致、只想查类型时用 `cargo check -p <crate>`；想再快配独立缓存与 LLD：`CARGO_TARGET_DIR=target/fast` + `RUSTFLAGS='-C linker=rust-lld'`（别和 release 互踩缓存）。**发布产物一律 `--release`**，`fast` 档的体积/执行速度都不是发布档。
 - **`rinadown_server` 的 Web UI 是编译期内嵌的**：`native/server/build.rs` 把 `RINADOWN_EMBED_WEBROOT`（缺省 `web/dist`）整棵目录递归全量 `include_bytes!` 进二进制（不按扩展名筛选，新增文件/新建子目录下次编译自动进包）。改了前端**必须先 `cd web && bun run build` 再重编服务器**才能看到；产物是单二进制，不再有同级 `web/` 目录，`RINADOWN_WEBROOT` 降级为可选的磁盘覆盖。构建时目录缺失只 warning + 运行期 503 提示页，不会让编译失败。
 
 **运行期不变式**

@@ -4908,6 +4908,12 @@ async fn do_segment(
                         let write_slice = &bytes[..write_len];
 
                         // --- Speed limiter: write in sub-chunks as tokens allow ---
+                        //
+                        // 记账与写入同步逐子块推进（而不是整块写完再一次性 +=）：
+                        // 限速下单个 chunk 要跨多轮令牌才写得完，整块计数会让
+                        // `total_downloaded` 呈阶梯状——UI 按 200ms 增量算瞬时速度时
+                        // 会把限速值显示成 2× 以上（实测 1s 窗口峰值 2.68×，而限速器
+                        // 授予的同一窗口只有 1.06×）。逐子块后上报口径 == 授予口径。
                         let mut offset = 0usize;
                         while offset < write_len {
                             let remaining = (write_len - offset) as u64;
@@ -4915,15 +4921,12 @@ async fn do_segment(
                             let end = offset + allowed as usize;
                             file.write_all(&write_slice[offset..end]).await?;
                             offset = end;
+
+                            let delta = allowed as i64;
+                            seg_downloaded += delta;
+                            total_downloaded.fetch_add(delta, Ordering::Relaxed);
+                            update_seg_state(seg_states, seg_idx, seg_downloaded);
                         }
-
-                        let len = write_len as i64;
-                        seg_downloaded += len;
-                        total_downloaded.fetch_add(len, Ordering::Relaxed);
-
-                        // Only `downloaded_bytes` is written — `end_byte` is
-                        // exclusively owned by the coordinator.
-                        update_seg_state(seg_states, seg_idx, seg_downloaded);
 
                         // 边界截断：仅 flush 页缓存，DB 满段写统一走循环后完成路径
                         // （覆盖式 fdatasync → update_segment_progress_bounded），

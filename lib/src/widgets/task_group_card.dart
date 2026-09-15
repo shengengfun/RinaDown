@@ -199,7 +199,7 @@ Color _sparkBarColor(TaskStatus status, AppColors c) => switch (status) {
   TaskStatus.pending => c.surface3,
   TaskStatus.downloading ||
   TaskStatus.preparing ||
-  TaskStatus.resuming => c.accent,
+  TaskStatus.resuming => AppColors.progress,
   TaskStatus.canceled => c.textMuted,
 };
 
@@ -364,7 +364,7 @@ Widget buildGroupSumBar(
       child: ColoredBox(
         color: group.statusBucket == TaskStatus.completed
             ? AppColors.green
-            : c.accent,
+            : AppColors.progress,
       ),
     ),
   );

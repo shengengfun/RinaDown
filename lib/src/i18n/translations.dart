@@ -891,6 +891,14 @@ class S {
   String get torrentAssocDialogDesc => _r('torrentAssocDialogDesc');
   String get notifyOnComplete => _r('notifyOnComplete');
   String get notifyOnCompleteDesc => _r('notifyOnCompleteDesc');
+  String get notifySound => _r('notifySound');
+  String get notifySoundDesc => _r('notifySoundDesc');
+  String get notifySoundBuiltin => _r('notifySoundBuiltin');
+  String get notifySoundPreview => _r('notifySoundPreview');
+  String get notifySoundFolder => _r('notifySoundFolder');
+  String get notifySoundRefresh => _r('notifySoundRefresh');
+  String notifySoundFolderHint(String path) =>
+      _r('notifySoundFolderHint', {'path': path});
   String get silentDownload => _r('silentDownload');
   String get silentDownloadDesc => _r('silentDownloadDesc');
   String get silentSkipSelection => _r('silentSkipSelection');
@@ -1665,6 +1673,9 @@ class S {
   List<String> get searchKeywordsNotifyOnComplete =>
       _r('searchKeywordsNotifyOnComplete').split(',')
         ..addAll(['notification', 'complete', 'toast']);
+  List<String> get searchKeywordsNotifySound =>
+      _r('searchKeywordsNotifySound').split(',')
+        ..addAll(['sound', 'audio', 'chime']);
   List<String> get searchKeywordsSilentDownload =>
       _r('searchKeywordsSilentDownload').split(',')
         ..addAll(['silent', 'confirm', 'dialog']);

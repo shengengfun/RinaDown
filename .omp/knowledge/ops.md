@@ -25,6 +25,9 @@ Dart 与 Rust 两端写**同一目录同一文件**，统一格式 `HH:MM:SS.mmm
 
 构建期 dart-define：`APP_VERSION`、`ANALYTICS_APP_KEY`、`FLUXCLOUD_BASE_URL`、`STATS_*`。
 
+**发布说明写法（手动发版同样适用）**：结构与 CI 产物一致——`## [x.y.z] - YYYY-MM-DD` + git-cliff 分类标题（`### 🐛 Bug Fixes` / `🚀 Features` …）+ 中英双语块，用 `<!-- rinadown:lang:zh -->` / `<!-- rinadown:lang:en -->` 分隔。两份正文都必须写（消费方按 locale 取块：App 更新弹窗 `pickLocaleBody`、官网 `ChangelogSection.tsx`；缺 en 块时英文用户会看到中文）。
+正文只写**用户可见的结果**：一句概述 + 分类 bullet，禁止把排查过程、根因推理、实测对照表、日志片段、内部权衡写进发布说明（那些属于 commit message / `.omp/knowledge`）。结尾可留 `**完整变更**：compare 链接`。
+
 ---
 
 ## 设计文档实现状态（`docs/`）

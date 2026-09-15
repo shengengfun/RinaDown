@@ -161,7 +161,9 @@ pub struct SetTaskSeedLimits {
 }
 
 /// 设置单个任务的下载限速（Dart → Rust）。B/s；0 = 不限（跟随队列/全局）。
-/// 正在运行的任务于下次启动/续传生效（与任务级做种上传限速同语义）。
+/// 正在运行的任务**立即生效**（分层限速器热改本层值；改成 0 = 退回队列/
+/// 全局额度）。BT 任务例外：出口由 librqbit 会话级限速管控，任务级数值在
+/// 下次 add/re-add 时烘焙。
 #[derive(Deserialize, DartSignal)]
 pub struct SetTaskSpeedLimit {
     pub task_id: String,

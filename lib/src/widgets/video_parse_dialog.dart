@@ -156,7 +156,9 @@ class _VideoParseDialogContentState extends State<_VideoParseDialogContent> {
     final s = LocaleScope.of(context);
     final options = _result?.variants ?? const <ResolveVariantOption>[];
     return ShadDialog(
-      constraints: const BoxConstraints(maxWidth: 680),
+      // 表单一共只有「链接 / 目录 / 画质列表」三块，680 的默认宽度会让
+      // 链接输入框明显过长；收到 520 后既能容纳长 URL，也不再空洞。
+      constraints: const BoxConstraints(maxWidth: 520),
       title: Row(
         children: [
           Icon(LucideIcons.video, color: c.accent, size: 18),

@@ -4003,6 +4003,12 @@ async fn download_single_once(
                 match chunk {
                     Some(Ok(bytes)) => {
                         // --- Speed limiter: write in sub-chunks as tokens allow ---
+                        //
+                        // `downloaded` 逐子块累加（而不是整块写完再 += chunk_len）：
+                        // 限速下单个 chunk 可能要等好几轮令牌才写完（1 个 64KB chunk
+                        // 在 512KB/s 下 ≈ 0.13s），整块计数会让进度呈「阶梯」——
+                        // UI 按 200ms 增量算瞬时速度，阶梯会把限速值显示成 2× 以上。
+                        // 逐子块计数后，上报口径与限速器授予严格同步。
                         let mut offset = 0usize;
                         let chunk_len = bytes.len();
                         while offset < chunk_len {
@@ -4010,10 +4016,9 @@ async fn download_single_once(
                             let allowed = speed_limiter.consume(remaining).await;
                             let end = offset + allowed as usize;
                             file.write_all(&bytes[offset..end]).await?;
+                            downloaded += allowed as i64;
                             offset = end;
                         }
-                        let len = chunk_len as i64;
-                        downloaded += len;
 
                         // Progress report to Dart — every 200ms for smooth UI.
                         if last_report.elapsed().as_millis() >= 200 {

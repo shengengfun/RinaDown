@@ -1526,6 +1526,16 @@ pub struct DownloadManager {
     /// Per-queue speed limiters (queue_id → SpeedLimiter).
     /// Created on demand for queues that have speed_limit_kbps > 0.
     queue_limiters: HashMap<String, SpeedLimiter>,
+    /// 运行中任务的分层限速器（task_id → SpeedLimiter）。
+    ///
+    /// 任务启动时**总是**建一个分层桶：本层承载任务级 `speed_limit_bps`
+    /// （初始可为 0），为 0 时额度整体委托给队列/全局桶。这样用户在详情页
+    /// 改单个任务限速时，只需 `set_limit` 改本层，**正在跑的任务立即换挡**，
+    /// 不必（像旧实现那样）等下次启动/续传。
+    ///
+    /// 条目在 `effective_limiter_for` 里按 `active_tasks` 惰性清理；BT 任务
+    /// 不走这个桶（BT 走 librqbit 会话级限速）。
+    task_limiters: HashMap<String, SpeedLimiter>,
     /// 定时调度的边沿触发账本：(queue_id, 是否启动边沿) → 最近处理日期。
     /// 保证每个定时边沿每天至多触发一次（手动启停后同一天不再重复触发）；
     /// 内存级，重启清零——重启后当天已越过的边沿会补触发一次（见
@@ -1712,6 +1722,7 @@ impl DownloadManager {
             cdn_max_nodes: 0, // 0 = 自动档
             queues: HashMap::new(),
             queue_limiters: HashMap::new(),
+            task_limiters: HashMap::new(),
             schedule_fired: HashMap::new(),
             startup_reset_done: false,
             suppress_bulk_broadcasts: false,
@@ -3574,9 +3585,17 @@ impl DownloadManager {
     /// 选择任务启动/续传所用的下载限速器。
     ///
     /// 优先级：任务级 `speed_limit_bps` > 0（读取 DB）> 队列级 > 全局。
-    /// 任务级限速在任务本次启动期固定（后续修改于下次启动/续传生效，
-    /// 与任务级做种上传限速同语义）。
+    ///
+    /// 返回的**始终是本任务专属的分层限速器**：本层 = 任务级限速（可为 0），
+    /// 本层为 0 时额度委托给队列/全局桶（见 `SpeedLimiter::new_with_fallback`）。
+    /// 任务级数值因此可以在运行中热改（[`Self::set_task_speed_limit`]）——
+    /// 旧实现给任务级限速新建一个独立桶，改值只能等下次启动才生效。
     async fn effective_limiter_for(&mut self, task_id: &str, queue_id: &str) -> SpeedLimiter {
+        // 惰性清理：已完成/暂停的任务不再持有桶（active_tasks 是权威存活集，
+        // 两个调用点都在 insert(active_tasks) 之后，故不会误删本次要建的条目）。
+        let active = &self.active_tasks;
+        self.task_limiters.retain(|id, _| active.contains_key(id));
+
         let db = self.db.clone();
         let task_speed = db
             .load_task_by_id(task_id)
@@ -3585,22 +3604,37 @@ impl DownloadManager {
             .flatten()
             .map(|t| t.speed_limit_bps.max(0) as u64)
             .unwrap_or(0);
-        if task_speed > 0 {
-            let l = SpeedLimiter::new(task_speed);
-            l.spawn_refill_task();
-            l
-        } else {
-            self.queue_limiter_for(queue_id)
-        }
+        let base = self.queue_limiter_for(queue_id);
+        let limiter = SpeedLimiter::new_with_fallback(task_speed, Some(base));
+        self.task_limiters
+            .insert(task_id.to_string(), limiter.clone());
+        limiter
     }
 
-    /// 设置任务级下载限速（B/s，0 = 不限）。持久化到 DB；正在运行的任务在
-    /// 下次启动/续传生效。
+    /// 设置任务级下载限速（B/s，0 = 不限）。持久化到 DB，并**立即热生效**于
+    /// 正在运行的任务（旧实现在下次启动/续传才生效）。
+    ///
+    /// BT 任务例外：BT 出口由 librqbit 会话级限速统一管控，任务级数值只在
+    /// 下次 add/re-add 时烘焙（与任务级做种上传限速同语义）。
     pub async fn set_task_speed_limit(&mut self, task_id: &str, bps: u64) {
         if let Err(e) = self.db.set_task_speed_limit(task_id, bps as i64).await {
             crate::log_error!(
                 "[manager] set_task_speed_limit persist failed for {}: {e:#}",
                 task_id
+            );
+        }
+        // BT 出口走 librqbit 会话级限速，任务级桶对它不生效——热改只会
+        // 打日志骗人，故跳过（BT 的任务级限速在 add/re-add 时烘焙）。
+        let is_bt = self
+            .active_tasks
+            .get(task_id)
+            .is_some_and(|entry| entry.is_bt);
+        if !is_bt && let Some(limiter) = self.task_limiters.get(task_id) {
+            limiter.set_limit(bps);
+            log_info!(
+                "[manager] task {} speed limit hot-applied: {} B/s",
+                task_id,
+                bps
             );
         }
     }

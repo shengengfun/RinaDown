@@ -84,6 +84,7 @@ flutter:
   assets:
     - assets/logo/
     - assets/i18n/
+    - assets/sounds/
     - userscript/rinadown.user.js
 
   # An image asset can refer to one or more resolution-specific "variants", see

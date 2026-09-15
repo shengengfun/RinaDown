@@ -223,6 +223,7 @@ const KNOWN_ITEMS: &[&str] = &[
     "settings.json",
     "logs",
     "icons",
+    "sounds",
     "bt_session",
     "plugins",
     "plugins-work",

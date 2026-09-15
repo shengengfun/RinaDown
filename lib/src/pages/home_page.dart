@@ -473,9 +473,12 @@ class _HomePageState extends State<HomePage> {
     // 通知服务内部做 800ms 防抖合批（多文件 → "N 个文件已下载"），
     // 此处无需再做汇总聚合。
     NotificationService.instance.showDownloadComplete(task);
-    // 下载完成提示音（Windows；与「完成通知」同开关联动）
-    if (Platform.isWindows && _settingsProvider.notifyOnComplete) {
-      unawaited(CompletionSound.instance.play());
+    // 下载完成提示音（Windows；与「完成通知」同开关联动，音效可选内置合成
+    // 音或 `<数据目录>/sounds/` 里用户自备的音频）
+    if (_settingsProvider.notifyOnComplete) {
+      unawaited(
+        CompletionSound.instance.play(soundId: _settingsProvider.notifySound),
+      );
     }
     // CDN 遥测事件驱动上报：任务完成 → 10s 去抖后上传本轮样本。
     CdnReportService.instance.notifyTaskCompleted();

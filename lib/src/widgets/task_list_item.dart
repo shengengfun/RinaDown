@@ -481,7 +481,12 @@ class _CompactProgressEdge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = AppColors.of(context);
-    final color = taskStatusColor(task.status, c, fileMissing: task.fileMissing);
+    // 紧凑视图的左侧进度条同样固定蓝，与列表行/网格卡一致。
+    final color = taskProgressColor(
+      task.status,
+      c,
+      fileMissing: task.fileMissing,
+    );
     return ColoredBox(
       color: c.surface3,
       child: task.isIndeterminate

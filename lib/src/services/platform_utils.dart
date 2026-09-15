@@ -40,6 +40,7 @@ const _knownItems = [
   'settings.json',
   'logs',
   'icons',
+  'sounds',
   'bt_session',
   'plugins',
   'plugins-work',

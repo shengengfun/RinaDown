@@ -189,6 +189,28 @@ Color taskStatusColor(TaskStatus status, AppColors c, {bool fileMissing = false}
   }
 }
 
+/// 进度条填充色 —— 进行中恒用固定蓝（[AppColors.progress]），不随主题强调色
+/// 变化；其余状态沿用 [taskStatusColor] 的语义色。列表行 / 网格卡 / 紧凑边条
+/// 三处进度填充统一走这里，避免「同一个进度条三种颜色」。
+Color taskProgressColor(
+  TaskStatus status,
+  AppColors c, {
+  bool fileMissing = false,
+}) {
+  switch (status) {
+    case TaskStatus.downloading:
+    case TaskStatus.pending:
+    case TaskStatus.preparing:
+    case TaskStatus.resuming:
+      return AppColors.progress;
+    case TaskStatus.completed:
+    case TaskStatus.paused:
+    case TaskStatus.error:
+    case TaskStatus.canceled:
+      return taskStatusColor(status, c, fileMissing: fileMissing);
+  }
+}
+
 /// 状态图标（design-proto-spec §5 `ST[st].icon`：dl=down,pend=clock,
 /// pause=pause,err=alert,done=check；preparing/resuming 视觉上归入下载中）。
 IconData taskStatusIcon(TaskStatus status) => switch (status) {
@@ -257,7 +279,8 @@ final Map<TaskColumnId, TaskColumnDef> kTaskColumns = {
     label: (s) => s.colProgress,
     cellBuilder: (context, task) {
       final c = AppColors.of(context);
-      final color = taskStatusColor(
+      // 进度条固定蓝（不随主题色），状态列/图标仍用语义强调色。
+      final color = taskProgressColor(
         task.status,
         c,
         fileMissing: task.fileMissing,

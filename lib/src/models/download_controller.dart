@@ -1710,7 +1710,9 @@ class DownloadController extends ChangeNotifier {
   int taskSpeedLimitBps(String taskId) => _taskSpeedLimitBps[taskId] ?? 0;
 
   /// 设置单个任务的下载限速（B/s；0 = 不限，跟随队列/全局）。
-  /// 正在运行的任务于下次启动/续传生效（引擎语义与做种上传限速一致）。
+  /// 正在运行的任务**立即生效**（引擎侧为本任务持有的分层限速器，热改本层
+  /// 数值；0 = 退回队列/全局限速）。BT 任务例外：出口由 librqbit 会话级限速
+  /// 管控，任务级数值在下次 add/re-add 时烘焙。
   void setTaskSpeedLimit(String taskId, int bps) {
     final v = bps < 0 ? 0 : bps;
     logInfo(_tag, 'setTaskSpeedLimit: task=$taskId, bps=$v');

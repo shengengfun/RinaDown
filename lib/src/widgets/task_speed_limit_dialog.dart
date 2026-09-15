@@ -12,7 +12,7 @@ import '../models/settings_provider.dart';
 import '../models/speed_unit.dart';
 import '../theme/app_colors.dart';
 
-/// 弹出单任务下载限速设置。正在运行的任务于下次启动/续传生效。
+/// 弹出单任务下载限速设置。正在运行的任务立即生效（引擎侧分层限速器）。
 Future<void> showTaskSpeedLimitDialog(
   BuildContext context,
   DownloadController controller,
@@ -32,6 +32,9 @@ Future<void> showTaskSpeedLimitDialog(
     context: context,
     barrierColor: c.dialogBarrier,
     builder: (dialogContext) => ShadDialog(
+      // 弹窗只承载「一个数字 + 单位」，宽度收紧到刚好容纳一行，
+      // 避免输入框横跨整个对话框（原实现用 Expanded 撑满）。
+      constraints: const BoxConstraints(maxWidth: 360),
       title: Text(s.speedLimit),
       actions: [
         ShadButton.outline(
@@ -54,7 +57,8 @@ Future<void> showTaskSpeedLimitDialog(
         padding: const EdgeInsets.only(top: 8),
         child: Row(
           children: [
-            Expanded(
+            SizedBox(
+              width: 132,
               child: ShadInput(
                 controller: ctrl,
                 keyboardType: TextInputType.number,

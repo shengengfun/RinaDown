@@ -43,6 +43,10 @@ class SettingsProvider extends ChangeNotifier {
   bool _autoCheckUpdate = true; // 默认启动时自动检查更新
   String _updateChannel = 'stable'; // 更新渠道：stable 稳定版 / frontier 预览版（含预发布）
   bool _notifyOnComplete = true; // 默认任务完成时弹出通知
+  /// 下载完成提示音 id（= `<数据目录>/sounds/` 下文件名去掉扩展名）；
+  /// 空字符串 = 内置合成「叮咚」。**设备本地**概念：音效文件在各自设备上，
+  /// 故不进云同步目录（sync_catalog）。
+  String _notifySound = '';
   String _customBackgroundPath = ''; // 外观：自定义背景图片路径（空 = 无）
   bool _silentDownloadEnabled = false; // 免打扰下载：外部请求不弹确认框直接下载
   bool _silentSkipSelection = false; // 免打扰子开关：跳过 BT/HLS/变体二次选择弹窗
@@ -292,6 +296,7 @@ class SettingsProvider extends ChangeNotifier {
   bool get autoCheckUpdate => _autoCheckUpdate;
   String get updateChannel => _updateChannel;
   bool get notifyOnComplete => _notifyOnComplete;
+  String get notifySound => _notifySound;
   String get customBackgroundPath => _customBackgroundPath;
   bool get silentDownloadEnabled => _silentDownloadEnabled;
   bool get silentSkipSelection => _silentSkipSelection;
@@ -760,6 +765,15 @@ class SettingsProvider extends ChangeNotifier {
     _notifyOnComplete = value;
     notifyListeners();
     _saveToRust('notify_on_complete', value.toString());
+  }
+
+  /// 设置下载完成提示音（'' = 内置合成音）。音效文件在设备本地目录，
+  /// 跨设备同步过来也没用，故只落本机 config。
+  void setNotifySound(String value) {
+    if (_notifySound == value) return;
+    _notifySound = value;
+    notifyListeners();
+    _saveToRust('notify_sound', value);
   }
 
   /// 覆盖整张端点表并落库。引擎侧 `apply_config_key` 命中
@@ -2063,6 +2077,8 @@ class SettingsProvider extends ChangeNotifier {
           _customBackgroundPath = entry.value;
         case 'notify_on_complete':
           _notifyOnComplete = entry.value != 'false'; // 默认 true
+        case 'notify_sound':
+          _notifySound = entry.value;
         case 'webhook.endpoints':
           _webhookEndpoints = WebhookEndpoint.decodeList(entry.value);
         case 'silent_download_enabled':
