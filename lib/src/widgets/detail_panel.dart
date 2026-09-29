@@ -1699,78 +1699,12 @@ class _DetailPanelState extends State<DetailPanel> {
 
   Widget _buildLogTab(AppColors c, DownloadTask task) {
     final s = currentS;
-    // 时间线：拆分事件与多 CDN 事件按接收时间合并（同刻保持到达顺序）。
-    final timeline = <(DateTime, int, Widget)>[];
-    var seq = 0;
-    for (final split in task.recentSplits) {
-      final kind = split.isProactive
-          ? s.detailSplitProactive
-          : s.detailSplitReactive;
-      final size = DownloadTask.formatBytes(
-        split.childEnd - split.childStart + 1,
-      );
-      timeline.add((
-        split.receivedAt,
-        seq++,
-        _buildLogRow(
-          c,
-          _formatDateTime(split.receivedAt),
-          s.detailLogSplit(
-            split.parentIndex + 1,
-            split.childIndex + 1,
-            size,
-            kind,
-          ),
-        ),
-      ));
-    }
-    for (final evt in task.cdnEvents) {
-      final text = _cdnEventText(s, evt);
-      if (text.isEmpty) continue;
-      timeline.add((
-        evt.receivedAt,
-        seq++,
-        _buildLogRow(c, _formatDateTime(evt.receivedAt), text),
-      ));
-    }
-    for (final evt in task.routeEvents) {
-      timeline.add((
-        evt.receivedAt,
-        seq++,
-        _buildLogRow(
-          c,
-          _formatDateTime(evt.receivedAt),
-          s.detailLogRoute(s.taskRouteLabel(evt.route)),
-        ),
-      ));
-    }
-    timeline.sort((a, b) {
-      final byTime = a.$1.compareTo(b.$1);
-      return byTime != 0 ? byTime : a.$2.compareTo(b.$2);
-    });
-    final rows = <Widget>[
-      _buildLogRow(c, _formatDateTime(task.createdAt), s.detailLogCreated),
-      ...timeline.map((e) => e.$3),
-    ];
-    if (task.completedAt != null) {
-      rows.add(
-        _buildLogRow(
-          c,
-          _formatDateTime(task.completedAt!),
-          s.detailLogCompleted,
-        ),
-      );
-    }
-    if (task.status == TaskStatus.error && task.errorMessage.isNotEmpty) {
-      rows.add(
-        _buildLogRow(
-          c,
-          null,
-          s.detailLogFailed(task.errorMessage),
-          isError: true,
-        ),
-      );
-    }
+    final entries = _logEntries(s, task);
+    // 整段时间线的纯文本形态（每行「时间戳  文案」），供一键复制——用户要把
+    // 失败现场贴进反馈或 issue 时，逐行手抄不现实。
+    final plainText = entries
+        .map((e) => e.$1 == null ? e.$2 : '${e.$1}  ${e.$2}')
+        .join('\n');
     return _tabScroll(
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1786,19 +1720,89 @@ class _DetailPanelState extends State<DetailPanel> {
                   style: TextStyle(fontSize: 10.5, color: c.textMuted),
                 ),
               ),
+              if (entries.isNotEmpty)
+                _CopyValueButton(
+                  value: plainText,
+                  color: c.textMuted,
+                  toastText: s.detailLogCopied,
+                  tooltip: s.detailLogCopy,
+                ),
             ],
           ),
           const SizedBox(height: 12),
-          if (rows.isEmpty)
+          if (entries.isEmpty)
             Text(
               s.detailLogEmpty,
               style: TextStyle(fontSize: 11, color: c.textMuted),
             )
           else
-            ...rows,
+            for (final entry in entries)
+              _buildLogRow(c, entry.$1, entry.$2, isError: entry.$3),
         ],
       ),
     );
+  }
+
+  /// 日志 Tab 的时间线（时间戳, 文案, 是否错误）。
+  ///
+  /// 三类事件（分段拆分 / 多 CDN / 链路定论）按接收时间合并，同刻保持到达顺序；
+  /// 首行是「创建任务」，末尾按状态补「下载完成」或「失败：<原因>」。渲染与
+  /// 「复制整段日志」共用这一份数据，避免两处各拼一遍导致复制内容与屏幕不一致。
+  List<(String?, String, bool)> _logEntries(S s, DownloadTask task) {
+    final timeline = <(DateTime, int, String, bool)>[];
+    var seq = 0;
+    for (final split in task.recentSplits) {
+      final kind = split.isProactive
+          ? s.detailSplitProactive
+          : s.detailSplitReactive;
+      final size = DownloadTask.formatBytes(
+        split.childEnd - split.childStart + 1,
+      );
+      timeline.add((
+        split.receivedAt,
+        seq++,
+        s.detailLogSplit(
+          split.parentIndex + 1,
+          split.childIndex + 1,
+          size,
+          kind,
+        ),
+        false,
+      ));
+    }
+    for (final evt in task.cdnEvents) {
+      final text = _cdnEventText(s, evt);
+      if (text.isEmpty) continue;
+      timeline.add((evt.receivedAt, seq++, text, false));
+    }
+    for (final evt in task.routeEvents) {
+      timeline.add((
+        evt.receivedAt,
+        seq++,
+        s.detailLogRoute(s.taskRouteLabel(evt.route)),
+        false,
+      ));
+    }
+    timeline.sort((a, b) {
+      final byTime = a.$1.compareTo(b.$1);
+      return byTime != 0 ? byTime : a.$2.compareTo(b.$2);
+    });
+
+    final entries = <(String?, String, bool)>[
+      (_formatDateTime(task.createdAt), s.detailLogCreated, false),
+      for (final e in timeline) (_formatDateTime(e.$1), e.$3, e.$4),
+    ];
+    if (task.completedAt != null) {
+      entries.add((
+        _formatDateTime(task.completedAt!),
+        s.detailLogCompleted,
+        false,
+      ));
+    }
+    if (task.status == TaskStatus.error && task.errorMessage.isNotEmpty) {
+      entries.add((null, s.detailLogFailed(task.errorMessage), true));
+    }
+    return entries;
   }
 
   /// 多 CDN 候选来源标记 → 本地化标签（`sys` / `doh:<端点>` / `ecs:<端点>`）。
@@ -1875,7 +1879,9 @@ class _DetailPanelState extends State<DetailPanel> {
     String text, {
     bool isError = false,
   }) {
-    final textWidget = Text(
+    // SelectableText（而非 Text）：日志可能被拉到截图外/需要摘几行贴进反馈，
+    // 允许直接框选复制；整段一键复制见 Tab 头部的复制按钮。
+    final textWidget = SelectableText(
       text,
       style: TextStyle(
         fontSize: 11,
@@ -1896,7 +1902,7 @@ class _DetailPanelState extends State<DetailPanel> {
         children: [
           SizedBox(
             width: 140,
-            child: Text(
+            child: SelectableText(
               time,
               style: TextStyle(
                 fontSize: 11,
@@ -2295,10 +2301,15 @@ class _CopyValueButton extends StatefulWidget {
   final Color color;
   final String? toastText;
 
+  /// 悬浮提示文案（可选）。纯图标按钮没有文字，语义靠它交代——
+  /// 日志 Tab 的「复制整段日志」就用它说明按钮用途。
+  final String? tooltip;
+
   const _CopyValueButton({
     required this.value,
     required this.color,
     this.toastText,
+    this.tooltip,
   });
 
   @override
@@ -2324,7 +2335,7 @@ class _CopyValueButtonState extends State<_CopyValueButton> {
 
   @override
   Widget build(BuildContext context) {
-    return ShadButton.ghost(
+    final button = ShadButton.ghost(
       onPressed: _onCopy,
       size: ShadButtonSize.sm,
       width: 24,
@@ -2339,6 +2350,13 @@ class _CopyValueButtonState extends State<_CopyValueButton> {
           color: _copied ? const Color(0xFF22C55E) : widget.color,
         ),
       ),
+    );
+    final tooltip = widget.tooltip;
+    if (tooltip == null) return button;
+    return ShadTooltip(
+      waitDuration: const Duration(milliseconds: 350),
+      builder: (_) => Text(tooltip),
+      child: button,
     );
   }
 }

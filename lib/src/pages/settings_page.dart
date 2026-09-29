@@ -11675,6 +11675,39 @@ class _LogExportCardState extends State<_LogExportCard> {
   /// 日志总大小上限可选项（MB）
   static const _maxSizeOptions = [5, 10, 20, 50, 100];
 
+  /// 「复制日志」带走的当日日志行数上限。与诊断报告同样只取尾部：够贴进反馈
+  /// 定位问题，又不至于把 10MB 的日志塞爆剪贴板（粘到聊天框里会卡死输入法）。
+  static const _copyTailLines = 200;
+
+  /// 把当日日志尾部复制到剪贴板——用户报错时最省事的取证方式：
+  /// 不用先导出 zip、再找文件、再解压。
+  Future<void> _copyLogs() async {
+    final s = LocaleScope.of(context);
+    final raw = await LogService.instance.readTodayLog();
+    if (!mounted) return;
+    if (raw.isEmpty) {
+      FluxSonner.of(context).show(
+        ShadToast(
+          title: Text(s.logExportEmpty),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    final lines = raw.split('\n');
+    final text = lines.length <= _copyTailLines
+        ? raw
+        : lines.sublist(lines.length - _copyTailLines).join('\n');
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    FluxSonner.of(context).show(
+      ShadToast(
+        title: Text(s.logCopyToast),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   Future<void> _exportLogs() async {
     if (_exporting) return;
     setState(() => _exporting = true);
@@ -11836,6 +11869,23 @@ class _LogExportCardState extends State<_LogExportCard> {
                     ],
                     const SizedBox(width: 6),
                     Text(s.logExportButton),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              ShadButton.outline(
+                size: ShadButtonSize.sm,
+                onPressed: _copyLogs,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      LucideIcons.copy,
+                      size: 13,
+                      color: c.textSecondary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(s.logCopyButton),
                   ],
                 ),
               ),

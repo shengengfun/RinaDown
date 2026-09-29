@@ -16,7 +16,7 @@
 //! - Per-segment retry with exponential backoff
 
 use std::collections::{BTreeMap, HashMap};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use futures_util::StreamExt;
@@ -146,6 +146,18 @@ pub struct HlsVariant {
     pub uri: String,
 }
 
+/// EXT-X-MAP 指出的 Media Initialization Section(fMP4/CMAF 的 `ftyp`+`moov`)。
+///
+/// fMP4 媒体分片自身(moof+mdat)不含解码所需的轨道初始化信息,必须把初始化段
+/// 写在其服务的所有媒体分片**之前**,否则产物无法解码。
+#[derive(Clone, PartialEq, Eq)]
+pub struct HlsInitMap {
+    /// 已解析为绝对 URL 的初始化段 URI。
+    pub uri: String,
+    /// 初始化段自身的 EXT-X-BYTERANGE 子区间 `(offset, length)`;`None` = 整资源。
+    pub byte_range: Option<(u64, u64)>,
+}
+
 /// A single segment from a media playlist.
 #[allow(dead_code)]
 pub struct HlsSegment {
@@ -161,6 +173,10 @@ pub struct HlsSegment {
     /// 并保留该标志;隐式 IV 仍按 RFC 8216 用绝对 Media Sequence Number 计算
     /// (见 `compute_default_iv` 注释),不连续点不重置该序号。
     pub discontinuity: bool,
+    /// 本段生效的初始化段(EXT-X-MAP)。`None` = 纯 TS 播放列表(旧式,
+    /// 每个分片自带 PAT/PMT,无需初始化段)。`Some` = fMP4/CMAF,
+    /// 写盘时必须先落初始化段,产物容器也因此是 mp4 而非 ts。
+    pub map: Option<HlsInitMap>,
 }
 
 /// Encryption key info for a segment.
@@ -270,6 +286,11 @@ pub async fn parse_m3u8(
             let media_sequence = media.media_sequence;
             let mut total_duration: f32 = 0.0;
             let mut current_key: Option<HlsKey> = None;
+            // EXT-X-MAP 与 EXT-X-KEY 一样是「持续生效」标签(RFC 8216 §4.3.2.5:
+            // 作用于其后所有分片,直到下一个 EXT-X-MAP)。m3u8-rs 在解析每个分片
+            // URI 后会把 map 重置为 None(parser.rs:`map = None;`),照搬其逐段取值
+            // 会漏掉除首个分片外的全部初始化段,故与 `current_key` 一样自行跟踪。
+            let mut current_map: Option<HlsInitMap> = None;
             let mut segments: Vec<HlsSegment> = Vec::with_capacity(media.segments.len());
             // EXT-X-BYTERANGE 省略 @offset 时,offset = 同一 uri 上一子区间结束
             // 位置+1(按出现顺序累计)。键为已解析的绝对段 URI,值为该 uri 上
@@ -279,14 +300,27 @@ pub async fn parse_m3u8(
             for seg in &media.segments {
                 total_duration += seg.duration;
 
-                // EXT-X-MAP(fMP4/CMAF 初始化段)目前无法正确产出可解码的 fMP4
-                // 输出:本引擎只拼接媒体分片(moof+mdat),缺少前置 ftyp+moov
-                // 初始化段则文件不可解码。为杜绝"静默产出不可播放文件却标记完成",
-                // 检测到 EXT-X-MAP 即报错而非继续(安全退化方案)。
-                if seg.map.is_some() {
-                    return Err(DownloadError::Other(
-                        "EXT-X-MAP (fMP4/CMAF 初始化段) 暂不支持".to_string(),
-                    ));
+                // EXT-X-MAP(fMP4/CMAF 初始化段):解析出绝对 URL + 自身的
+                // BYTERANGE 子区间,写盘阶段先于其服务的分片落盘(见
+                // `needs_init_segment`)。BYTERANGE 的 @offset 缺省按 0 处理
+                // (EXT-X-MAP 的隐式 offset 语义不在 RFC 中定义,0 是唯一安全的
+                // 解释:实测 YouTube/CMAF 播放列表要么不给 BYTERANGE,要么显式给
+                // @offset)。
+                if let Some(ref map) = seg.map {
+                    let length_zero = map.byte_range.as_ref().is_some_and(|br| br.length == 0);
+                    if length_zero {
+                        return Err(DownloadError::Other(
+                            "EXT-X-MAP BYTERANGE length must be > 0".to_string(),
+                        ));
+                    }
+                    let map_range = map.byte_range.as_ref().map(|br| {
+                        let offset = br.offset.unwrap_or(0);
+                        (offset, br.length)
+                    });
+                    current_map = Some(HlsInitMap {
+                        uri: resolve_uri(&base_url, &map.uri),
+                        byte_range: map_range,
+                    });
                 }
 
                 if let Some(ref key) = seg.key {
@@ -365,6 +399,7 @@ pub async fn parse_m3u8(
                     key: seg_key,
                     byte_range,
                     discontinuity: seg.discontinuity,
+                    map: current_map.clone(),
                 });
             }
 
@@ -768,6 +803,372 @@ async fn select_variant(
 }
 
 // ---------------------------------------------------------------------------
+// fMP4 / CMAF 初始化段（EXT-X-MAP）与独立音频轨
+// ---------------------------------------------------------------------------
+
+/// 播放列表是否含 EXT-X-MAP（即 fMP4/CMAF）。含则产物本身是 mp4 容器，
+/// 最终落盘要换 `.mp4` 扩展名，且绝不能再走 ts2mp4（内容已非 TS）。
+fn has_init_map(segments: &[HlsSegment]) -> bool {
+    segments.iter().any(|s| s.map.is_some())
+}
+
+/// 本段之前是否需要写入其 EXT-X-MAP 初始化段。
+///
+/// 判据是「与上一段的初始化段不同」而不是「本段有初始化段」：真实 CMAF 播放列表
+/// 只在头部写一次 EXT-X-MAP 并作用于其后所有分片，逐段写会把 ftyp+moov 反复插进
+/// 文件；而续传（`first_idx > 0`）时首段与上一段带的是同一个初始化段，同样不该重
+/// 写——上一轮已经写在文件头部，再插一次会把它塞进文件中段。
+fn needs_init_segment(segments: &[HlsSegment], seg_idx: usize) -> bool {
+    let Some(cur) = segments.get(seg_idx).and_then(|s| s.map.as_ref()) else {
+        return false;
+    };
+    match seg_idx
+        .checked_sub(1)
+        .and_then(|i| segments.get(i))
+        .and_then(|s| s.map.as_ref())
+    {
+        Some(prev) => prev != cur,
+        None => true,
+    }
+}
+
+/// 初始化段缓存：键为 `(URI, BYTERANGE)`。同一播放列表的多个不连续点可能复用同
+/// 一个初始化段。只有单写者（`run_hls_download_inner` 的写出循环）会读它，故用普通
+/// `HashMap` 即可，无需加锁。
+type InitMapCache = HashMap<(String, Option<(u64, u64)>), Vec<u8>>;
+
+/// 取初始化段字节（带缓存）。`seg_idx` 只用于日志/错误定位。
+#[allow(clippy::too_many_arguments)]
+async fn fetch_init_segment(
+    client: &Client,
+    map: &HlsInitMap,
+    cookies: &str,
+    playlist_url: &str,
+    cancel_token: &tokio_util::sync::CancellationToken,
+    task_id: &str,
+    seg_idx: usize,
+    extra_headers: &std::collections::HashMap<String, String>,
+    cache: &mut InitMapCache,
+) -> Result<Vec<u8>, DownloadError> {
+    let key = (map.uri.clone(), map.byte_range);
+    if let Some(cached) = cache.get(&key) {
+        return Ok(cached.clone());
+    }
+    let data = download_segment_with_retry(
+        client,
+        &map.uri,
+        map.byte_range,
+        cookies,
+        playlist_url,
+        cancel_token,
+        task_id,
+        seg_idx,
+        extra_headers,
+    )
+    .await?;
+    cache.insert(key, data.clone());
+    Ok(data)
+}
+
+/// 以限速器节奏把 `data` 完整写入 `file`；写入中途失败时把文件回退到
+/// `rollback_to`（本块写入前的逻辑长度），避免半截数据污染后续续传，并把
+/// ENOSPC 翻译成用户可懂的提示。
+async fn write_limited(
+    file: &mut File,
+    limiter: &crate::speed_limiter::SpeedLimiter,
+    data: &[u8],
+    rollback_to: i64,
+    task_id: &str,
+    label: &str,
+) -> Result<(), DownloadError> {
+    let mut offset = 0usize;
+    while offset < data.len() {
+        let remaining_bytes = (data.len() - offset) as u64;
+        let allowed = limiter.consume(remaining_bytes).await;
+        let end = offset + allowed as usize;
+        if let Err(e) = file.write_all(&data[offset..end]).await {
+            if let Err(trunc_err) = file.set_len(rollback_to as u64).await {
+                log_info!(
+                    "[hls] task {} {} rollback set_len({}) failed: {}",
+                    task_id,
+                    label,
+                    rollback_to,
+                    trunc_err
+                );
+            }
+            // 磁盘空间不足(ENOSPC, errno 28 / ErrorKind::StorageFull)给出明确
+            // 提示,便于用户区分"磁盘满"与普通 IO 错误。
+            return Err(
+                if e.kind() == std::io::ErrorKind::StorageFull || e.raw_os_error() == Some(28) {
+                    DownloadError::Other("磁盘空间不足，请清理磁盘后重试".to_string())
+                } else {
+                    DownloadError::Io(e)
+                },
+            );
+        }
+        offset = end;
+    }
+    Ok(())
+}
+
+/// 独立音频轨的下载计划：与视频播放列表**同一时刻**解析出的分片清单。
+///
+/// 直播/DVR 播放列表是滚动窗口（分片按序号不断前移），音频窗口若在视频下完之后才
+/// 抓取，就会与视频窗口错位（音画不同步，甚至整轨对不上）。因此在主流程解析完视频
+/// 播放列表后立刻解析音频播放列表，把那一瞬的窗口固定下来，稍后再逐段下载。
+struct AudioTrackPlan {
+    /// 实际列出分片的播放列表 URL（master→media 时是选中的 media playlist），
+    /// 段/密钥的同源 cookie 判定以它为基准。
+    media_url: String,
+    segments: Vec<HlsSegment>,
+    media_sequence: u64,
+}
+
+/// 解析独立音频轨的下载计划。`None` = 该轨不是 HLS 播放列表（直链，稍后直接 GET）。
+async fn plan_audio_track(
+    p: &DownloadParams,
+    audio_url: &str,
+) -> Result<Option<AudioTrackPlan>, DownloadError> {
+    if !is_hls_url(audio_url) {
+        return Ok(None);
+    }
+    let content = parse_m3u8(&p.client, audio_url, &p.cookies, &p.extra_headers).await?;
+    let (segments, media_sequence, media_url) = match content {
+        M3u8Content::Media {
+            segments,
+            total_duration: _,
+            media_sequence,
+        } => (segments, media_sequence, audio_url.to_string()),
+        M3u8Content::Master { variants } => {
+            // 音频轨不做画质弹框：取带宽最高的一条（音频 master 通常只有 1 条，
+            // 多语言时取码率最高者，与视频轨的静默默认档语义一致）。
+            let best = variants.iter().max_by_key(|v| v.bandwidth).ok_or_else(|| {
+                DownloadError::Other("audio master playlist has no variants".into())
+            })?;
+            let variant_cookies = cookies_for_url(audio_url, &best.uri, &p.cookies);
+            let media = parse_m3u8(&p.client, &best.uri, variant_cookies, &p.extra_headers).await?;
+            match media {
+                M3u8Content::Media {
+                    segments,
+                    total_duration: _,
+                    media_sequence,
+                } => (segments, media_sequence, best.uri.clone()),
+                M3u8Content::Master { .. } => {
+                    return Err(DownloadError::Other(
+                        "nested master playlist not supported".to_string(),
+                    ));
+                }
+            }
+        }
+    };
+    if segments.is_empty() {
+        return Err(DownloadError::Other(
+            "audio playlist has no segments".to_string(),
+        ));
+    }
+    Ok(Some(AudioTrackPlan {
+        media_url,
+        segments,
+        media_sequence,
+    }))
+}
+
+/// 下载独立音频轨到 `video_path` 同目录的 `.audio.*` 旁挂文件，返回 (路径, 字节数)。
+///
+/// HLS 视频轨常常是纯视频（YouTube 等把音频单列一条轨），此时音频必须另外取回并由
+/// 调用方用 ffmpeg mux。这里顺序下载：音频轨体量小（几 MB），顺序写盘让进度上报天然
+/// 单调，也避免与主链路的段级并发/续传机制纠缠。
+async fn download_audio_track(
+    p: &DownloadParams,
+    audio_url: &str,
+    plan: Option<&AudioTrackPlan>,
+    video_path: &Path,
+    base_bytes: i64,
+) -> Result<(PathBuf, i64), DownloadError> {
+    let audio_path = crate::dash_downloader::build_audio_path(video_path);
+    // 残留旁挂文件（上一轮取消 / mux 失败留下）一律先删：音频轨只有几 MB，与其做一套
+    // sidecar 续传，不如保证 mux 输入与本次视频轨同代。
+    let audio_temp = PathBuf::from(format!("{}{}", audio_path.display(), TEMP_EXT));
+    let _ = tokio::fs::remove_file(&audio_path).await;
+    let _ = tokio::fs::remove_file(&audio_temp).await;
+
+    let mut file = File::create(&audio_temp).await?;
+    let mut written: i64 = 0;
+    let mut last_report = std::time::Instant::now();
+
+    if let Some(plan) = plan {
+        let key_cache: KeyCache = Arc::new(Mutex::new(HashMap::new()));
+        let mut init_cache: InitMapCache = HashMap::new();
+        for (seg_idx, segment) in plan.segments.iter().enumerate() {
+            if p.cancel_token.is_cancelled() {
+                return Err(DownloadError::Cancelled);
+            }
+            // 初始化段（fMP4 音频）与本段分片都按顺序落盘。
+            if needs_init_segment(&plan.segments, seg_idx)
+                && let Some(map) = segment.map.clone()
+            {
+                let start = written;
+                let init = fetch_init_segment(
+                    &p.client,
+                    &map,
+                    &p.cookies,
+                    &plan.media_url,
+                    &p.cancel_token,
+                    &p.task_id,
+                    seg_idx,
+                    &p.extra_headers,
+                    &mut init_cache,
+                )
+                .await?;
+                write_limited(
+                    &mut file,
+                    &p.speed_limiter,
+                    &init,
+                    start,
+                    &p.task_id,
+                    "audio init segment",
+                )
+                .await?;
+                written += init.len() as i64;
+            }
+
+            let key_info: Option<(String, Option<String>)> = segment.key.as_ref().and_then(|k| {
+                if k.method == HlsKeyMethod::Aes128 && !k.uri.is_empty() {
+                    Some((k.uri.clone(), k.iv.clone()))
+                } else {
+                    None
+                }
+            });
+            let data = download_and_decrypt_segment(
+                &p.client,
+                &segment.uri,
+                segment.byte_range,
+                &p.cookies,
+                &plan.media_url,
+                &p.cancel_token,
+                &p.task_id,
+                seg_idx,
+                &p.extra_headers,
+                key_info.as_ref(),
+                &key_cache,
+                plan.media_sequence,
+            )
+            .await?;
+            let start = written;
+            write_limited(
+                &mut file,
+                &p.speed_limiter,
+                &data,
+                start,
+                &p.task_id,
+                &format!("audio segment {}", seg_idx),
+            )
+            .await?;
+            written += data.len() as i64;
+
+            if last_report.elapsed().as_millis() >= 200 {
+                let _ = p
+                    .progress_tx
+                    .send(ProgressUpdate {
+                        task_id: p.task_id.clone(),
+                        downloaded_bytes: base_bytes + written,
+                        total_bytes: 0,
+                        status: 1,
+                        error_message: String::new(),
+                        file_name: String::new(),
+                        segment_details: None,
+                        ..Default::default()
+                    })
+                    .await;
+                last_report = std::time::Instant::now();
+            }
+        }
+    } else {
+        let data = download_segment_with_retry(
+            &p.client,
+            audio_url,
+            None,
+            &p.cookies,
+            audio_url,
+            &p.cancel_token,
+            &p.task_id,
+            0,
+            &p.extra_headers,
+        )
+        .await?;
+        write_limited(
+            &mut file,
+            &p.speed_limiter,
+            &data,
+            0,
+            &p.task_id,
+            "audio track",
+        )
+        .await?;
+        written = data.len() as i64;
+    }
+
+    file.flush().await?;
+    drop(file);
+    tokio::fs::rename(&audio_temp, &audio_path)
+        .await
+        .map_err(|e| {
+            DownloadError::Other(format!(
+                "failed to rename {} -> {}: {}",
+                audio_temp.display(),
+                audio_path.display(),
+                e
+            ))
+        })?;
+    log_info!(
+        "[hls-download] task {} audio track done: {} bytes -> {}",
+        p.task_id,
+        written,
+        audio_path.display()
+    );
+    Ok((audio_path, written))
+}
+
+/// 把内容已是 mp4 的产物（fMP4 拼接结果或 ffmpeg mux 结果，其名可能仍带 `.ts`）
+/// 落名为 `.mp4`：沿用 `dedup_filename` 的名字协商（同名既有文件绝不覆盖，除非
+/// `allow_overwrite`），再原子 rename。失败返回 `None`（调用方保留原名产物）。
+async fn finalize_mp4_path(path: &Path, allow_overwrite: bool) -> Option<PathBuf> {
+    if path
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| e.eq_ignore_ascii_case("mp4"))
+    {
+        return Some(path.to_path_buf());
+    }
+    let parent = path.parent()?;
+    let stem = path.file_stem().and_then(|s| s.to_str())?;
+    let unique_name = dedup_filename(
+        parent,
+        &format!("{}.mp4", stem),
+        &std::collections::HashSet::new(),
+        &std::collections::HashSet::new(),
+        allow_overwrite,
+    )
+    .await;
+    let target = parent.join(unique_name);
+    if target == path {
+        return Some(target);
+    }
+    match tokio::fs::rename(path, &target).await {
+        Ok(()) => Some(target),
+        Err(e) => {
+            log_info!(
+                "[hls] rename {} -> {} failed, keeping original name: {}",
+                path.display(),
+                target.display(),
+                e
+            );
+            None
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Core logic
 // ---------------------------------------------------------------------------
 
@@ -855,6 +1256,41 @@ async fn run_hls_download_inner(p: &DownloadParams) -> Result<i64, DownloadError
             "HLS playlist has no segments".to_string(),
         ));
     }
+
+    // fMP4/CMAF（EXT-X-MAP）判定：决定产物是 mp4 还是 ts，也决定是否必须预置初始化段。
+    let fmp4 = has_init_map(&segments);
+    if fmp4 {
+        log_info!(
+            "[hls-download] task {} playlist uses EXT-X-MAP (fMP4/CMAF): init segment will \
+             be prepended and output lands as .mp4",
+            p.task_id
+        );
+    }
+
+    // 独立音频轨（HLS 视频轨常为纯视频）：立刻解析其分片清单，把与视频同一时刻的
+    // 窗口固定下来（直播/DVR 是滚动窗口，晚抓会音画错位）。解析失败只降级为
+    // 「无音频」而非任务失败——用户先拿到画面，日志里能看到原因。
+    let audio_url: Option<String> = p
+        .audio_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|u| !u.is_empty())
+        .map(str::to_string);
+    let audio_plan = match audio_url.as_deref() {
+        Some(url) => match plan_audio_track(p, url).await {
+            Ok(plan) => plan,
+            Err(e) => {
+                log_info!(
+                    "[hls-download] task {} audio playlist parse failed ({}); \
+                     continuing without audio track",
+                    p.task_id,
+                    e
+                );
+                None
+            }
+        },
+        None => None,
+    };
 
     let auto_name = if p.file_name.is_empty() {
         let url_name = extract_from_url(&p.url).unwrap_or_else(|| "download.ts".to_string());
@@ -1111,6 +1547,8 @@ async fn run_hls_download_inner(p: &DownloadParams) -> Result<i64, DownloadError
     let mut pending: BTreeMap<usize, Vec<u8>> = BTreeMap::new();
     let mut next_to_write = first_idx;
     let mut fatal_error: Option<DownloadError> = None;
+    // EXT-X-MAP 初始化段缓存（仅单写者持有，见 `InitMapCache`）。
+    let mut init_cache: InitMapCache = HashMap::new();
 
     'writer: while next_to_write < segment_count {
         // Writer-side cancellation check (mirrors the original between-segment
@@ -1171,45 +1609,70 @@ async fn run_hls_download_inner(p: &DownloadParams) -> Result<i64, DownloadError
             // truncate 到恰好 safe_size(== 初始 downloaded_bytes),此后每段以
             // append 方式精确追加 chunk_len 字节,故文件磁盘长度始终等于
             // downloaded_bytes —— 用它作为出错回退点是准确的。
-            let chunk_len = output_data.len();
-            let seg_start_pos = downloaded_bytes;
-            let mut offset = 0usize;
-            let mut write_result: Result<(), std::io::Error> = Ok(());
-            while offset < chunk_len {
-                let remaining_bytes = (chunk_len - offset) as u64;
-                let allowed = p.speed_limiter.consume(remaining_bytes).await;
-                let end = offset + allowed as usize;
-                if let Err(e) = file.write_all(&output_data[offset..end]).await {
-                    write_result = Err(e);
-                    break;
+            // 先落 EXT-X-MAP 初始化段（fMP4/CMAF）：它服务于本段及其后同 map 的
+            // 分片，必须出现在它们之前。续传时上一轮已在文件头部写过
+            // （`needs_init_segment` 比对上一段的 map，相同则跳过），故不会重复插入。
+            if needs_init_segment(&segments, seg_idx)
+                && let Some(map) = segments.get(seg_idx).and_then(|s| s.map.clone())
+            {
+                let init_start_pos = downloaded_bytes;
+                let init_data = match fetch_init_segment(
+                    &p.client,
+                    &map,
+                    &p.cookies,
+                    &media_playlist_url,
+                    &p.cancel_token,
+                    &p.task_id,
+                    seg_idx,
+                    &p.extra_headers,
+                    &mut init_cache,
+                )
+                .await
+                {
+                    Ok(data) => data,
+                    Err(e) => {
+                        p.cancel_token.cancel();
+                        fatal_error = Some(e);
+                        break 'writer;
+                    }
+                };
+                if let Err(e) = write_limited(
+                    &mut file,
+                    &p.speed_limiter,
+                    &init_data,
+                    init_start_pos,
+                    &p.task_id,
+                    "init segment",
+                )
+                .await
+                {
+                    p.cancel_token.cancel();
+                    fatal_error = Some(e);
+                    break 'writer;
                 }
-                offset = end;
+                downloaded_bytes += init_data.len() as i64;
+                log_info!(
+                    "[hls-download] task {} wrote EXT-X-MAP init segment ({} bytes) before segment {}",
+                    p.task_id,
+                    init_data.len(),
+                    seg_idx
+                );
             }
 
-            if let Err(e) = write_result {
-                // 写入中途失败(常见:磁盘满 ENOSPC)。本段已部分写入,先把文件
-                // 回退到本段写入前的长度,避免残留半截分段污染后续 resume(与
-                // dash_downloader 的 set_len(start_pos) 兜底一致)。回退失败仅记录
-                // 日志,不掩盖原始写入错误。
-                if let Err(trunc_err) = file.set_len(seg_start_pos as u64).await {
-                    log_info!(
-                        "[hls] task {} segment {} rollback set_len({}) failed: {}",
-                        p.task_id,
-                        seg_idx,
-                        seg_start_pos,
-                        trunc_err
-                    );
-                }
+            let chunk_len = output_data.len();
+            let seg_start_pos = downloaded_bytes;
+            if let Err(e) = write_limited(
+                &mut file,
+                &p.speed_limiter,
+                &output_data,
+                seg_start_pos,
+                &p.task_id,
+                &format!("segment {}", seg_idx),
+            )
+            .await
+            {
                 p.cancel_token.cancel();
-                // 磁盘空间不足(ENOSPC, errno 28 / ErrorKind::StorageFull)给出
-                // 明确提示,便于用户区分"磁盘满"与普通 IO 错误。
-                if e.kind() == std::io::ErrorKind::StorageFull || e.raw_os_error() == Some(28) {
-                    fatal_error = Some(DownloadError::Other(
-                        "磁盘空间不足，请清理磁盘后重试".to_string(),
-                    ));
-                } else {
-                    fatal_error = Some(DownloadError::Io(e));
-                }
+                fatal_error = Some(e);
                 break 'writer;
             }
 
@@ -1321,7 +1784,86 @@ async fn run_hls_download_inner(p: &DownloadParams) -> Result<i64, DownloadError
         dest_path.display()
     );
 
-    if let Some(mp4_path) = remux_ts_to_mp4(&dest_path, &p.task_id, p.allow_overwrite).await {
+    // -----------------------------------------------------------------------
+    // 独立音频轨（HLS 视频轨常为纯视频，YouTube 等把音频单列一条轨）。
+    //
+    // 音频轨下载失败/合并失败都不致命：保留视频轨比两个文件都不给好，日志里留痕。
+    // 合并成功后产物内容已是 mp4，落名阶段直接换 `.mp4`（不再走 ts2mp4）。
+    // -----------------------------------------------------------------------
+    let mut muxed_to_mp4 = false;
+    if let Some(audio_url) = audio_url.as_deref() {
+        // 落库音频轨标记：删除任务时的旁挂文件清理（`build_audio_path`）以此为门控，
+        // 与 dash_downloader 的轨对路径同一约定（幂等 UPDATE）。
+        if let Err(e) = p.db.save_audio_url(&p.task_id, audio_url).await {
+            log_info!(
+                "[hls] task {} save_audio_url failed: {}（删除任务时旁挂音频清理可能失效）",
+                p.task_id,
+                e
+            );
+        }
+        match download_audio_track(
+            p,
+            audio_url,
+            audio_plan.as_ref(),
+            &dest_path,
+            downloaded_bytes,
+        )
+        .await
+        {
+            Ok((audio_path, audio_bytes)) => {
+                downloaded_bytes += audio_bytes;
+                let expected = downloaded_bytes.max(0) as u64;
+                match crate::dash_downloader::mux_audio_video(
+                    &dest_path,
+                    &audio_path,
+                    expected,
+                    &p.cancel_token,
+                    crate::dash_downloader::effective_ffmpeg(p),
+                )
+                .await
+                {
+                    Ok(()) => {
+                        muxed_to_mp4 = true;
+                        log_info!(
+                            "[hls] task {} audio track muxed into {}",
+                            p.task_id,
+                            dest_path.display()
+                        );
+                        let _ = tokio::fs::remove_file(&audio_path).await;
+                    }
+                    Err(DownloadError::Cancelled) => return Err(DownloadError::Cancelled),
+                    Err(e) => {
+                        log_info!(
+                            "[hls] task {} warning: audio mux failed ({}). \
+                             需要 ffmpeg 才能合并音视频；音频已保存为独立文件: {}",
+                            p.task_id,
+                            e,
+                            audio_path.display()
+                        );
+                    }
+                }
+            }
+            Err(DownloadError::Cancelled) => return Err(DownloadError::Cancelled),
+            Err(e) => {
+                log_info!(
+                    "[hls] task {} warning: audio track download failed ({}); \
+                     continuing with video-only output",
+                    p.task_id,
+                    e
+                );
+            }
+        }
+    }
+
+    // 内容已是 mp4（fMP4 拼接结果 / ffmpeg mux 结果）→ 直接换名 `.mp4`；
+    // 纯 TS → 走既有 ts2mp4 重封装（内容若已是 mp4 再喂给 ts2mp4 会解析失败）。
+    let mp4_path = if muxed_to_mp4 || fmp4 {
+        finalize_mp4_path(&dest_path, p.allow_overwrite).await
+    } else {
+        remux_ts_to_mp4(&dest_path, &p.task_id, p.allow_overwrite).await
+    };
+
+    if let Some(mp4_path) = mp4_path {
         let mp4_file_name = mp4_path
             .file_name()
             .and_then(|n| n.to_str())
@@ -1360,7 +1902,7 @@ async fn run_hls_download_inner(p: &DownloadParams) -> Result<i64, DownloadError
             }
             Err(e) => {
                 log_info!(
-                    "[hls] task {} DB update failed after remux: {}, removing orphan mp4 at {}",
+                    "[hls] task {} DB update failed after mp4 finalize: {}, removing orphan mp4 at {}",
                     p.task_id,
                     e,
                     mp4_path.display()
@@ -1787,9 +2329,9 @@ async fn download_segment_once(
 #[cfg(test)]
 mod tests {
     use super::{
-        DEFAULT_HLS_CONCURRENCY, MAX_HLS_CONCURRENCY, compute_default_iv, decrypt_segment,
-        hls_concurrency, is_hls_url, parse_iv_hex, parse_resume_checkpoint, remux_space_ok,
-        resolve_uri,
+        DEFAULT_HLS_CONCURRENCY, HlsInitMap, HlsSegment, MAX_HLS_CONCURRENCY, compute_default_iv,
+        decrypt_segment, has_init_map, hls_concurrency, is_hls_url, needs_init_segment,
+        parse_iv_hex, parse_resume_checkpoint, remux_space_ok, resolve_uri,
     };
     use aes::Aes128;
     use cbc::cipher::block_padding::{NoPadding, Pkcs7};
@@ -2102,5 +2644,81 @@ mod tests {
         // Spawning more workers than segments left is wasteful; cap at remaining.
         assert_eq!(hls_concurrency(16, 5), 5);
         assert_eq!(hls_concurrency(8, 2), 2);
+    }
+
+    // --- EXT-X-MAP (fMP4/CMAF) 初始化段落点 ---
+
+    /// 造一段只带 `map` 差异的段（其余字段与本组断言无关）。
+    fn seg_with_map(map: Option<&str>) -> HlsSegment {
+        HlsSegment {
+            uri: "https://cdn.example/seg.m4s".to_string(),
+            duration: 4.0,
+            key: None,
+            byte_range: None,
+            discontinuity: false,
+            map: map.map(|uri| HlsInitMap {
+                uri: uri.to_string(),
+                byte_range: None,
+            }),
+        }
+    }
+
+    #[test]
+    fn test_has_init_map_detects_fmp4() {
+        assert!(!has_init_map(&[seg_with_map(None), seg_with_map(None)]));
+        assert!(
+            has_init_map(&[seg_with_map(Some("https://cdn.example/init.mp4"))]),
+            "带 EXT-X-MAP 的播放列表即 fMP4/CMAF，产物为 mp4 容器"
+        );
+    }
+
+    #[test]
+    fn test_needs_init_segment_writes_once_at_head() {
+        // 真实 CMAF 播放列表只在头部给一次 EXT-X-MAP（解析阶段会把它复制到其后
+        // 每一段）→ 只有首段之前需要落初始化段，绝不能逐段重复写 ftyp+moov。
+        let init = "https://cdn.example/init.mp4";
+        let segments = [
+            seg_with_map(Some(init)),
+            seg_with_map(Some(init)),
+            seg_with_map(Some(init)),
+        ];
+        assert!(needs_init_segment(&segments, 0));
+        assert!(!needs_init_segment(&segments, 1));
+        assert!(!needs_init_segment(&segments, 2));
+    }
+
+    #[test]
+    fn test_needs_init_segment_on_map_change() {
+        // 不连续点换了初始化段 → 必须在新段之前再写一次。
+        let segments = [
+            seg_with_map(Some("a.mp4")),
+            seg_with_map(Some("a.mp4")),
+            seg_with_map(Some("b.mp4")),
+            seg_with_map(Some("b.mp4")),
+        ];
+        assert!(needs_init_segment(&segments, 0));
+        assert!(!needs_init_segment(&segments, 1));
+        assert!(needs_init_segment(&segments, 2));
+        assert!(!needs_init_segment(&segments, 3));
+    }
+
+    #[test]
+    fn test_needs_init_segment_resume_does_not_rewrite() {
+        // 续传从第 3 段续写：它与上一段共用同一初始化段，上一轮已写在文件头部，
+        // 重写会把 ftyp+moov 插进文件中段（播放器可能在此处重新初始化）。
+        let init = "https://cdn.example/init.mp4";
+        let segments = [
+            seg_with_map(Some(init)),
+            seg_with_map(Some(init)),
+            seg_with_map(Some(init)),
+        ];
+        assert!(!needs_init_segment(&segments, 2));
+    }
+
+    #[test]
+    fn test_needs_init_segment_plain_ts_never_writes() {
+        let segments = [seg_with_map(None), seg_with_map(None)];
+        assert!(!needs_init_segment(&segments, 0));
+        assert!(!needs_init_segment(&segments, 1));
     }
 }

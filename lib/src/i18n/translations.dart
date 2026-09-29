@@ -391,6 +391,8 @@ class S {
   String detailQueueMovedToast(String name) =>
       _r('detailQueueMovedToast', {'name': name});
   String get detailLogHint => _r('detailLogHint');
+  String get detailLogCopy => _r('detailLogCopy');
+  String get detailLogCopied => _r('detailLogCopied');
   String get detailLogEmpty => _r('detailLogEmpty');
   String get detailLogCreated => _r('detailLogCreated');
   String detailLogSplit(
@@ -1593,6 +1595,8 @@ class S {
   String logStatusDegraded(int count, String error) =>
       _r('logStatusDegraded', {'count': count, 'error': error});
   String get logExportButton => _r('logExportButton');
+  String get logCopyButton => _r('logCopyButton');
+  String get logCopyToast => _r('logCopyToast');
   String get logOpenDirButton => _r('logOpenDirButton');
   String logExportSuccess(int count) =>
       _r('logExportSuccess', {'count': count});

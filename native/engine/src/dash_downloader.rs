@@ -159,7 +159,7 @@ pub async fn run_dash_download(params: DownloadParams) {
 }
 
 /// mux 使用的 ffmpeg 路径：manager 解析注入的组件路径，缺省回退 PATH 名。
-fn effective_ffmpeg(p: &DownloadParams) -> &Path {
+pub(crate) fn effective_ffmpeg(p: &DownloadParams) -> &Path {
     p.ffmpeg_path.as_deref().unwrap_or(Path::new("ffmpeg"))
 }
 
@@ -177,7 +177,10 @@ fn effective_ffmpeg(p: &DownloadParams) -> &Path {
 /// 无转码)。用于 ENOSPC 预检——mux 期间 video、audio、muxed_tmp 三文件
 /// 并存,峰值 ≈ 2x;空间不足时提前返回 Err,复用调用方"mux 失败保留
 /// 双文件"的既有降级分支,避免 ffmpeg 中途 ENOSPC。
-async fn mux_audio_video(
+///
+/// 合并成功后用 muxed 产物**原地替换** `video_path`(rename),故调用方传入的
+/// 必须是"视频轨文件"的路径；HLS 路径(fMP4 视频轨 + 独立音频轨)复用本函数。
+pub(crate) async fn mux_audio_video(
     video_path: &Path,
     audio_path: &Path,
     expected_bytes: u64,

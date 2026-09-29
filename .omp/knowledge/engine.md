@@ -42,11 +42,22 @@
 | **HTTP/HTTPS**（默认兜底） | fallthrough | `segment_coordinator`（IDM worker pool） | `downloader.rs` / `segment_coordinator.rs` / `segment_advisor.rs` |
 | **FTP** | `is_ftp_url` | `ftp_downloader::run_ftp_download` | `ftp_downloader.rs`（suppaftp 同步 + spawn_blocking） |
 | **BitTorrent** | `is_bt_url`（magnet 或 .torrent 哨兵） | librqbit `SharedBtSession` | `bt_downloader.rs` / `tracker_subscription.rs` |
-| **HLS** | `hls_downloader::is_hls_url` | `run_hls_download` | `hls_downloader.rs`（M3U8/多码率/AES-128） |
+| **HLS** | `hls_downloader::is_hls_url` | `run_hls_download` | `hls_downloader.rs`（M3U8/多码率/AES-128/EXT-X-MAP 即 fMP4·CMAF/独立音频轨 mux） |
 | **DASH / 音视频轨合并** | `is_dash_url` 或有 `audio_url` | `run_dash_download` | `dash_downloader.rs` |
 | **ED2K（仅下载）** | `ed2k::link::is_ed2k_url` | `ed2k::run_ed2k_download` | `ed2k/`（mod,link,proto,hash,server,peer,client,server_subscription,upnp,kad/） |
 
 - BT 任务绕过 pending 队列，且**不计入** http/ftp 并发计数（`max_concurrent`）。
+- **HLS 的 fMP4/CMAF 档（`EXT-X-MAP`）必须预置初始化段**：分片自身只有
+  moof+mdat，没有前置 `ftyp`+`moov` 就不可解码。写盘谓词是「本段 map ≠ 上一段
+  map」（`needs_init_segment`）而非「本段有 map」——真实 CMAF 播放列表只在头部写
+  一次 EXT-X-MAP，逐段写会把初始化段反复插进文件；续传也不能重写（上一轮已写在
+  文件头部）。另注意 m3u8-rs 把 `map` 当「仅作用于紧随其后那一段」（每个 URI 后
+  重置），与 `EXT-X-KEY` 一样需要在解析层自行跟踪。含初始化段 ⇒ 产物内容已是
+  mp4，最终落名换 `.mp4`（**不**走 ts2mp4）。
+- **HLS 视频轨常是纯视频**（YouTube 就是这样，音频单列一条 `m3u8`）：`audio_url`
+  非空时音频轨**与视频播放列表同一时刻**解析（直播/DVR 是滚动窗口，晚抓会错位），
+  视频下完后再逐段下载 + ffmpeg mux（`dash_downloader::mux_audio_video` 共用）；
+  ffmpeg 缺失/失败只降级为「保留 `.audio.m4a` 旁挂文件」，不判任务失败。
 - **BT 判定只认 `magnet:` 与 `torrent-file://` 哨兵**（`is_bt_url`）。HTTP 的
   `.torrent` **直链不会走 BT**——会被当普通文件下回来一个种子文件。要让直链
   变成真下载，必须先把字节抓下来再以 `NewTaskSpec::torrent_file_bytes` 建任务

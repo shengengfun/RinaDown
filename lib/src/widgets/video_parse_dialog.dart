@@ -207,7 +207,12 @@ class _VideoParseDialogContentState extends State<_VideoParseDialogContent> {
           ),
           if (_error.isNotEmpty) ...[
             const SizedBox(height: 10),
-            Text(_error, style: TextStyle(color: c.textMuted, fontSize: 12)),
+            // 可选中：解析失败的原因常需要贴给别人排障，别让用户对着不可选的
+            // 一行字手抄（日志面板同样支持框选 + 一键复制）。
+            SelectableText(
+              _error,
+              style: TextStyle(color: c.textMuted, fontSize: 12),
+            ),
           ],
           if (options.isNotEmpty) ...[
             const SizedBox(height: 14),
