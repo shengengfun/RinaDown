@@ -5,6 +5,7 @@
 !Cargo.lock
 !native
 !crates
+!examples
 !web
 !docker
 web/node_modules

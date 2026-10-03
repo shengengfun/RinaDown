@@ -50,6 +50,9 @@ COPY native/ native/
 # "failed to load manifest for workspace member /src/crates/*"。此处只需目录存在
 # 即可，不会编译这些成员（只 build rinadown_server）。.dockerignore 的白名单同步放行。
 COPY crates/ crates/
+# examples/plugins/ytdlp 由 rinadown_engine 用 include_str! 内嵌（内置插件种子），
+# 缺了会让 engine 直接编译失败（couldn't read .../examples/plugins/ytdlp/manifest.json）。
+COPY examples/ examples/
 # Web SPA 在编译期由 native/server/build.rs 嵌入二进制（单文件分发，运行时层
 # 不再有 web/ 目录，也无需 RINADOWN_WEBROOT）。
 COPY --from=web /src/web/dist /webroot
