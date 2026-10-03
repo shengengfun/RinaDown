@@ -42,6 +42,7 @@ import '../widgets/group_detail_panel.dart';
 import '../widgets/status_bar.dart';
 import '../widgets/new_download_dialog.dart';
 import '../widgets/video_parse_dialog.dart';
+import '../widgets/builtin_browser_dialog.dart';
 import '../widgets/incoming_pairing_dialog.dart';
 import '../widgets/task_list_item.dart';
 import '../widgets/title_drag_area.dart';
@@ -1127,6 +1128,7 @@ class _HomePageState extends State<HomePage> {
                   _settingsProvider,
                 ),
                 onVideoParse: () => showVideoParseDialog(context),
+                onBuiltinBrowser: () => showBuiltinBrowserDialog(context),
                 onRevealTask: _revealTask,
                 onNavigateToSettings: (item) {
                   setState(() {

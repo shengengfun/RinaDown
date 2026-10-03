@@ -50,7 +50,7 @@ SharedPreferences 门面，**便携模式**（`portable` 标记）写 `<exe>/por
 - **manifest 对话框族**：`manifest_select_dialog`/`manifest_select_view`（与 popup 共享）/`manifest_dialog_chrome`/`manifest_browse_list`/`manifest_advanced_panel`（backed by `models/manifest_selection`+`manifest_breadcrumb`）。
 - **组件**：`task_group_card`/`group_detail_panel`（backed by `models/task_group`）。
 - **详情**：`detail_panel`/`bt_file_list_widget`。
-- **对话框族**：`new_download_dialog`、`quick_download_dialog`+`quick_download_form`（与 popup 共享）、`queue_manager_dialog`、`plugin_detail_dialog`/`plugin_setting_form`/`plugin_list_view`、`resolve_variant_dialog`、`hls_quality_dialog`、`bt_file_selection_dialog`、`category_edit_dialog`、`update_changelog_dialog`、`feedback_dialog`。
+- **对话框族**：`new_download_dialog`、`quick_download_dialog`+`quick_download_form`（与 popup 共享）、`builtin_browser_dialog`（**内置浏览器**：`dart:io HttpClient` 抓取页面 HTML → 后缀白名单/媒体标签提取可下载直链 → 一键建任务，取代外部浏览器；不引 WebView 依赖）、`queue_manager_dialog`、`plugin_detail_dialog`/`plugin_setting_form`/`plugin_list_view`、`resolve_variant_dialog`、`hls_quality_dialog`、`bt_file_selection_dialog`、`category_edit_dialog`、`update_changelog_dialog`、`feedback_dialog`。
 - **原语**：`flux_sonner`（toast）、`context_menu`、`split_action_button`、`number_selector`、`ui_scale_widget`、`dir_picker_field`。
 
 ### 移动端 `mobile/`（Android 已发布）

@@ -229,6 +229,15 @@ class S {
   String get trafficWheelHint => _r('trafficWheelHint');
   String get recentDirs => _r('recentDirs');
   String get recentDirsEmpty => _r('recentDirsEmpty');
+  String get builtinBrowser => _r('builtinBrowser');
+  String get builtinBrowserHint => _r('builtinBrowserHint');
+  String get builtinBrowserUrlPlaceholder => _r('builtinBrowserUrlPlaceholder');
+  String get builtinBrowserOpen => _r('builtinBrowserOpen');
+  String get builtinBrowserLoading => _r('builtinBrowserLoading');
+  String get builtinBrowserFetchFailed => _r('builtinBrowserFetchFailed');
+  String get builtinBrowserNoLinks => _r('builtinBrowserNoLinks');
+  String get builtinBrowserTakeover => _r('builtinBrowserTakeover');
+  String get builtinBrowserDownloadAll => _r('builtinBrowserDownloadAll');
   String get perfCpu => _r('perfCpu');
   String get perfRam => _r('perfRam');
   String get perfNetD => _r('perfNetD');

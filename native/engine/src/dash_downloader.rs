@@ -163,12 +163,39 @@ pub(crate) fn effective_ffmpeg(p: &DownloadParams) -> &Path {
     p.ffmpeg_path.as_deref().unwrap_or(Path::new("ffmpeg"))
 }
 
-/// Attempt to mux separate audio and video files into a single MP4 using ffmpeg.
+/// 合并输出容器：跟随目标扩展名（webm/mkv/m4v/mov），其余一律 mp4。返回
+/// `(容器扩展名, 是否 mov 家族)`——后者决定是否追加 `-movflags +faststart`
+/// （mov/mp4 私有 muxer 选项，webm/mkv 上传会直接报错）。
+///
+/// 注意：HLS 路径的 dest 可能是中间名 `.ts`，不能直接当容器（HLS mux 后另有
+/// rename 到 `.mp4` 的步骤），故不在识别范围内、回落到 mp4。
+fn mux_container_for(path: &Path) -> (&'static str, bool) {
+    match path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("webm") => ("webm", false),
+        Some("mkv") => ("mkv", false),
+        Some("m4v") | Some("mov") => ("mov", true),
+        _ => ("mp4", true),
+    }
+}
+
+/// Attempt to mux separate audio and video files into a single playable file
+/// using ffmpeg.
 ///
 /// DASH streams split audio and video into separate files.  This function
 /// invokes the resolved `ffmpeg` binary (if available) to combine them into a
 /// single playable file.  If ffmpeg is not installed, returns an error — the
 /// caller should fall back to keeping both files.
+///
+/// 输出容器跟随 `video_path` 的扩展名（仅识别 mp4/mov/webm/mkv，其余一律按
+/// MP4）。硬编码 MP4 会让 WebM 音轨（Opus）无法 `-c copy` 封入而 mux 失败，
+/// 降级为「视频无音轨 + 独立音频文件」——用户看到的就是「下完的视频没声音」。
+/// 插件轨对（如 yt-dlp 的 VP9+Opus）因此会带上 `.webm` 落名，这里必须按
+/// WebM 容器合并才能保留音轨。
 ///
 /// The muxing is done with `-c copy` (stream copy, no re-encoding) which is
 /// near-instant regardless of file size.
@@ -189,8 +216,9 @@ pub(crate) async fn mux_audio_video(
 ) -> Result<(), DownloadError> {
     use tokio::process::Command;
 
+    let (container_ext, is_mp4) = mux_container_for(video_path);
     // Build a temporary output path to avoid overwriting the video while muxing
-    let muxed_tmp = video_path.with_extension("muxed.mp4");
+    let muxed_tmp = video_path.with_extension(format!("muxed.{container_ext}"));
 
     // ENOSPC 预检:None(网络盘/超时,无法探测)乐观放行——预检是优化,
     // 安全网是下方既有的 ffmpeg 失败清理路径。
@@ -214,23 +242,19 @@ pub(crate) async fn mux_audio_video(
     // future), the child process is killed automatically.
     let mut cmd = Command::new(ffmpeg);
     crate::proc::no_console_window(&mut cmd);
+    cmd.args([
+        "-y", // overwrite output without asking
+        "-i", &video_str, "-i", &audio_str, "-map",
+        "0:v:0", // select first video stream from first input
+        "-map", "1:a:0", // select first audio stream from second input
+        "-c", "copy", // stream copy, no re-encoding
+    ]);
+    // `-movflags` 是 mov/mp4 私有 muxer 选项，webm/mkv 上行会直接报错。
+    if is_mp4 {
+        cmd.args(["-movflags", "+faststart"]); // web-optimized MP4
+    }
     let output_fut = cmd
-        .args([
-            "-y", // overwrite output without asking
-            "-i",
-            &video_str,
-            "-i",
-            &audio_str,
-            "-map",
-            "0:v:0", // select first video stream from first input
-            "-map",
-            "1:a:0", // select first audio stream from second input
-            "-c",
-            "copy", // stream copy, no re-encoding
-            "-movflags",
-            "+faststart", // web-optimized MP4
-            &muxed_str,
-        ])
+        .arg(&muxed_str)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::piped())
         .kill_on_drop(true)
@@ -2045,7 +2069,30 @@ async fn download_segment_streaming(
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
-    use super::{build_from_template, is_dash_url, resolve_url_template};
+    use super::{build_from_template, is_dash_url, mux_container_for, resolve_url_template};
+    use std::path::Path;
+
+    /// mux 输出容器跟随目标扩展名：webm/mkv 必须各自成容器（否则 Opus/VP9
+    /// 无法 `-c copy` 进 MP4，mux 失败 → 用户拿到的视频「没声音」）；HLS 的
+    /// `.ts` 中间名与无扩展名回落到 mp4；只有 mov 家族才带 `-movflags`。
+    #[test]
+    fn mux_container_follows_destination_extension() {
+        assert_eq!(
+            mux_container_for(Path::new("D:/dl/a.webm")),
+            ("webm", false)
+        );
+        assert_eq!(
+            mux_container_for(Path::new("D:/dl/a.WEBM")),
+            ("webm", false)
+        );
+        assert_eq!(mux_container_for(Path::new("D:/dl/a.mkv")), ("mkv", false));
+        assert_eq!(mux_container_for(Path::new("D:/dl/a.mp4")), ("mp4", true));
+        assert_eq!(mux_container_for(Path::new("D:/dl/a.m4v")), ("mov", true));
+        assert_eq!(mux_container_for(Path::new("D:/dl/a.mov")), ("mov", true));
+        // HLS 中间产物 / 无扩展名 → MP4（后续另有 rename 到 .mp4 的步骤）。
+        assert_eq!(mux_container_for(Path::new("D:/dl/a.ts")), ("mp4", true));
+        assert_eq!(mux_container_for(Path::new("D:/dl/plain")), ("mp4", true));
+    }
 
     /// 构造一个仅含 SegmentTimeline 的最小 SegmentTemplate，用于驱动
     /// build_from_template 的 r=-1 末段计数测试。

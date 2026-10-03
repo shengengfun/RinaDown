@@ -55,6 +55,9 @@ class SearchResult {
 class HeaderBar extends StatefulWidget {
   final VoidCallback onNewDownload;
   final VoidCallback onVideoParse;
+
+  /// 打开内置浏览器（应用内抓取网页并接管其下载链接）。
+  final VoidCallback onBuiltinBrowser;
   final DownloadController controller;
   final void Function(SettingsSearchItem item) onNavigateToSettings;
 
@@ -69,6 +72,7 @@ class HeaderBar extends StatefulWidget {
     super.key,
     required this.onNewDownload,
     required this.onVideoParse,
+    required this.onBuiltinBrowser,
     required this.controller,
     required this.onNavigateToSettings,
     required this.onRevealTask,
@@ -324,6 +328,29 @@ class HeaderBarState extends State<HeaderBar> {
                       fontSize: 13,
                       color: Color(0xFF123B2A),
                       fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            ShadButton(
+              onPressed: widget.onBuiltinBrowser,
+              height: 30,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              backgroundColor: c.surface2,
+              hoverBackgroundColor: c.surface3,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(LucideIcons.globe, size: 14, color: c.accent),
+                  const SizedBox(width: 6),
+                  Text(
+                    s.builtinBrowser,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: c.textPrimary,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],

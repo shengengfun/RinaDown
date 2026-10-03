@@ -176,10 +176,36 @@ function headersOf(f, info) {
   return keys.length ? out : null;
 }
 
+// 取视频格式的高度（px）。优先 f.height，缺失时回退解析 f.resolution
+// （"1920x1080" / "1080p" 等）。某些客户端返回的格式只给 resolution、height
+// 为 null，只读 height 会让画质档丢失分辨率（表现为「分辨率无法获取」）。
+function heightOf(f) {
+  if (!f) return 0;
+  var h = Number(f.height);
+  if (h > 0) return Math.round(h);
+  var res = String(f.resolution || '');
+  var m = /(\d{3,4})\s*[x×]\s*(\d{3,4})/.exec(res);
+  if (m) return Number(m[2]);
+  m = /^(\d{3,4})p?$/.exec(res.trim());
+  if (m) return Number(m[1]);
+  return 0;
+}
+
+// 与给定视频容器匹配的音频容器（保证 ffmpeg 能 -c copy 进同一容器）：
+// webm 视频配 webm(Opus) 音频、mp4/mov 视频配 m4a(AAC) 音频。容器不匹配时
+// mux 会失败降级为「视频无音轨 + 独立音频文件」，用户看到的就是「没声音」。
+function audioExtFor(videoExt) {
+  var e = String(videoExt || '').toLowerCase();
+  if (e === 'webm') return 'webm';
+  if (e === 'mp4' || e === 'm4v' || e === 'mov') return 'm4a';
+  return null;
+}
+
 // 从完整格式列表（info.formats，不受 -f 选择器影响）中选出最佳纯音频轨
-// （vcodec=none 且 acodec!=none）。preferMp4 时优先 m4a（AAC 容器，兼容性更
-// 好），其余情形按码率/文件大小取最高。供多个 video-only 变体共享配对音频。
-function pickBestAudio(formats, preferMp4) {
+// （vcodec=none 且 acodec!=none）。wantExt 非空时只考虑该容器（与视频容器
+// 配对，保证可 copy 合并）；否则 preferMp4 时优先 m4a（AAC，兼容性更好），
+// 其余按码率/文件大小取最高。无可用音频轨返回 null。
+function pickBestAudio(formats, preferMp4, wantExt) {
   var best = null;
   var bestScore = -1;
   for (var i = 0; i < formats.length; i++) {
@@ -188,8 +214,9 @@ function pickBestAudio(formats, preferMp4) {
     var hasA = f.acodec && f.acodec !== 'none';
     var hasV = f.vcodec && f.vcodec !== 'none';
     if (!hasA || hasV) continue;
+    if (wantExt && String(f.ext || '').toLowerCase() !== wantExt) continue;
     var score = (Number(f.abr) || Number(f.tbr) || 0) * 1000 + sizeOf(f) / 1e6;
-    if (preferMp4 && f.ext === 'm4a') score += 1e9;
+    if (!wantExt && preferMp4 && f.ext === 'm4a') score += 1e9;
     if (score > bestScore) {
       bestScore = score;
       best = f;
@@ -200,7 +227,9 @@ function pickBestAudio(formats, preferMp4) {
 
 // 从完整格式列表中，为目标高度梯度选出「不超过该高度、越接近越好」的最优视频
 // 轨（可能是纯视频轨，也可能是已混流轨）。preferMp4 时同等条件优先 mp4 容器。
-function pickVideoAtOrBelow(formats, targetHeight, preferMp4) {
+// needMuxedAudio 为真（列表中没有任何独立音频轨可配对）时，只接受自带音轨的
+// 混流格式——否则选出的纯视频轨无音可配，下载完就是「没声音」。
+function pickVideoAtOrBelow(formats, targetHeight, preferMp4, needMuxedAudio) {
   var best = null;
   var bestScore = -1;
   for (var i = 0; i < formats.length; i++) {
@@ -208,8 +237,34 @@ function pickVideoAtOrBelow(formats, targetHeight, preferMp4) {
     if (!f || !f.url) continue;
     var hasV = f.vcodec && f.vcodec !== 'none';
     if (!hasV) continue;
-    var h = Number(f.height) || 0;
+    var h = heightOf(f);
     if (h <= 0 || h > targetHeight) continue;
+    var hasA = f.acodec && f.acodec !== 'none';
+    if (needMuxedAudio && !hasA) continue;
+    var score = h * 1e6 + (Number(f.tbr) || 0);
+    if (preferMp4 && f.ext === 'mp4') score += 1e12;
+    if (score > bestScore) {
+      bestScore = score;
+      best = f;
+    }
+  }
+  return best;
+}
+
+// 列表中高度最高的「已混流」格式（vcodec 与 acodec 均非 none）。仅用于
+// 视频轨为纯视频、但整张格式表没有任何可配对音频轨时的兜底：宁可降到带声音的
+// 混流档，也不给用户一个静音视频。无可选返回 null。
+function pickBestMuxed(formats, preferMp4) {
+  var best = null;
+  var bestScore = -1;
+  for (var i = 0; i < formats.length; i++) {
+    var f = formats[i];
+    if (!f || !f.url) continue;
+    var hasV = f.vcodec && f.vcodec !== 'none';
+    var hasA = f.acodec && f.acodec !== 'none';
+    if (!hasV || !hasA) continue;
+    var h = heightOf(f);
+    if (h <= 0) continue;
     var score = h * 1e6 + (Number(f.tbr) || 0);
     if (preferMp4 && f.ext === 'mp4') score += 1e12;
     if (score > bestScore) {
@@ -264,24 +319,33 @@ function buildVariants(info, preferMp4, base, singleMeta) {
 
   var formats = Array.isArray(info.formats) ? info.formats : [];
   if (formats.length) {
-    var bestAudio = pickBestAudio(formats, preferMp4);
+    var bestAudio = pickBestAudio(formats, preferMp4, null);
 
     for (var i = 0; i < VARIANT_HEIGHT_TIERS.length && list.length < MAX_VARIANTS; i++) {
-      var vf = pickVideoAtOrBelow(formats, VARIANT_HEIGHT_TIERS[i], preferMp4);
-      if (!vf || !vf.height || seenHeights[vf.height]) continue;
-      seenHeights[vf.height] = true;
+      var vf = pickVideoAtOrBelow(
+        formats, VARIANT_HEIGHT_TIERS[i], preferMp4, !bestAudio
+      );
+      if (!vf) continue;
+      var vfHeight = heightOf(vf);
+      if (!vfHeight || seenHeights[vfHeight]) continue;
+      seenHeights[vfHeight] = true;
       var hasMuxedAudio = vf.acodec && vf.acodec !== 'none';
       var container = vf.ext || 'mp4';
-      var pairAudio = !hasMuxedAudio && bestAudio;
+      // 纯视频轨优先配「与视频容器一致」的音频（可 copy 合并）；无匹配容器时
+      // 回退任意最佳音频；仍无则跳过该档（不能产出静音视频）。
+      var pairAudio = hasMuxedAudio
+        ? null
+        : (pickBestAudio(formats, preferMp4, audioExtFor(container)) || bestAudio);
+      if (!hasMuxedAudio && !pairAudio) continue;
       list.push(buildVariant({
-        label: vf.height + 'p ' + container.toUpperCase(),
+        label: vfHeight + 'p ' + container.toUpperCase(),
         url: vf.url,
-        audioUrl: pairAudio ? bestAudio.url : '',
+        audioUrl: pairAudio ? pairAudio.url : '',
         fileName: base + '.' + container,
-        totalBytes: sizeOf(vf) + (pairAudio ? sizeOf(bestAudio) : 0),
+        totalBytes: sizeOf(vf) + (pairAudio ? sizeOf(pairAudio) : 0),
         bandwidth: Number(vf.tbr) ? Math.round(Number(vf.tbr) * 1000) : 0,
         width: Number(vf.width) || 0,
-        height: Number(vf.height),
+        height: vfHeight,
         container: container,
       }));
     }
@@ -591,6 +655,8 @@ globalThis.resolve = async (ctx) => {
   if (variantMatch) selectedVariantIndex = Number(variantMatch[1]);
   var reqs = Array.isArray(info.requested_formats) ? info.requested_formats : null;
 
+  var allFormats = Array.isArray(info.formats) ? info.formats : [];
+
   // 情形 A：requested_formats（音视频分离或选定单流）。
   if (reqs && reqs.length >= 1) {
     var vf = null;
@@ -599,36 +665,75 @@ globalThis.resolve = async (ctx) => {
       var f = reqs[i];
       var hasV = f.vcodec && f.vcodec !== 'none';
       var hasA = f.acodec && f.acodec !== 'none';
+      // 只把「纯视频轨」记作 vf——混流轨走下面的 muxed 分支，绝不把它同时
+      // 当音频轨（会把同一 URL 下两遍，且不是真正的音视频分离）。
       if (hasV && !vf) vf = f;
       else if (hasA && !hasV && !af) af = f;
-      else if (hasA && !af) af = f;
     }
 
     if (vf && vf.url) {
+      var vExt = extOf(vf, info, true).slice(1) || 'mp4';
       var vFileName = base + extOf(vf, info, true);
-      var vContainer = extOf(vf, info, true).slice(1) || 'mp4';
-      var vHeight = Number(vf.height) || Number(info.height) || 0;
+      var vContainer = vExt;
+      var vHeight = heightOf(vf) || heightOf(info) || 0;
+      var vMuxed = !!(vf.acodec && vf.acodec !== 'none');
+      // 纯视频轨必须配一条音频轨，否则下完的文件就是「没声音」。requested_formats
+      // 缺音频（部分 player_client / 回退档会出现）时从 info.formats 补选：优先与
+      // 视频容器一致的音频（保证可 copy 合并），退而取任意最佳音频；整表都没有
+      // 独立音频轨时，退回带声音的混流档（宁可降画质也不给静音视频）。
+      var vAudioExt = audioExtFor(vExt);
+      if (!vMuxed && vAudioExt && af && String(af.ext || '').toLowerCase() !== vAudioExt) {
+        // requested_formats 里的音频容器与视频不一致（mux 无法 copy 合并）→
+        // 换成与该容器匹配的音频轨。
+        var matchedAudio = pickBestAudio(allFormats, preferMp4, vAudioExt);
+        if (matchedAudio) af = matchedAudio;
+      }
+      var pairedAudio = null;
+      if (!vMuxed) {
+        pairedAudio = (af && af.url ? af : null) ||
+          pickBestAudio(allFormats, preferMp4, vAudioExt) ||
+          pickBestAudio(allFormats, preferMp4, null);
+        if (!pairedAudio) {
+          var muxedFallback = pickBestMuxed(allFormats, preferMp4);
+          if (muxedFallback && muxedFallback.url) {
+            if (verbose) {
+              flux.logger.info(
+                '[ytdlp] no separate audio track — falling back to muxed',
+                muxedFallback.format_id
+              );
+            }
+            vf = muxedFallback;
+            vExt = extOf(vf, info, true).slice(1) || 'mp4';
+            vFileName = base + extOf(vf, info, true);
+            vContainer = vExt;
+            vHeight = heightOf(vf) || vHeight;
+            vMuxed = true;
+          }
+        }
+      }
+      var vTotal = sizeOf(vf) + (pairedAudio ? sizeOf(pairedAudio) : 0);
       var result = {
         url: vf.url,
         fileName: vFileName,
-        totalBytes: (sizeOf(vf) + sizeOf(af)) || null,
+        totalBytes: vTotal || null,
         extraHeaders: headersOf(vf, info),
         ephemeral: true,
         rangeSupported: true,
       };
-      if (af && af.url) result.audioUrl = af.url;
+      if (pairedAudio && pairedAudio.url) result.audioUrl = pairedAudio.url;
       if (verbose) {
         flux.logger.info(
           '[ytdlp] video', vf.format_id, vf.ext,
-          af ? 'audio ' + af.format_id : 'muxed'
+          pairedAudio ? 'audio ' + pairedAudio.format_id
+            : (vMuxed ? 'muxed' : 'video-only(无可配对音轨)')
         );
       }
       var builtV = buildVariants(info, preferMp4, base, {
         label: (vHeight ? vHeight + 'p ' : '') + vContainer.toUpperCase(),
         url: vf.url,
-        audioUrl: (af && af.url) ? af.url : '',
+        audioUrl: (pairedAudio && pairedAudio.url) ? pairedAudio.url : '',
         fileName: vFileName,
-        totalBytes: sizeOf(vf) + sizeOf(af),
+        totalBytes: vTotal,
         bandwidth: Number(vf.tbr) ? Math.round(Number(vf.tbr) * 1000) : 0,
         width: Number(vf.width) || 0,
         height: vHeight,
@@ -644,28 +749,38 @@ globalThis.resolve = async (ctx) => {
 
   // 情形 B：单一 muxed 流（顶层 url）。
   if (info.url) {
+    var bInfoHeight = heightOf(info);
     var hasVideo = !!(info.vcodec && info.vcodec !== 'none') ||
-      Number(info.height) > 0 || Number(info.width) > 0;
+      bInfoHeight > 0 || Number(info.width) > 0;
     if (verbose) flux.logger.info('[ytdlp] muxed single', info.format_id, info.ext);
     var bFileName = base + extOf(info, info, hasVideo);
     var bContainer = extOf(info, info, hasVideo).slice(1) || (hasVideo ? 'mp4' : 'm4a');
-    var bHeight = hasVideo ? (Number(info.height) || 0) : 0;
+    var bHeight = hasVideo ? bInfoHeight : 0;
+    // 顶层流若为「纯视频」（无音轨）同样要配对音频，否则下完没声音。
+    var bMuxed = !!(info.acodec && info.acodec !== 'none');
+    var bAudio = null;
+    if (hasVideo && !bMuxed) {
+      bAudio = pickBestAudio(allFormats, preferMp4, audioExtFor(bContainer)) ||
+        pickBestAudio(allFormats, preferMp4, null);
+    }
+    var bTotal = sizeOf(info) + (bAudio ? sizeOf(bAudio) : 0);
     var single2 = {
       url: info.url,
       fileName: bFileName,
-      totalBytes: sizeOf(info) || null,
+      totalBytes: bTotal || null,
       extraHeaders: headersOf(null, info),
       ephemeral: true,
       rangeSupported: true,
     };
+    if (bAudio && bAudio.url) single2.audioUrl = bAudio.url;
     var builtB = buildVariants(info, preferMp4, base, {
       label: hasVideo
         ? (bHeight ? bHeight + 'p ' : '') + bContainer.toUpperCase()
         : 'Audio only (' + bContainer + ')',
       url: info.url,
-      audioUrl: '',
+      audioUrl: (bAudio && bAudio.url) ? bAudio.url : '',
       fileName: bFileName,
-      totalBytes: sizeOf(info),
+      totalBytes: bTotal,
       bandwidth: Number(info.tbr) ? Math.round(Number(info.tbr) * 1000) : 0,
       width: hasVideo ? (Number(info.width) || 0) : 0,
       height: bHeight,

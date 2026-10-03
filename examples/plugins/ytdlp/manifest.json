@@ -1,7 +1,7 @@
 {
   "identity": "rinadown@ytdlp",
   "name": "yt-dlp 通用视频解析",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "经 RinaDown yt-dlp 组件把视频页解析为可下载直链，交回引擎多段并发下载 + 断点续传。为避免误接管任意链接，仅对一批社区默认、低版权风险的主流平台生效：YouTube / Bilibili（B站）/ Niconico / Twitch / Vimeo / Dailymotion / SoundCloud / AcFun（A站）。画质在下载时经画质选择弹框由用户挑选（含各分辨率与仅音频档，非在设置里固定）；可为需要登录的平台分别配置 Cookie（如 B站大会员画质、YouTube 会员/风控、Vimeo 私有视频）。⚠ YouTube 依赖 JS 运行时：需在系统 PATH 安装 Node.js（≥22）或 Deno（≥2.3），否则无法求解 n-sig 挑战（其他平台通常不需要）。签名直链自动按一次性 URL 处理并透传 http_headers 鉴权头。关闭「优先 MP4 容器」时下载完成后经 ffmpeg 转码为 H.264/AAC mp4。需在 App「组件」页安装 yt-dlp（及可选 ffmpeg）。",
   "homepage": "https://rinadown.zerx.dev",
   "minAppVersion": "0.1.60",
