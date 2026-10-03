@@ -1566,7 +1566,6 @@ jobs:
 
       - name: Replace server executable with signed version
         if: ${{ runner.os == 'Windows' && env.SIGNPATH_API_TOKEN != '' }}
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           Copy-Item "build\signing\signed\rinadown-server.exe" "target\${{ matrix.target }}\release\rinadown-server.exe" -Force
@@ -1783,7 +1782,6 @@ jobs:
 
       - name: Replace CLI executable with signed version
         if: ${{ runner.os == 'Windows' && env.SIGNPATH_API_TOKEN != '' }}
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           Copy-Item "build\signing\signed\rinadown.exe" "target\${{ matrix.target }}\release\rinadown.exe" -Force
