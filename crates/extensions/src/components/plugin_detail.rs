@@ -2,12 +2,12 @@
 
 use std::rc::Rc;
 
-use rinadown_protocol::{MarketEntryDto, PluginDto};
-use rinadown_ui_i18n::Translator;
 use gpui::{App, IntoElement, ParentElement, SharedString, Styled, Window, div, px};
 use gpui_component::{
     ActiveTheme as _, StyledExt as _, WindowExt as _, h_flex, link::Link, tag::Tag, v_flex,
 };
+use rinadown_protocol::{MarketEntryDto, PluginDto};
+use rinadown_ui_i18n::Translator;
 
 /// 详情对话框的数据；调用侧从各自 DTO 拆字段。
 #[derive(Clone, Debug, Default)]

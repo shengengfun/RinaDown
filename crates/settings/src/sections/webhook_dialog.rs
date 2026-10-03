@@ -3,10 +3,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use rinadown_protocol::{RpcErrorData, WebhookDeliveriesResponse, WebhookPresetDto, method};
-use rinadown_ui_components::{ButtonVariant, button};
-use rinadown_ui_i18n::Translator;
-use rinadown_ui_theme::active_theme;
 use gpui::{
     Anchor, App, AppContext as _, ClickEvent, ClipboardItem, Context, Div, Entity,
     InteractiveElement as _, IntoElement, ParentElement, Render, SharedString,
@@ -22,6 +18,10 @@ use gpui_component::{
     switch::Switch,
     v_flex,
 };
+use rinadown_protocol::{RpcErrorData, WebhookDeliveriesResponse, WebhookPresetDto, method};
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_i18n::Translator;
+use rinadown_ui_theme::active_theme;
 use serde_json::{Value, json};
 
 use super::webhook::{EndpointSpec, WEBHOOK_EVENTS, read_endpoints, write_endpoints};

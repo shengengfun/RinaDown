@@ -1,14 +1,14 @@
 //! Doctor：环境自检报告与就地修复。检查项 `id`/`hint`/`repair.action` 由 agent 给出。
 
-use rinadown_protocol::{DiagnosticLevel, DiagnosticRepairParams, method};
-use rinadown_ui_components::{ButtonVariant, button};
-use rinadown_ui_theme::active_theme;
 use gpui::{App, ClipboardItem, IntoElement as _, ParentElement, SharedString, Styled, div};
 use gpui_component::{
     Icon, IconName, h_flex,
     setting::{SettingGroup, SettingItem, SettingPage},
     v_flex,
 };
+use rinadown_protocol::{DiagnosticLevel, DiagnosticRepairParams, method};
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_theme::active_theme;
 use serde_json::json;
 
 use super::{SectionContext, camel};

@@ -3,12 +3,12 @@
 //! gpui-base 提供交互、键盘与无障碍语义；本 crate 只负责从完整主题 token
 //! 组装稳定的 shadcn 风格。业务组件依赖这里，不直接散落颜色和尺寸字面量。
 
-use rinadown_ui_theme::active_theme;
 use gpui::{
     App, Div, ElementId, FontWeight, Hsla, InteractiveElement, IntoElement, ParentElement,
     SharedString, StatefulInteractiveElement as _, Styled, div, px, relative,
 };
 use gpui_base::Button;
+use rinadown_ui_theme::active_theme;
 
 /// 基础按钮的视觉语义。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

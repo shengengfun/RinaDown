@@ -1,12 +1,12 @@
 //! 下载：保存位置、行为、连接与性能、自动重试、高级。
 
-use rinadown_ui_components::{ButtonVariant, button};
-use rinadown_ui_theme::active_theme;
 use gpui::{App, ParentElement, SharedString, Styled, div};
 use gpui_component::{
     Icon, IconName, h_flex,
     setting::{SettingField, SettingGroup, SettingPage},
 };
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_theme::active_theme;
 
 use super::{SectionContext, user_agent};
 

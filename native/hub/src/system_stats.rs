@@ -38,9 +38,18 @@ fn ft(ts: FILETIME) -> u64 {
 /// 读一次快照 → (cpu%, ram%, rx_bps, tx_bps)。非 Windows / 采样失败返回 None。
 fn sample() -> Option<(f32, f32, f32, f32)> {
     unsafe {
-        let mut idle = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
-        let mut kernel = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
-        let mut user = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+        let mut idle = FILETIME {
+            dwLowDateTime: 0,
+            dwHighDateTime: 0,
+        };
+        let mut kernel = FILETIME {
+            dwLowDateTime: 0,
+            dwHighDateTime: 0,
+        };
+        let mut user = FILETIME {
+            dwLowDateTime: 0,
+            dwHighDateTime: 0,
+        };
         if GetSystemTimes(&mut idle, &mut kernel, &mut user) == 0 {
             return None;
         }
@@ -74,7 +83,14 @@ fn sample() -> Option<(f32, f32, f32, f32)> {
             rx_bps = rx.saturating_sub(p.rx) as f32 / dt;
             tx_bps = tx.saturating_sub(p.tx) as f32 / dt;
         }
-        *guard = Some(Prev { idle, kernel, user, rx, tx, instant: now });
+        *guard = Some(Prev {
+            idle,
+            kernel,
+            user,
+            rx,
+            tx,
+            instant: now,
+        });
         Some((cpu, ram, rx_bps, tx_bps))
     }
 }

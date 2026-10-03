@@ -4,8 +4,6 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use rinadown_protocol::{PluginDto, RpcErrorData, SettingFieldDto};
-use rinadown_ui_i18n::Translator;
 use gpui::{
     Anchor, AppContext as _, ClipboardItem, Context, Entity, InteractiveElement as _, IntoElement,
     ParentElement, Render, SharedString, StatefulInteractiveElement as _, Styled, Window, div,
@@ -21,6 +19,8 @@ use gpui_component::{
     switch::Switch,
     v_flex,
 };
+use rinadown_protocol::{PluginDto, RpcErrorData, SettingFieldDto};
+use rinadown_ui_i18n::Translator;
 
 use crate::{ExtensionsPort, controller::update_plugin_settings, error_text};
 

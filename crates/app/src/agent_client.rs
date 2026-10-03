@@ -7,12 +7,12 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 
+use futures_util::{SinkExt, StreamExt};
 use rinadown_protocol::method;
 use rinadown_protocol::{
     AgentSnapshot, ApplicationErrorCode, EventFrame, RequestId, RpcErrorData, RpcNotification,
     RpcRequest, RpcResponse, ServiceHello, ServiceRole, Snapshot, SnapshotBody,
 };
-use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;

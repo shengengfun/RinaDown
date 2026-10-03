@@ -6,13 +6,13 @@
 
 use std::time::Duration;
 
+use reqwest::{Client, Method, StatusCode};
 use rinadown_api::auth::TOKEN_HEADER;
 use rinadown_api::routes;
 use rinadown_api::service::UNKNOWN_ENDPOINT_MESSAGE;
 use rinadown_protocol::daemon::{
     ApiInfo, CreateTaskRequest, CreatedTask, QueueDto, RssItemDto, RssSourceDto, TaskDto,
 };
-use reqwest::{Client, Method, StatusCode};
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 

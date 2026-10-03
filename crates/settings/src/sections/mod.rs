@@ -21,13 +21,13 @@ pub(crate) mod user_agent;
 pub(crate) mod webhook;
 pub(crate) mod webhook_dialog;
 
-use rinadown_protocol::{DaemonConfigKind, daemon_config_field};
-use rinadown_ui_i18n::Translator;
 use gpui::{AnyView, App, Entity, IntoElement as _, ParentElement as _, SharedString};
 use gpui_component::{
     Icon, IconName,
     setting::{NumberFieldOptions, SettingField, SettingGroup, SettingItem, SettingPage},
 };
+use rinadown_protocol::{DaemonConfigKind, daemon_config_field};
+use rinadown_ui_i18n::Translator;
 
 use crate::store::SettingsStore;
 

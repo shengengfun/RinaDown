@@ -6,6 +6,10 @@ use std::{
     sync::Arc,
 };
 
+use gpui::{
+    App, AppContext as _, Bounds, Entity, WeakEntity, Window, WindowBounds, WindowHandle, px, size,
+};
+use gpui_component::{Icon, IconName, Root};
 use rinadown_ui_account::AccountView;
 use rinadown_ui_downloads::{
     DOWNLOAD_ICON_PATH, DownloadView, NewDownloadContext, NewDownloadView,
@@ -18,10 +22,6 @@ use rinadown_ui_shell::{
     AuxiliaryWindowView, RouteId, ShellAction, ShellRoute, ShellView, auxiliary_window_options,
     main_window_options,
 };
-use gpui::{
-    App, AppContext as _, Bounds, Entity, WeakEntity, Window, WindowBounds, WindowHandle, px, size,
-};
-use gpui_component::{Icon, IconName, Root};
 
 use crate::account_port::AgentAccountPort;
 use crate::agent_client::{AgentClient, AgentClientConfig, AgentClientEvent};

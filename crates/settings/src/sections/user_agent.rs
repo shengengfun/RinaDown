@@ -1,6 +1,5 @@
 //! 全局 User-Agent：预设下拉 + 自定义输入，与 `lib/src/models/ua_presets.dart` 同基线。
 
-use rinadown_ui_theme::active_theme;
 use gpui::{
     App, AppContext as _, Entity, IntoElement as _, ParentElement, SharedString, Styled,
     Subscription, Window, px,
@@ -10,6 +9,7 @@ use gpui_component::{
     setting::SettingField,
     v_flex,
 };
+use rinadown_ui_theme::active_theme;
 
 use super::SectionContext;
 

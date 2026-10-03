@@ -1,14 +1,14 @@
 //! 自定义分类：模型（与 `lib/src/models/custom_category.dart` 同 JSON 形状）与列表分区。
 
-use rinadown_ui_components::{ButtonVariant, button};
-use rinadown_ui_i18n::Translator;
-use rinadown_ui_theme::active_theme;
 use gpui::{App, Context, IntoElement as _, ParentElement, SharedString, Styled, div, px};
 use gpui_component::{
     Icon, h_flex,
     setting::{SettingGroup, SettingItem},
     v_flex,
 };
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_i18n::Translator;
+use rinadown_ui_theme::active_theme;
 use serde::{Deserialize, Serialize};
 
 use super::{SectionContext, category_dialog};

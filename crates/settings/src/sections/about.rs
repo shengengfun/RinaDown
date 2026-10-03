@@ -1,14 +1,14 @@
 //! 关于：版本、软件更新、日志导出、浏览器扩展与捐赠链接。
 
-use rinadown_protocol::method;
-use rinadown_ui_components::{ButtonVariant, button};
-use rinadown_ui_theme::active_theme;
 use gpui::{App, IntoElement as _, ParentElement, SharedString, Styled, div};
 use gpui_component::{
     Icon, IconName, h_flex,
     setting::{SettingField, SettingGroup, SettingItem, SettingPage},
     v_flex,
 };
+use rinadown_protocol::method;
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_theme::active_theme;
 use serde_json::json;
 
 use super::SectionContext;

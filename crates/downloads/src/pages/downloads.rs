@@ -15,7 +15,6 @@ use crate::{
     pages::new_download::{NewDownloadContext, NewDownloadQueue, NewDownloadSubmission},
     strings::DownloadStrings,
 };
-use rinadown_ui_i18n::Translator;
 use gpui::{
     App, AppContext as _, Context, Entity, IntoElement, KeyBinding, ParentElement, Render,
     SharedString, Styled, Window, actions, div, px,
@@ -24,6 +23,7 @@ use gpui_component::{
     ResizableState, h_resizable, resizable_panel,
     table::{TableEvent, TableState},
 };
+use rinadown_ui_i18n::Translator;
 
 actions!(downloads, [SelectAllTasks]);
 

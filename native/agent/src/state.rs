@@ -3,10 +3,10 @@
 use std::fs::{File, OpenOptions};
 use std::path::{Path, PathBuf};
 
+use fs2::FileExt;
 use rinadown_protocol::{
     AgentPreferencesDto, AgentSessionDto, GatewayStatusDto, RemoteTaskDto, SyncStatusDto,
 };
-use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;

@@ -6,8 +6,6 @@ mod pages;
 
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use rinadown_protocol::{AgentSnapshot, ApplicationErrorCode, RpcErrorData, ServiceEvent};
-use rinadown_ui_i18n::Translator;
 use gpui::{
     Context, Entity, IntoElement, ParentElement, Render, Styled, Window, div,
     prelude::FluentBuilder as _,
@@ -18,6 +16,8 @@ use gpui_component::{
     tab::{Tab, TabBar},
     v_flex,
 };
+use rinadown_protocol::{AgentSnapshot, ApplicationErrorCode, RpcErrorData, ServiceEvent};
+use rinadown_ui_i18n::Translator;
 
 use controller::{COMPONENT_KINDS, component_slot};
 pub use controller::{ExtensionsController, ExtensionsSignal};

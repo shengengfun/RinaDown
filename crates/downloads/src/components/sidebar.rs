@@ -1,5 +1,3 @@
-use rinadown_ui_components::sidebar_navigation_button;
-use rinadown_ui_theme::active_theme;
 use gpui::{
     App, Context, Div, FontWeight, InteractiveElement as _, IntoElement, ParentElement,
     SharedString, StatefulInteractiveElement as _, Styled, Window, div, percentage,
@@ -9,6 +7,8 @@ use gpui_component::{
     ActiveTheme as _, Icon, IconName, animation::ease_in_out_cubic, h_flex,
     scroll::ScrollableElement as _, v_flex,
 };
+use rinadown_ui_components::sidebar_navigation_button;
+use rinadown_ui_theme::active_theme;
 
 use crate::{
     model::{

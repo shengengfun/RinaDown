@@ -26,8 +26,8 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use rinadown_engine::selection::{HostSelection, SelectionOutcome};
 use hub::rinf_selection::RinfHostSelection;
+use rinadown_engine::selection::{HostSelection, SelectionOutcome};
 
 /// (a) An answer delivered *within* the timeout window must win, regardless
 /// of how short the timeout is -- arriving in time is what matters, not the

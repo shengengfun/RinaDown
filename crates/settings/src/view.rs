@@ -1,12 +1,12 @@
 //! 设置窗口内容：左侧分类 + 搜索 + 右侧分区（gpui-component `Settings` DSL）。
 
-use rinadown_ui_i18n::Translator;
-use rinadown_ui_theme::active_theme;
 use gpui::{
     AnyView, Context, Entity, IntoElement, ParentElement, Render, SharedString, Styled, Window,
     div, prelude::FluentBuilder as _, px,
 };
 use gpui_component::{Sizable as _, group_box::GroupBoxVariant, setting::Settings, v_flex};
+use rinadown_ui_i18n::Translator;
+use rinadown_ui_theme::active_theme;
 
 use crate::sections::{
     self, SectionContext, about, api, appearance, bt, doctor, download, ed2k, general, notify,

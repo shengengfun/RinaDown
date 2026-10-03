@@ -1,7 +1,5 @@
 use std::{cmp::Ordering, collections::HashSet};
 
-use rinadown_ui_components::toolbar_action_button;
-use rinadown_ui_theme::active_theme;
 use gpui::{
     AnyElement, App, AppContext as _, ClickEvent, Context, Div, InteractiveElement as _,
     IntoElement, Modifiers, MouseButton, ParentElement, Render, SharedString, Stateful,
@@ -19,6 +17,8 @@ use gpui_component::{
     tooltip::Tooltip,
     v_flex,
 };
+use rinadown_ui_components::toolbar_action_button;
+use rinadown_ui_theme::active_theme;
 
 use crate::{
     controller::DownloadsCommand,

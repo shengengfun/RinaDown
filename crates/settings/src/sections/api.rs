@@ -1,8 +1,5 @@
 //! API 服务：本机网关的功能开关、端口、访问令牌与 LAN 暴露。
 
-use rinadown_protocol::GatewayPatchParams;
-use rinadown_ui_components::{ButtonVariant, button};
-use rinadown_ui_theme::active_theme;
 use gpui::{
     App, AppContext as _, ClipboardItem, Entity, ParentElement, SharedString, Styled, Window, div,
     px,
@@ -13,6 +10,9 @@ use gpui_component::{
     setting::{SettingField, SettingGroup, SettingPage},
     v_flex,
 };
+use rinadown_protocol::GatewayPatchParams;
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_theme::active_theme;
 
 use super::SectionContext;
 

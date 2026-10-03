@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::time::Duration;
 
+use gpui::{Context, SharedString};
 use rinadown_protocol::{
     AgentEvent, AgentPreferencesDto, AgentSnapshot, ApplicationErrorCode, ComponentStatusDto,
     ConnPolicySummaryDto, DaemonConfigPatch, DaemonConfigSnapshot, DaemonEvent,
@@ -14,7 +15,6 @@ use rinadown_protocol::{
     UpdateCheckResultDto, WebhookDeliveryDto, method, setting_spec, setting_value_kind,
     value_to_daemon_config,
 };
-use gpui::{Context, SharedString};
 use serde_json::{Value, json};
 
 use crate::port::{PortFuture, SettingsPort};

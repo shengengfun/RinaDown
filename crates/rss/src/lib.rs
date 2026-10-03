@@ -2,7 +2,6 @@
 
 use std::{future::Future, pin::Pin, sync::Arc};
 
-use rinadown_ui_i18n::Translator;
 use gpui::{
     AppContext as _, Context, Entity, IntoElement, ParentElement, Render, Styled, Window, div,
     prelude::FluentBuilder as _,
@@ -14,6 +13,7 @@ use gpui_component::{
     input::{Input, InputState},
     v_flex,
 };
+use rinadown_ui_i18n::Translator;
 
 pub type PortFuture<T> =
     Pin<Box<dyn Future<Output = Result<T, rinadown_protocol::RpcErrorData>> + Send + 'static>>;

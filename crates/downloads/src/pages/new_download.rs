@@ -13,9 +13,6 @@ use crate::{
     },
     strings::NewDownloadStrings,
 };
-use rinadown_protocol::CreateTaskRequest;
-use rinadown_ui_i18n::Translator;
-use rinadown_ui_theme::active_theme;
 use gpui::{
     Anchor, App, AppContext as _, ClickEvent, Context, Div, Entity, InteractiveElement as _,
     IntoElement, ParentElement, Pixels, Render, SharedString, StatefulInteractiveElement as _,
@@ -32,6 +29,9 @@ use gpui_component::{
     switch::Switch,
     v_flex,
 };
+use rinadown_protocol::CreateTaskRequest;
+use rinadown_ui_i18n::Translator;
+use rinadown_ui_theme::active_theme;
 
 /// 队列下拉候选（显示名由表单按内置队列本地化）。
 #[derive(Clone, Debug, PartialEq, Eq)]

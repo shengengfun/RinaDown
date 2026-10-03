@@ -4,8 +4,8 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
-use rinadown_protocol::{AgentEvent, DaemonConfigPatch, RpcErrorData};
 use futures_util::StreamExt;
+use rinadown_protocol::{AgentEvent, DaemonConfigPatch, RpcErrorData};
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::sync::{Mutex, Notify};

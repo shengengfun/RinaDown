@@ -10,13 +10,13 @@ use axum::extract::{State, WebSocketUpgrade};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use futures_util::StreamExt;
+use reqwest::Method;
 use rinadown_protocol::method;
 use rinadown_protocol::{
     ApplicationErrorCode, RpcErrorData, RpcErrorObject, RpcNotification, RpcRequest, RpcResponse,
     ServiceHello, ServiceRole, validate_first_request,
 };
-use futures_util::StreamExt;
-use reqwest::Method;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;

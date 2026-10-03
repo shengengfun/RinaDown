@@ -1,5 +1,5 @@
-use rinadown_ui_i18n::{Translator, keys};
 use gpui::SharedString;
+use rinadown_ui_i18n::{Translator, keys};
 
 #[derive(Clone)]
 pub(crate) struct ShellStrings {

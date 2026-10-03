@@ -1,9 +1,6 @@
 //! 分类新增 / 编辑对话框：字段、校验与保存语义与
 //! `lib/src/widgets/category_edit_dialog.dart` 逐条对齐。
 
-use rinadown_ui_components::{ButtonVariant, button};
-use rinadown_ui_i18n::Translator;
-use rinadown_ui_theme::active_theme;
 use gpui::{
     App, AppContext as _, ClickEvent, Context, Div, Entity, InteractiveElement as _, IntoElement,
     ParentElement, Render, SharedString, StatefulInteractiveElement as _, Styled, Window, div,
@@ -17,6 +14,9 @@ use gpui_component::{
     input::{Input, InputState},
     v_flex,
 };
+use rinadown_ui_components::{ButtonVariant, button};
+use rinadown_ui_i18n::Translator;
+use rinadown_ui_theme::active_theme;
 
 use super::categories::{CategoryEntry, read_categories, write_categories};
 use crate::store::SettingsStore;

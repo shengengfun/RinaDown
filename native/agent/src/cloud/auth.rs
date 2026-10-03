@@ -1,7 +1,7 @@
 //! FluxCloud 登录/验证/退出与无令牌本地会话投影。
 
-use rinadown_protocol::{AgentEvent, AgentLoginResult};
 use reqwest::Method;
+use rinadown_protocol::{AgentEvent, AgentLoginResult};
 use serde::Serialize;
 use serde_json::Value;
 

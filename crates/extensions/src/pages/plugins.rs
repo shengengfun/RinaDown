@@ -3,7 +3,6 @@
 
 use std::collections::HashSet;
 
-use rinadown_protocol::{InstalledPlugin, MarketEntryDto, PluginDto};
 use gpui::{
     AppContext as _, Context, Entity, IntoElement, ParentElement, SharedString, Styled, Window,
     div, prelude::FluentBuilder as _, px,
@@ -19,6 +18,7 @@ use gpui_component::{
     tag::Tag,
     v_flex,
 };
+use rinadown_protocol::{InstalledPlugin, MarketEntryDto, PluginDto};
 
 use super::Frame;
 use crate::{

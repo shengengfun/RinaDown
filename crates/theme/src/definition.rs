@@ -407,8 +407,7 @@ mod tests {
 
     #[test]
     fn accent_rewrites_derived_tokens_and_keeps_alpha() {
-        let theme =
-            FluxThemeDefinition::rinadown_default().with_accent(AccentScheme::Lanzhu, 0);
+        let theme = FluxThemeDefinition::rinadown_default().with_accent(AccentScheme::Lanzhu, 0);
         let lanzhu = color(0xF69992);
         for tokens in [&theme.light, &theme.dark] {
             assert_eq!(tokens.colors.primary, lanzhu);
