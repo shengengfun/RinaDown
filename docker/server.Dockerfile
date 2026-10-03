@@ -45,6 +45,11 @@ RUN case "$TARGETARCH" in \
     esac
 COPY Cargo.toml Cargo.lock ./
 COPY native/ native/
+# workspace 里还有 crates/* 成员（GPUI 迁移层）。cargo 解析 workspace 需要每个
+# 成员目录都存在，否则 `cargo build -p rinadown_server` 直接报
+# "failed to load manifest for workspace member /src/crates/*"。此处只需目录存在
+# 即可，不会编译这些成员（只 build rinadown_server）。.dockerignore 的白名单同步放行。
+COPY crates/ crates/
 # Web SPA 在编译期由 native/server/build.rs 嵌入二进制（单文件分发，运行时层
 # 不再有 web/ 目录，也无需 RINADOWN_WEBROOT）。
 COPY --from=web /src/web/dist /webroot

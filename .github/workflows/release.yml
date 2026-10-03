@@ -18,6 +18,10 @@ env:
   SIGNPATH_PROJECT_SLUG: RinaDown
   SIGNPATH_SIGNING_POLICY: test-signing
   SIGNPATH_ARTIFACT_CONFIG: windows-exe-zip
+  # 经 env 中转再在步骤里判断：`secrets` 上下文在步骤 if 中不可用，`env` 可以。
+  # 未配置该 secret 时所有 SignPath 步骤自动跳过（产物不带签名），
+  # 否则整个 Windows 矩阵会在签名步骤直接失败、一个产物都发不出来。
+  SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
 
 jobs:
   # ── 前置 Job: 检测上一个版本 tag → 当前 tag 之间哪些组件目录有变更 ──
@@ -395,6 +399,7 @@ jobs:
           path: build/signing/app/*.exe
 
       - name: Sign app executables (SignPath)
+        if: ${{ env.SIGNPATH_API_TOKEN != '' }}
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -408,6 +413,7 @@ jobs:
           output-artifact-directory: build/signing/app-signed
 
       - name: Replace app executables with signed versions
+        if: ${{ env.SIGNPATH_API_TOKEN != '' }}
         shell: pwsh
         run: |
           Copy-Item "build\signing\app-signed\*.exe" "build\windows\${{ matrix.arch }}\runner\Release\" -Force
@@ -445,6 +451,7 @@ jobs:
           path: build/installer/RinaDown-*.exe
 
       - name: Sign installer (SignPath)
+        if: ${{ env.SIGNPATH_API_TOKEN != '' }}
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -458,6 +465,7 @@ jobs:
           output-artifact-directory: build/signing/installer-signed
 
       - name: Replace installer with signed version
+        if: ${{ env.SIGNPATH_API_TOKEN != '' }}
         shell: pwsh
         run: |
           Copy-Item "build\signing\installer-signed\*.exe" "build\installer\" -Force
@@ -1268,8 +1276,20 @@ jobs:
           java-version: "17"
 
       # ── Android SDK / NDK（Flutter 构建时需要）──
+      # 不再用 android-actions/setup-android@v3：它会去安装 "latest" cmdline-tools，
+      # 在新版 ubuntu-latest 镜像上和预装的 cmdline-tools 版本冲突
+      # （"Wrong version in preinstalled sdkmanager" → `sdkmanager tools` 退出 1，
+      # 整个 job 在 Setup Android SDK 这步就失败）。runner 镜像本就带完整 SDK，
+      # 这里只导出路径 + 接受许可，其余交给 Flutter/Gradle 自行取用。
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          CMDLINE="$(ls -d "$SDK"/cmdline-tools/*/ 2>/dev/null | sort -V | tail -1)"
+          if [ -n "$CMDLINE" ]; then
+            yes | "${CMDLINE}sdkmanager" --licenses > /dev/null 2>&1 || true
+          fi
 
       # ── Rust toolchain + Android 目标三元组（cargokit 编译各 ABI 的 cdylib）──
       - name: Setup Rust toolchain
@@ -1531,7 +1551,7 @@ jobs:
           path: build/signing/unsigned/*.exe
 
       - name: Sign server executable (SignPath)
-        if: runner.os == 'Windows'
+        if: ${{ runner.os == 'Windows' && env.SIGNPATH_API_TOKEN != '' }}
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -1545,6 +1565,7 @@ jobs:
           output-artifact-directory: build/signing/signed
 
       - name: Replace server executable with signed version
+        if: ${{ runner.os == 'Windows' && env.SIGNPATH_API_TOKEN != '' }}
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -1747,7 +1768,7 @@ jobs:
           path: build/signing/unsigned/*.exe
 
       - name: Sign CLI executable (SignPath)
-        if: runner.os == 'Windows'
+        if: ${{ runner.os == 'Windows' && env.SIGNPATH_API_TOKEN != '' }}
         uses: signpath/github-action-submit-signing-request@v2
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
@@ -1761,6 +1782,7 @@ jobs:
           output-artifact-directory: build/signing/signed
 
       - name: Replace CLI executable with signed version
+        if: ${{ runner.os == 'Windows' && env.SIGNPATH_API_TOKEN != '' }}
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
